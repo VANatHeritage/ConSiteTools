@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2020-09-15
-# Last Edit: 2020-03-15
+# Last Edit: 2020-06-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -39,9 +39,9 @@ from PrioritizeConSites import *
 def main():
    ### Set up input variables ###
    # Paths to input and output geodatabases and directories - change these every time
-   in_GDB = r'N:\EssentialConSites\ECS_Run_March2021\ECS_Inputs_March2021.gdb'
-   out_GDB = r'N:\EssentialConSites\ECS_Run_March2021\ECS_Outputs_March2021.gdb'
-   out_DIR = r'N:\EssentialConSites\ECS_Run_March2021\Spreadsheets_March2021' 
+   in_GDB = r'N:\EssentialConSites\ECS_Run_June2021\ECS_Inputs_June2021.gdb'
+   out_GDB = r'N:\EssentialConSites\ECS_Run_June2021\ECS_Outputs_June2021.gdb'
+   out_DIR = r'N:\EssentialConSites\ECS_Run_June2021\Spreadsheets_June2021' 
    
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
