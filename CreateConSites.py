@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2020-07-27
+# Last Edit: 2021-07-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1163,7 +1163,9 @@ def CreateNoBuffSBB(in_PF, out_SBB):
    '''Creates SBBs that are simple copies of PFs for specified subset'''
    try:
       # Process: Select (No-Buffer Rules)
-      selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
+      ## selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
+		## Above selection query replace 7/29/21 
+		selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
       arcpy.MakeFeatureLayer_management(in_PF, "tmpLyr", selQry)
 
       # Count records and proceed accordingly
