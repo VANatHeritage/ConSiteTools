@@ -1241,7 +1241,6 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   arcpy.Buffer_analysis ("tmpPF", "myMinBuffer", minBuff)
 
                # Step 2: Create a maximum buffer around the Procedural Feature
-               printMsg("Creating maximum buffer")
                if myBuff==0:
                   printMsg("Creating reduced maximum buffer")
                   arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", minBuff)
