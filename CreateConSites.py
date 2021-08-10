@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-08-02
+# Last Edit: 2021-08-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1126,7 +1126,7 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
             try:
                BufferFloat = float(BufferString)
             except:
-               BufferFloat = 0
+               BufferFloat = None
          return BufferFloat"""
       arcpy.CalculateField_management(tmp_PF, "fltBuffer", expression2, "PYTHON", codeblock2)
 
@@ -1184,7 +1184,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
    '''Creates standard wetland SBBs from Rule 5, 6, 7, or 9 Procedural Features (PFs). The procedures are the same for all rules, the only difference being the rule-specific inputs.
    
 #     Carries out the following general procedures:
-#     1.  Buffer the PF by 250-m.  This is the minimum buffer.
+#     1.  Buffer the PF by 250-m.  This is the minimum buffer. [Exception: zero buffer overrides.]
 #     2.  Buffer the PF by 500-m.  This is the maximum buffer.
 #     3.  Clip any NWI wetland features to the maximum buffer, then shrinkwrap features.
 #     4.  Select clipped NWI features within 15-m of the PF.
@@ -1215,7 +1215,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
-      with arcpy.da.SearchCursor(sub_PF, [fld_SFID, "SHAPE@"]) as myProcFeats:
+      with arcpy.da.SearchCursor(sub_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
          for myPF in myProcFeats:
          # for each Procedural Feature in the set, do the following...
             try: # Even if one feature fails, script can proceed to next feature
@@ -1223,6 +1223,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                # Extract the unique Source Feature ID and geometry object
                myID = myPF[0]
                myShape = myPF[1]
+               myBuff = myPF[2]
 
                # Add a progress message
                printMsg("\nWorking on feature %s, with SFID = %s" %(str(myIndex), myID))
@@ -1232,13 +1233,21 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                selQry = fld_SFID + " = '%s'" % myID
                arcpy.Select_analysis (in_PF, "tmpPF", selQry)
 
-               # Step 1: Create a minimum buffer around the Procedural Feature
-               printMsg("Creating minimum buffer")
-               arcpy.Buffer_analysis ("tmpPF", "myMinBuffer", minBuff)
+               # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
+               if myBuff==0:
+                  printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
+               else:
+                  printMsg("Creating minimum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMinBuffer", minBuff)
 
                # Step 2: Create a maximum buffer around the Procedural Feature
                printMsg("Creating maximum buffer")
-               arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", maxBuff)
+               if myBuff==0:
+                  printMsg("Creating reduced maximum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", minBuff)
+               else:
+                  printMsg("Creating maximum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", maxBuff)
                
                # Step 3: Clip the NWI to the maximum buffer, and shrinkwrap
                printMsg("Clipping NWI features to maximum buffer and shrinkwrapping...")
@@ -1261,8 +1270,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   arcpy.Buffer_analysis ("NWI_lyr", "nwiBuff", nwiBuff)
 
                   # Step 6: Merge the minimum buffer with the NWI buffer
-                  printMsg("Merging buffered PF with buffered NWI feature(s)...")
-                  feats2merge = ["myMinBuffer", "nwiBuff"]
+                  if myBuff==0:
+                     printMsg("Merging unbuffered PF with buffered NWI feature(s)...")
+                     feats2merge = ["tmpPF", "nwiBuff"]
+                  else:
+                     printMsg("Merging buffered PF with buffered NWI feature(s)...")
+                     feats2merge = ["myMinBuffer", "nwiBuff"]
                   print str(feats2merge)
                   arcpy.Merge_management(feats2merge, "tmpMerged")
 
