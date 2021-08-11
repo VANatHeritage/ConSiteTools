@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-08-09
+# Last Edit: 2021-08-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1114,19 +1114,41 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
 
       # Process: Calculate Field (fltBuffer)
       # Note that code here will have to change if changes are made to buffer standards
-      expression2 = "string2float(!intRule!, !" + fld_Buff + "!)"
+      expression2 = "string2float(!intRule!, !%s!)"%fld_Buff
       codeblock2 = """def string2float(RuleInteger, BufferString):
-         if RuleInteger == 1:
-            BufferFloat = 150
-         elif RuleInteger in (2,3,4,8,14):
-            BufferFloat = 250
-         elif RuleInteger in (11,12):
-            BufferFloat = 450
-         else:
-            try:
-               BufferFloat = float(BufferString)
-            except:
-               BufferFloat = None
+         try:
+            BufferFloat = float(BufferString)
+            # Converts text field to number
+         except:
+            printErr("There is a non-numeric value in the Buffer field") 
+            # Raises an error, aborting calculations
+               
+         if BufferFloat == 0:
+            pass 
+            # If zero buffer was entered, it overrides anything else
+         elif RuleInteger in (-1,13):
+            pass 
+            # If variable-buffer rule 13 or AHZ (-1), entered buffer is assumed correct
+         elif RuleInteger == 10:
+            if BufferFloat in (150, 500):
+               pass 
+               # If one of permissible buffer values for rule 10 is entered, assumed correct
+            else:
+               printErr("Buffer distance is invalid for rule 10") 
+               # Raises an error, aborting calculations
+         else: 
+            # For remaining rules without zero buffer, standard buffers are used regardless of what user entered
+            if RuleInteger == 1:
+               BufferFloat = 150
+            elif RuleInteger in (2,3,4,8,14):
+               BufferFloat = 250
+            elif RuleInteger in (11,12):
+               BufferFloat = 405
+            elif RuleInteger == 15:
+               BufferFloat = 0
+            else: 
+               BufferFloat = None 
+               # Sets buffer field to null for wetland rules 5,6,7,9
          return BufferFloat"""
       arcpy.CalculateField_management(tmp_PF, "fltBuffer", expression2, "PYTHON", codeblock2)
 
