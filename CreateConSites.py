@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-08-10
+# Last Edit: 2021-08-12
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1116,28 +1116,25 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
       # Note that code here will have to change if changes are made to buffer standards
       expression2 = "string2float(!intRule!, !%s!)"%fld_Buff
       codeblock2 = """def string2float(RuleInteger, BufferString):
-         try:
-            BufferFloat = float(BufferString)
-            # Converts text field to number
-         except:
-            printErr("There is a non-numeric value in the Buffer field") 
-            # Raises an error, aborting calculations
-               
-         if BufferFloat == 0:
-            pass 
-            # If zero buffer was entered, it overrides anything else
-         elif RuleInteger in (-1,13):
-            pass 
-            # If variable-buffer rule 13 or AHZ (-1), entered buffer is assumed correct
+         if RuleInteger == -1:
+            if not BufferString:
+               BufferFloat = 0
+               # Assuming that if no buffer value was entered, it should be zero
+            else:
+               BufferFloat = float(BufferString)
+         elif RuleInteger == 13:
+            BufferFloat = float(BufferString) 
+            # If variable-buffer rule 13, entered buffer is assumed correct
          elif RuleInteger == 10:
-            if BufferFloat in (150, 500):
-               pass 
+            if BufferString in ("0", "150", "500"):
+               BufferFloat = float(BufferString) 
                # If one of permissible buffer values for rule 10 is entered, assumed correct
             else:
-               printErr("Buffer distance is invalid for rule 10") 
-               # Raises an error, aborting calculations
+               BufferFloat = None
+               arcpy.AddWarning("Buffer distance is invalid for rule 10") 
+               # Sets buffer to null and prints a warning
          else: 
-            # For remaining rules without zero buffer, standard buffers are used regardless of what user entered
+            # For remaining rules, standard buffers are used regardless of what user entered
             if RuleInteger == 1:
                BufferFloat = 150
             elif RuleInteger in (2,3,4,8,14):
@@ -1149,6 +1146,11 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
             else: 
                BufferFloat = None 
                # Sets buffer field to null for wetland rules 5,6,7,9
+
+         if BufferString == "0":
+            BufferFloat = 0 
+            # If zero buffer was entered, it overrides anything else
+
          return BufferFloat"""
       arcpy.CalculateField_management(tmp_PF, "fltBuffer", expression2, "PYTHON", codeblock2)
 
@@ -1311,9 +1313,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   # Use the clipped, combined feature geometry as the final shape
                   myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
                else:
-                  # Use the simple minimum buffer as the final shape
+                  # Use the simple minimum buffer or the PF as the final shape
                   printMsg("No NWI features found within specified search distance")
-                  myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
+                  if myBuff==0:
+                     myFinalShape = arcpy.SearchCursor("tmpPF").next().Shape
+                  else:
+                     myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
 
                # Update the PF shape
                myCurrentPF_rows = arcpy.UpdateCursor("tmpPF", "", "", "Shape", "")
