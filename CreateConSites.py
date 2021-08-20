@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-08-12
+# Last Edit: 2021-08-20
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1115,19 +1115,19 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
       # Process: Calculate Field (fltBuffer)
       # Note that code here will have to change if changes are made to buffer standards
       expression2 = "string2float(!intRule!, !%s!)"%fld_Buff
-      codeblock2 = """def string2float(RuleInteger, BufferString):
+      codeblock2 = """def string2float(RuleInteger, origBuff):
          if RuleInteger == -1:
-            if not BufferString:
+            if not origBuff:
                BufferFloat = 0
                # Assuming that if no buffer value was entered, it should be zero
             else:
-               BufferFloat = float(BufferString)
+               BufferFloat = float(origBuff)
          elif RuleInteger == 13:
-            BufferFloat = float(BufferString) 
+            BufferFloat = float(origBuff) 
             # If variable-buffer rule 13, entered buffer is assumed correct
          elif RuleInteger == 10:
-            if BufferString in ("0", "150", "500"):
-               BufferFloat = float(BufferString) 
+            if origBuff in (0, 150, 500):
+               BufferFloat = float(origBuff) 
                # If one of permissible buffer values for rule 10 is entered, assumed correct
             else:
                BufferFloat = None
@@ -1147,7 +1147,7 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
                BufferFloat = None 
                # Sets buffer field to null for wetland rules 5,6,7,9
 
-         if BufferString == "0":
+         if origBuff == 0:
             BufferFloat = 0 
             # If zero buffer was entered, it overrides anything else
 

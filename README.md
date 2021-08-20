@@ -12,6 +12,13 @@ Additional notes:
 - Helper functions for reprojecting an input dataset to match a template dataset have been added/updated.
 - A new function for producing a raster representing "flow buffers" has been added.
 
+#### Version 1.1.1:
+Unchanged from previous version except:
+- updated to allow user-entered zero buffer to override standard buffers, for any SBB rule
+- updated to handle buffer values coming in numeric or string format
+- corrected error in how nulls were being handled in the SBB buffer field
+- corrected an error in the standard buffer distance for rules 11-12 (405 vs 450)
+
 #### Version 1.1: The delineation process for Terrestrial Conservation Sites and Anthropogenic Habitat Zones remains unchanged from previous version, except for a slight modification of the shrinkwrap function to correct an anomaly that can arise when the SBB is the same as the PF. 
 In addition, this version incorporates the following changes:
 - Added tools for delineating Stream Conservation Units
