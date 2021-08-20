@@ -1126,9 +1126,9 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
             BufferFloat = float(origBuff) 
             # If variable-buffer rule 13, entered buffer is assumed correct
          elif RuleInteger == 10:
-            if origBuff in (0, 150, 500):
+            if origBuff in (0, 150, 500, "0", "150", "500"):
                BufferFloat = float(origBuff) 
-               # If one of permissible buffer values for rule 10 is entered, assumed correct
+               # If one of permissible buffer values for rule 10 is entered, assumed correct; covering cases for numeric or string entries
             else:
                BufferFloat = None
                arcpy.AddWarning("Buffer distance is invalid for rule 10") 
@@ -1147,9 +1147,9 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
                BufferFloat = None 
                # Sets buffer field to null for wetland rules 5,6,7,9
 
-         if origBuff == 0:
+         if origBuff in (0, "0"):
             BufferFloat = 0 
-            # If zero buffer was entered, it overrides anything else
+            # If zero buffer was entered, whether string or numeric, it overrides anything else
 
          return BufferFloat"""
       arcpy.CalculateField_management(tmp_PF, "fltBuffer", expression2, "PYTHON", codeblock2)
