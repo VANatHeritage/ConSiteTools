@@ -2,7 +2,7 @@
 # CreateSBBs.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-01-29
-# Last Edit: 2018-03-09
+# Last Edit: 2021-08-30
 # Creator:  Kirsten R. Hazler
 #
 # Summary:
@@ -51,19 +51,43 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
 
       # Process: Calculate Field (fltBuffer)
       # Note that code here will have to change if changes are made to buffer standards
-      expression2 = "string2float(!intRule!, !" + fld_Buff + "!)"
-      codeblock2 = """def string2float(RuleInteger, BufferString):
-         if RuleInteger == 1:
-            BufferFloat = 150
-         elif RuleInteger in (2,3,4,8,14):
-            BufferFloat = 250
-         elif RuleInteger in (11,12):
-            BufferFloat = 450
-         else:
-            try:
-               BufferFloat = float(BufferString)
-            except:
+      expression2 = "string2float(!intRule!, !%s!)"%fld_Buff
+      codeblock2 = """def string2float(RuleInteger, origBuff):
+         if RuleInteger == -1:
+            if not origBuff:
                BufferFloat = 0
+               # Assuming that if no buffer value was entered, it should be zero
+            else:
+               BufferFloat = float(origBuff)
+         elif RuleInteger == 13:
+            BufferFloat = float(origBuff) 
+            # If variable-buffer rule 13, entered buffer is assumed correct
+         elif RuleInteger == 10:
+            if origBuff in (0, 150, 500, "0", "150", "500"):
+               BufferFloat = float(origBuff) 
+               # If one of permissible buffer values for rule 10 is entered, assumed correct; covering cases for numeric or string entries
+            else:
+               BufferFloat = None
+               arcpy.AddWarning("Buffer distance is invalid for rule 10") 
+               # Sets buffer to null and prints a warning
+         else: 
+            # For remaining rules, standard buffers are used regardless of what user entered
+            if RuleInteger == 1:
+               BufferFloat = 150
+            elif RuleInteger in (2,3,4,8,14):
+               BufferFloat = 250
+            elif RuleInteger in (11,12):
+               BufferFloat = 405
+            elif RuleInteger == 15:
+               BufferFloat = 0
+            else: 
+               BufferFloat = None 
+               # Sets buffer field to null for wetland rules 5,6,7,9
+
+         if origBuff in (0, "0"):
+            BufferFloat = 0 
+            # If zero buffer was entered, whether string or numeric, it overrides anything else
+
          return BufferFloat"""
       arcpy.CalculateField_management(tmp_PF, "fltBuffer", expression2, "PYTHON", codeblock2)
 
@@ -72,7 +96,7 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
       arcpy.AddError('Unable to complete intitial pre-processing necessary for all further steps.')
       tback()
       quit()
-
+      
 def CreateStandardSBB(in_PF, out_SBB, scratchGDB = "in_memory"):
    '''Creates standard buffer SBBs for specified subset of PFs'''
    try:
@@ -100,7 +124,9 @@ def CreateNoBuffSBB(in_PF, out_SBB):
    '''Creates SBBs that are simple copies of PFs for specified subset'''
    try:
       # Process: Select (No-Buffer Rules)
-      selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
+      ## selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
+      ## Above selection query replaced 7/29/21 
+      selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
       arcpy.MakeFeatureLayer_management(in_PF, "tmpLyr", selQry)
 
       # Count records and proceed accordingly
@@ -119,7 +145,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
    '''Creates standard wetland SBBs from Rule 5, 6, 7, or 9 Procedural Features (PFs). The procedures are the same for all rules, the only difference being the rule-specific inputs.
    
 #     Carries out the following general procedures:
-#     1.  Buffer the PF by 250-m.  This is the minimum buffer.
+#     1.  Buffer the PF by 250-m.  This is the minimum buffer. [Exception: zero buffer overrides.]
 #     2.  Buffer the PF by 500-m.  This is the maximum buffer.
 #     3.  Clip any NWI wetland features to the maximum buffer, then shrinkwrap features.
 #     4.  Select clipped NWI features within 15-m of the PF.
@@ -150,7 +176,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
-      with arcpy.da.SearchCursor(sub_PF, [fld_SFID, "SHAPE@"]) as myProcFeats:
+      with arcpy.da.SearchCursor(sub_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
          for myPF in myProcFeats:
          # for each Procedural Feature in the set, do the following...
             try: # Even if one feature fails, script can proceed to next feature
@@ -158,6 +184,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                # Extract the unique Source Feature ID and geometry object
                myID = myPF[0]
                myShape = myPF[1]
+               myBuff = myPF[2]
 
                # Add a progress message
                printMsg("\nWorking on feature %s, with SFID = %s" %(str(myIndex), myID))
@@ -167,13 +194,20 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                selQry = fld_SFID + " = '%s'" % myID
                arcpy.Select_analysis (in_PF, "tmpPF", selQry)
 
-               # Step 1: Create a minimum buffer around the Procedural Feature
-               printMsg("Creating minimum buffer")
-               arcpy.Buffer_analysis ("tmpPF", "myMinBuffer", minBuff)
+               # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
+               if myBuff==0:
+                  printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
+               else:
+                  printMsg("Creating minimum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMinBuffer", minBuff)
 
                # Step 2: Create a maximum buffer around the Procedural Feature
-               printMsg("Creating maximum buffer")
-               arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", maxBuff)
+               if myBuff==0:
+                  printMsg("Creating reduced maximum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", minBuff)
+               else:
+                  printMsg("Creating maximum buffer")
+                  arcpy.Buffer_analysis ("tmpPF", "myMaxBuffer", maxBuff)
                
                # Step 3: Clip the NWI to the maximum buffer, and shrinkwrap
                printMsg("Clipping NWI features to maximum buffer and shrinkwrapping...")
@@ -196,8 +230,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   arcpy.Buffer_analysis ("NWI_lyr", "nwiBuff", nwiBuff)
 
                   # Step 6: Merge the minimum buffer with the NWI buffer
-                  printMsg("Merging buffered PF with buffered NWI feature(s)...")
-                  feats2merge = ["myMinBuffer", "nwiBuff"]
+                  if myBuff==0:
+                     printMsg("Merging unbuffered PF with buffered NWI feature(s)...")
+                     feats2merge = ["tmpPF", "nwiBuff"]
+                  else:
+                     printMsg("Merging buffered PF with buffered NWI feature(s)...")
+                     feats2merge = ["myMinBuffer", "nwiBuff"]
                   print str(feats2merge)
                   arcpy.Merge_management(feats2merge, "tmpMerged")
 
@@ -212,9 +250,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   # Use the clipped, combined feature geometry as the final shape
                   myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
                else:
-                  # Use the simple minimum buffer as the final shape
+                  # Use the simple minimum buffer or the PF as the final shape
                   printMsg("No NWI features found within specified search distance")
-                  myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
+                  if myBuff==0:
+                     myFinalShape = arcpy.SearchCursor("tmpPF").next().Shape
+                  else:
+                     myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
 
                # Update the PF shape
                myCurrentPF_rows = arcpy.UpdateCursor("tmpPF", "", "", "Shape", "")
@@ -263,7 +304,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
          printWrng("Processing failed for the following features: " + str(myFailList))
    else:
       printMsg('There are no PFs with this rule; passing...')
-      
+
 def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, out_SBB, scratchGDB = "in_memory"):
    '''Creates SBBs for all input PFs, subsetting and applying rules as needed.
    Usage Notes:  
@@ -361,7 +402,7 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, 
    printMsg("Processing complete. Total elapsed time: %s" %deltaString)
    
    return out_SBB
-
+ 
 def ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchGDB = "in_memory"):
    '''Expands SBBs by adding core area.'''
    
