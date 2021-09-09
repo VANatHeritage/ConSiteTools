@@ -27,7 +27,7 @@ def main():
    out_GDB = r"N:\ProProjects\ConSites\ConSites.gdb"
    scsPts = out_GDB + os.sep + "scsPts"
    scsLines = out_GDB + os.sep + "scsLines"
-   scsSites_3k5c150 = out_GDB + os.sep + "scsSites"
+   scsSites = out_GDB + os.sep + "scsSites_3k5c150"
 
    ### Set up delineation parameters
    upDist = 3000
