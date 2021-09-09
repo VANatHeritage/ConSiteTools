@@ -21,7 +21,7 @@ def main():
    ### Set up basic input and output variables
    in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet\HydroNet_ND"
    in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
-   FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
+   in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
    
    in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
    out_GDB = r"N:\ProProjects\ConSites\ConSites.gdb"
