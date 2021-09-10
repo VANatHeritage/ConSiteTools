@@ -24,6 +24,7 @@ def main():
    in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
    
    in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
+   in_SCS = r"N:\ConSites_delin\Biotics.gdb\csStream"
    out_GDB = r"N:\ProProjects\ConSites\ConSites.gdb"
    scsPts = out_GDB + os.sep + "scsPts"
    scsLines = out_GDB + os.sep + "scsLines"
@@ -73,7 +74,7 @@ def main():
    printMsg("Starting DelinSite_scs function.")
    tStart = datetime.now()
    
-   DelinSite_scs(scsLines, in_Catch, in_hydroNet, scsSites, in_FlowBuff, "true", buffDist)
+   DelinSite_scs(scsLines, in_Catch, in_hydroNet, in_SCS, scsSites, in_FlowBuff, "true", buffDist)
 
    tEnd = datetime.now()
    ds = GetElapsedTime (tStart, tEnd)

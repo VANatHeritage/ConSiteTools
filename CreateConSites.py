@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-08-20
+# Last Edit: 2021-09-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1650,8 +1650,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    arcpy.MakeFeatureLayer_management(openWater, "Hydro_lyr")
    sub_Hydro = "Hydro_lyr"
    
-   # Process:  Create Feature Classes (to store ConSites)
-   printMsg("Creating ConSites features class to store output features...")
+   # Process:  Create Feature Class (to store ConSites)
+   printMsg("Creating ConSites feature class to store output features...")
    arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
 
    ### End data prep
@@ -1985,6 +1985,9 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
 
 def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
+   
+   POSSIBLE TO-DO:  Attribute points to indicate if they are tidal or not
+   
    Parameters:
    - in_hydroNet = Input hydrological network dataset
    - in_Catch = Input catchments from NHDPlus
@@ -2050,6 +2053,9 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    
 def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_Scratch = arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream and downstream service layers, and combines network segments to create linear SCUs.
+   
+   POSSIBLE TO-DO: For tidal points, run network and equal distance up and down
+   
    Parameters:
    - out_Lines = Output lines representing Stream Conservation Units
    - in_PF = Input Procedural Features
@@ -2234,7 +2240,7 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    
    return out_Buffers
 
-def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, out_Polys, in_FlowBuff, trim = "true", buffDist = 250, out_Scratch = "in_memory"):
+def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, trim = "true", buffDist = 250, out_Scratch = "in_memory"):
    """Creates Stream Conservation Sites.
    
    STILL TO DO: Need to use existing SCS as template; append final results to blank template.
@@ -2243,7 +2249,8 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, out_Polys, in_FlowBuff, trim 
    - in_Lines: Input SCU lines, generated as output from CreateLines_scu function
    - in_Catch: Input catchments from NHDPlus
    - in_hydroNet: Input hydrological network dataset
-   - out_Polys: Output polygons representing partial watersheds draining to the SCU lines
+   - in_ConSites: feature class representing current Stream Conservation Sites (or, a template feature class)
+   - out_ConSites: the output feature class representing updated Stream Conservation Sites
    - in_FlowBuff: Input raster where the flow distances shorter than a specified truncation distance are coded 1; output from the prepFlowBuff function. Ignored if trim = "false", in which case "None" can be entered.
    - trim: Indicates whether sites should be restricted to buffers ("true"; default) or encompass entire catchments ("false")
    - buffDist: Buffer distance used to make clipping buffers
@@ -2252,6 +2259,16 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, out_Polys, in_FlowBuff, trim 
    
    # timestamp
    t0 = datetime.now()
+   
+   # Declare path/name of output data and workspace
+   drive, path = os.path.splitdrive(out_ConSites) 
+   path, filename = os.path.split(path)
+   myWorkspace = drive + path
+   Output_CS_fname = filename
+   
+   # Process:  Create Feature Class (to store ConSites)
+   printMsg("Creating ConSites feature class to store output features...")
+   arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
 
    # Select catchments intersecting scuLines
    printMsg("Selecting catchments containing SCU lines...")
@@ -2336,12 +2353,12 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, out_Polys, in_FlowBuff, trim 
    arcpy. EliminatePolygonPart_management (in_Polys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
    
    # Reproject final shapes, if necessary
-   finPolys = ProjectToMatch_vec(fillPolys, in_Catch, out_Polys, copy = 1)
+   finPolys = ProjectToMatch_vec(fillPolys, in_Catch, out_ConSites, copy = 1)
    
    # # Coalesce to create final sites - 
    # # This takes forever! Like 9 hours. Don't include unless committee really wants it
    # printMsg("Coalescing...")
-   # Coalesce(fillPolys, 10, out_Polys)
+   # Coalesce(fillPolys, 10, out_ConSites)
    
    # timestamp
    t1 = datetime.now()
