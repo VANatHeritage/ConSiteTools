@@ -12,7 +12,7 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 - Additional notes:
    - Site priorities from the ECS process were first added to Biotics for the March 2020 quarterly update, and the ECS process remains stable since that time. 
    - Functions have been consolidated into fewer scripts, and files cleaned up/deleted as needed. (This was a MAJOR overhaul.)
-   - A new workflow script was created to facilitate delineation of all site types from within the Python IDE, without using the toolbox.
+   - New workflow scripts were created to facilitate delineation and prioritization of sites from within the Python IDE, without using the toolbox.
    - Helper functions for reprojecting an input dataset to match a template dataset have been added/updated.
    - A new function for producing a raster representing "flow buffers" has been added.
 
