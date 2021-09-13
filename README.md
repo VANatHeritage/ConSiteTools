@@ -2,6 +2,14 @@
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
 ### Toolbox Version Notes (last updated by K. Hazler, 2021-09-10):
+#### Version 1.3
+- The Conservation Site delineation process for Terrestrial Conservation Sites and Anthropogenic Habitat Zones remains unchanged from previous version.
+
+- The prioritization process for Essential Conservation Sites remains unchanged from previous version.
+
+- Working on updates to the delineation process for Stream Conservation Sites...
+
+
 #### Version 1.2 
 - The Conservation Site delineation process for Terrestrial Conservation Sites and Anthropogenic Habitat Zones remains unchanged from previous version.
 

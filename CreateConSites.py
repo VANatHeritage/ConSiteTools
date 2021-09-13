@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-09
+# Last Edit: 2021-09-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1986,6 +1986,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
 def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
+   TO-DO: Revise process so points don't get missed in wide-water areas where PFs are very far from flowlines
    POSSIBLE TO-DO:  Attribute points to indicate if they are tidal or not
    
    Parameters:
@@ -2009,10 +2010,6 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
    arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
    
-   # Select catchments intersecting PFs
-   printMsg("Selecting catchments intersecting Procedural Features...")
-   arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", in_PF)
-   
    # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
    printMsg("Buffering Procedural Features...")
    code_block = """def buff(elcode):
@@ -2027,16 +2024,26 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    buff_PF = "in_memory" + os.sep + "buff_PF"
    arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
 
-   # Clip buffered PFs to selected catchments
-   printMsg("Clipping buffered Procedural Features...")
-   clipBuff_PF = "in_memory" + os.sep + "clipBuff_PF"
-   arcpy.Clip_analysis (buff_PF, "lyr_Catchments", clipBuff_PF)
+   # Select catchments intersecting buffered PFs
+   printMsg("Selecting catchments intersecting buffered Procedural Features...")
+   arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", buff_PF)
    
    # Select by location flowlines that intersect selected catchments
    printMsg("Selecting flowlines intersecting selected catchments...")
    arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
    
-   # Clip selected flowlines to clipped, buffered PFs
+   ### Shift buffered PFs to align with primary flowline
+   # Get PF centroid
+   # Get near table: PF centroid vs flowlines (3 nearest)- include location
+   # Join StreamLevel from flowlines to near table
+   # For each centroid:
+   # - get lowest StreamLevel value
+   # - eliminate records with higher StreamLevel values
+   # - determine shortest distance among remaining records; remove all others
+   # Join from/to x/y fields from near table to the buffered PFs
+   # Calculate shift in x/y directions, and shift polygon
+   
+   # Clip selected flowlines to buffered, shifted PFs
    printMsg("Clipping flowlines...")
    clipLines = "in_memory" + os.sep + "clipLines"
    arcpy.Clip_analysis ("lyr_Flowlines", clipBuff_PF, clipLines)
