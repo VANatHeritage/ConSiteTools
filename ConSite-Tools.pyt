@@ -934,7 +934,7 @@ class ntwrkPts_scs(object):
       parm1 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
       parm2 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
       try:
-         parm2.value = "pfSCS"
+         parm2.value = "pfStream"
       except:
          pass
       parm3 = defineParam("out_Points", "Output Network Points", "DEFeatureClass", "Required", "Output", "scuPoints")
@@ -964,7 +964,7 @@ class ntwrkPts_scs(object):
       declareParams(parameters)
       
       # Run the function
-      scsPoints = MakeNetworkPts_scs(in_hydroNet, in_Catch, pfSCS, scsPts)
+      scsPoints = MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points)
       
       return scsPoints
       
