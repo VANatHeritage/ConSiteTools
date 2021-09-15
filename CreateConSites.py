@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-10
+# Last Edit: 2021-09-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1983,7 +1983,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    return (lyrDownTrace, lyrUpTrace)
 
-def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
+def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points, fld_SFID = "SFID"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
    TO-DO: Revise process so points don't get missed in wide-water areas where PFs are very far from flowlines
@@ -1994,6 +1994,7 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    - in_Catch = Input catchments from NHDPlus
    - in_PF = Input Procedural Features
    - out_Points = Output feature class containing points generated from procedural features
+   - fld_SFID = Source Feature ID
    """
    
    # timestamp
@@ -2033,15 +2034,7 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points):
    arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
    
    ### Shift buffered PFs to align with primary flowline
-   # Get PF centroid
-   # Get near table: PF centroid vs flowlines (3 nearest)- include location
-   # Join StreamLevel from flowlines to near table
-   # For each centroid:
-   # - get lowest StreamLevel value
-   # - eliminate records with higher StreamLevel values
-   # - determine shortest distance among remaining records; remove all others
-   # Join from/to x/y fields from near table to the buffered PFs
-   # Calculate shift in x/y directions, and shift polygon
+   shiftAlignToFlow(buff_PF, fld_SFID, "lyr_Flowlines")
    
    # Clip selected flowlines to buffered, shifted PFs
    printMsg("Clipping flowlines...")

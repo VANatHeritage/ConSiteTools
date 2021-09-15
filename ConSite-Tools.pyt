@@ -938,8 +938,9 @@ class ntwrkPts_scs(object):
       except:
          pass
       parm3 = defineParam("out_Points", "Output Network Points", "DEFeatureClass", "Required", "Output", "scuPoints")
+      parm4 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
 
-      parms = [parm0, parm1, parm2, parm3]
+      parms = [parm0, parm1, parm2, parm3, parm4]
       return parms
 
    def isLicensed(self):
