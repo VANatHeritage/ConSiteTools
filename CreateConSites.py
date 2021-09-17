@@ -602,31 +602,31 @@ def prepInclusionZone(in_Zone1, in_Zone2, in_Score, out_Rast, truncVal = 9):
    
 def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", scratchGDB = arcpy.env.scratchWorkspace):
    '''Submits new (typically automated) Conservation Site features to a Quality Control procedure, comparing new to existing (old) shapes  from the previous production cycle. It determines which of the following applies to the new site:
-- N:  Site is new, not corresponding to any old site.
-- I:  Site is identical to an old site.
-- M:  Site is a merger of two or more old sites.
-- S:  Site is one of several that split off from an old site.
-- C:  Site is a combination of merger(s) and split(s)
-- B:  Boundary change only.  Site corresponds directly to an old site, but the boundary has changed to some extent.
+   - N:  Site is new, not corresponding to any old site.
+   - I:  Site is identical to an old site.
+   - M:  Site is a merger of two or more old sites.
+   - S:  Site is one of several that split off from an old site.
+   - C:  Site is a combination of merger(s) and split(s)
+   - B:  Boundary change only.  Site corresponds directly to an old site, but the boundary has changed to some extent.
 
-For the last group of sites (B), determines how much the boundary has changed.  A "PercDiff" field contains the percentage difference in area between old and new shapes.  The area that differs is determined by ArcGIS's Symmetrical Difference tool.  The user specifies a threshold beyond which the difference is deemed "significant".  (I recommend 10% change as the cutoff).
+   For the last group of sites (B), determines how much the boundary has changed.  A "PercDiff" field contains the percentage difference in area between old and new shapes.  The area that differs is determined by ArcGIS's Symmetrical Difference tool.  The user specifies a threshold beyond which the difference is deemed "significant".  (I recommend 10% change as the cutoff).
 
-Finally, adds additional fields for QC purposes, and flags records that should be examined by a human (all N, M, and S sites, plus and B sites with change greater than the threshold).
+   Finally, adds additional fields for QC purposes, and flags records that should be examined by a human (all N, M, and S sites, plus and B sites with change greater than the threshold).
 
-In the output feature class, the output geometry is identical to the input new Conservation Sites features, but attributes have been added for QC purposes.  The addeded attributes are as follows:
-- ModType:  Text field indicating how the site has been modified, relative to existing old sites.  Values are "N". "M", "S", "I", or "B" as described above.
-- PercDiff:  Numeric field indicating the percent difference between old and new boundaries, as described above.  Applies only to sites where ModType = "B".
-- AssignID:  Long integer field containing the old SITEID associated with the new site.  This field is automatically populated only for sites where ModType is "B" or "I".  For other sites, the ID should be manually assigned during site review.  Attributes associated with this ID may be transferred, in whole or in part, from the old site to the new site.  
-- Flag:  Short integer field indicating whether the new site needs to be examined by a human (1) or not (0).  All sites where ModType is "N", "M", or "S" are flagged automatically.  Sites where ModType = "B" are flagged if the value in the PercDiff field is greater than the user-specified threshold.
-- Comment:  Text field to be used by site reviewers to enter comments.  Nothing is entered automatically.
+   In the output feature class, the output geometry is identical to the input new Conservation Sites features, but attributes have been added for QC purposes.  The addeded attributes are as follows:
+   - ModType:  Text field indicating how the site has been modified, relative to existing old sites.  Values are "N". "M", "S", "I", or "B" as described above.
+   - PercDiff:  Numeric field indicating the percent difference between old and new boundaries, as described above.  Applies only to sites where ModType = "B".
+   - AssignID:  Long integer field containing the old SITEID associated with the new site.  This field is automatically populated only for sites where ModType is "B" or "I".  For other sites, the ID should be manually assigned during site review.  Attributes associated with this ID may be transferred, in whole or in part, from the old site to the new site.  
+   - Flag:  Short integer field indicating whether the new site needs to be examined by a human (1) or not (0).  All sites where ModType is "N", "M", or "S" are flagged automatically.  Sites where ModType = "B" are flagged if the value in the PercDiff field is greater than the user-specified threshold.
+   - Comment:  Text field to be used by site reviewers to enter comments.  Nothing is entered automatically.
 
-User inputs:
-- auto_CS: new (typically automated) Conservation Site feature class
-- orig_CS: old Conservation Site feature class for comparison (the one currently in Biotics)
-- cutVal: a cutoff percentage that will be used to flag features that represent significant boundary growth or reduction(e.g., 10%)
-- out_Sites: output new Conservation Sites feature class with QC information
-- fld_SiteID: the unique site ID field in the old CS feature class
-- scratchGDB: scratch geodatabase for intermediate products'''
+   User inputs:
+   - auto_CS: new (typically automated) Conservation Site feature class
+   - orig_CS: old Conservation Site feature class for comparison (the one currently in Biotics)
+   - cutVal: a cutoff percentage that will be used to flag features that represent significant boundary growth or reduction(e.g., 10%)
+   - out_Sites: output new Conservation Sites feature class with QC information
+   - fld_SiteID: the unique site ID field in the old CS feature class
+   - scratchGDB: scratch geodatabase for intermediate products'''
 
    # Determine how many old sites are overlapped by each automated site.  Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
@@ -1983,7 +1983,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    return (lyrDownTrace, lyrUpTrace)
 
-def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points, fld_SFID = "SFID"):
+def MakeNetworkPts_scs(in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
    TO-DO: Revise process so points don't get missed in wide-water areas where PFs are very far from flowlines
@@ -2006,9 +2006,16 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points, fld_SFID = "SFI
    nwDataset = descHydro.catalogPath
    catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
    nhdFlowline = catPath + os.sep + "NHDFlowline"
+   nhdArea = catPath + os.sep + "NHDArea"
+   nhdWaterbody = catPath + os.sep + "NHDWaterbody"
+   scratchGDB = arcpy.env.scratchGDB
    
    # Make feature layers  
    arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
+   qry = "FType = 460" # StreamRiver only
+   lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
+   qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
+   lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
    arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
    
    # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
@@ -2025,21 +2032,49 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, out_Points, fld_SFID = "SFI
    buff_PF = "in_memory" + os.sep + "buff_PF"
    arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
 
+   # Make feature layer from buffered PFs
+   lyrPF = arcpy.MakeFeatureLayer_management (buff_PF, "lyr_buffPF")
+   
+   # Select the buffered PFs intersecting StreamRiver polys: new selection
+   lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
+   
+   # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
+   lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
+   
+   # Save out the result: these get the river (wide-water) process
+   riverPFs = scratchGDB + os.sep + "riverPFs"
+   CopyFeatures_management (lyrPF, riverPFs)
+   
+   # Switch selection and save out the result: these get the stream process
+   lyrPF = SelectLayerByAttribute_management (lyrPF, "SWITCH_SELECTION")
+   streamPFs = scratchGDB + os.sep + "streamPFs"
+   CopyFeatures_management (lyrPF, streamPFs)
+   
+   ## Stream process
    # Select catchments intersecting buffered PFs
    printMsg("Selecting catchments intersecting buffered Procedural Features...")
-   arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", buff_PF)
+   arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", streamPFs)
    
    # Select by location flowlines that intersect selected catchments
    printMsg("Selecting flowlines intersecting selected catchments...")
    arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
    
-   ### Shift buffered PFs to align with primary flowline
+   # Shift buffered PFs to align with primary flowline
+   shiftAlignToFlow(streamPFs, fld_SFID, "lyr_Flowlines")
+      
+   ## River process
+   # Select StreamRiver and LakePond polys intersecting buffered PF
+   # Merge selected into single layer
+   # Clip flowlines to merged layer
+   # Shift buffered PFs to align with primary flowline
    shiftAlignToFlow(buff_PF, fld_SFID, "lyr_Flowlines")
+      
+   # Merge shifted, buffered PFs to single layer
    
-   # Clip selected flowlines to buffered, shifted PFs
+   # Clip flowlines to buffered, shifted PFs
    printMsg("Clipping flowlines...")
    clipLines = "in_memory" + os.sep + "clipLines"
-   arcpy.Clip_analysis ("lyr_Flowlines", clipBuff_PF, clipLines)
+   arcpy.Clip_analysis ("lyr_Flowlines", buff_PF, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
    arcpy.FeatureVerticesToPoints_management (clipLines, out_Points, "BOTH_ENDS")

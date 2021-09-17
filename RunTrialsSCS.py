@@ -4,7 +4,7 @@
 # RunTrialsSCS.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2018-11-05
-# Last Edit: 2021-09-09
+# Last Edit: 2021-09-15
 # Creator(s):  Kirsten R. Hazler
 
 # Summary:
@@ -23,10 +23,12 @@ def main():
    in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
    in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
    
-   in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
+   #in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
+   in_PF = r'N:\ProProjects\ConSites\SCS_testing.gdb\testFeats5'
    in_SCS = r"N:\ConSites_delin\Biotics.gdb\csStream"
    out_GDB = r"N:\ProProjects\ConSites\ConSites.gdb"
-   scsPts = out_GDB + os.sep + "scsPts"
+   #scsPts = out_GDB + os.sep + "scsPts"
+   scsPts = r'N:\ProProjects\ConSites\SCS_testing.gdb\scsPts'
    scsLines = out_GDB + os.sep + "scsLines"
    scsSites = out_GDB + os.sep + "scsSites_3k5c150"
 
@@ -50,15 +52,15 @@ def main():
    # ds = GetElapsedTime (tStart, tEnd)
    # printMsg("Time elapsed to create service layers: %s" % ds)
    
-   # # Create points on network
-   # printMsg("Starting MakeNetworkPts_scs function.")
-   # tStart = datetime.now()
+   # Create points on network
+   printMsg("Starting MakeNetworkPts_scs function.")
+   tStart = datetime.now()
    
-   # MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, scsPts)
+   MakeNetworkPts_scs(in_hydroNet, in_Catch, in_PF, scsPts)
    
-   # tEnd = datetime.now()
-   # ds = GetElapsedTime (tStart, tEnd)
-   # # printMsg("Time elapsed to create points: %s" % ds)
+   tEnd = datetime.now()
+   ds = GetElapsedTime (tStart, tEnd)
+   # printMsg("Time elapsed to create points: %s" % ds)
    
    # # Create SCU lines
    # printMsg("Starting CreateLines_scs function.")
@@ -70,11 +72,11 @@ def main():
    # ds = GetElapsedTime (tStart, tEnd)
    # printMsg("Time elapsed to create lines: %s" % ds)
    
-   # Create Stream Conservation Sites   
-   printMsg("Starting DelinSite_scs function.")
-   tStart = datetime.now()
+   # # Create Stream Conservation Sites   
+   # printMsg("Starting DelinSite_scs function.")
+   # tStart = datetime.now()
    
-   DelinSite_scs(scsLines, in_Catch, in_hydroNet, in_SCS, scsSites, in_FlowBuff, "true", buffDist)
+   # DelinSite_scs(scsLines, in_Catch, in_hydroNet, in_SCS, scsSites, in_FlowBuff, "true", buffDist)
 
    tEnd = datetime.now()
    ds = GetElapsedTime (tStart, tEnd)
