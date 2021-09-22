@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-09-15
+# Last Edit: 2021-09-21
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -514,75 +514,150 @@ def clipRasterToPoly(in_Rast, in_Poly, out_Rast):
    
    return out_Rast
    
-def shiftAlignToFlow(inFeats, fldID, inFlowlines, fldLevel = "StreamLeve", scratchGDB = "in_memory"):
+def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel = "StreamLeve", scratchGDB = "in_memory"):
    '''Shifts features to align with flowlines, with preference for primary flowlines over tributaries.
    Incorporates variation on code found here: https://arcpy.wordpress.com/2012/11/15/shifting-features/
    
    Parameters:
-   - inFeats: Input features to be shifted. Features will be modified!
+   - inFeats: Input features to be shifted
+   - outFeats: Output shifted features
    - fldID: Field in inFeats, containing uniques IDs
-   - inFlowlines: Input flowlines; NHDPlus recommended
-   - fldLevel: Field in inFlowlines indicating the stream level; lower values indicate it is the mainstem
-   - scratchGDB: Geodatabase for storing intermediate outputs
+   - in_hydroNet = Input hydrological network dataset, assumed to contain NHDFlowline, NHDArea, and NHDWaterbody
+   - in_Catch = Input catchments from NHDPlus, assumed to correspond with data in in_hydroNet
+   - fldLevel: Field in inFlowlines indicating the stream level; lower values indicate it is the mainstem (assumed "StreamLeve" by default)
+   - scratchGDB: Geodatabase for storing intermediate outputs (assumed in_memory by default
    '''
    
-   # Set minimum StreamLevel field name
+   # Set up some variables
+   descHydro = arcpy.Describe(in_hydroNet)
+   nwDataset = descHydro.catalogPath
+   catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
+   nhdFlowline = catPath + os.sep + "NHDFlowline"
+   nhdArea = catPath + os.sep + "NHDArea"
+   nhdWaterbody = catPath + os.sep + "NHDWaterbody"
    minFld = "MIN_%s"%fldLevel
+   
+   # Make feature layers  
+   lyrFeats = arcpy.MakeFeatureLayer_management (inFeats, "lyr_inFeats")
+   lyrFlowlines = arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
+   lyrCatch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+   
+   qry = "FType = 460" # StreamRiver only
+   lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
+   
+   qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
+   lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
 
-   # Get (pseudo-)centroid of features to be shifted
-   centroids = scratchGDB + os.sep + "centroids"
-   arcpy.FeatureToPoint_management(inFeats, centroids, "INSIDE")
+   # Select the input features intersecting StreamRiver polys: new selection
+   lyrFeats = SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
    
-   # Get near table: distance from centroids to 3 nearest flowlines, including location info
-   # Note: This output cannot be written to memory or it doesn't produce the location info, which is needed
-   nearTab = arcpy.env.scratchGDB + os.sep + "nearTab"
-   arcpy.GenerateNearTable_analysis(centroids, inFlowlines, nearTab, "", "LOCATION", "ANGLE", "ALL", "3", "PLANAR")
+   ### Parse out features to be assigned to stream or river (wide-water) processes
+   # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
+   lyrFeats = SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
    
-   # Join centroid IDs to near table
-   arcpy.JoinField_management(nearTab, "IN_FID", centroids, "OBJECTID", fldID)
+   # Save out the result: these get the river (wide-water) process
+   printMsg("Saving out the features for river (wide-water) process")
+   riverFeats = scratchGDB + os.sep + "riverFeats"
+   CopyFeatures_management (lyrFeats, riverFeats)
    
-   # Join StreamLevel from flowlines to near table
-   arcpy.JoinField_management(nearTab, "NEAR_FID", inFlowlines, "OBJECTID", fldLevel)
+   # Switch selection and save out the result: these get the stream process
+   printMsg("Saving out the PFs for stream process")
+   lyrFeats = SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
+   streamFeats = scratchGDB + os.sep + "streamFeats"
+   CopyFeatures_management (lyrFeats, streamFeats)
    
-   # Get summary statistics to determine lowest StreamLevel value for each centroid; attach to near table
-   sumTab = scratchGDB + os.sep + "sumTab"
-   stats = "%s MIN"%fldLevel
-   arcpy.Statistics_analysis(nearTab, sumTab, stats, "IN_FID")
-   arcpy.JoinField_management(nearTab, "IN_FID", sumTab, "IN_FID", minFld)
+   ### Select the appropriate flowline features to be used for stream or river processes
+   ## Stream process
+   # Select catchments intersecting input features
+   printMsg("Selecting catchments intersecting input features...")
+   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats)
    
-   # Keep only records with lowest StreamLevel values
-   where_clause = "StreamLeve = %s"%minFld
-   arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+   # Clip flowlines to selected catchments
+   printMsg("Clipping flowlines to selected catchments...")
+   streamLines = scratchGDB + os.sep + "streamLines"
+   arcpy.Clip_analysis (lyrFlowlines, lyrCatch, streamLines)
    
-   # Get summary statistics to determine shortest distance among remaining records; attach to near table
-   sumTab2 = scratchGDB + os.sep + "sumTab2"
-   arcpy.Statistics_analysis("nearTab_View", sumTab2, "NEAR_DIST MIN", "IN_FID")
-   arcpy.JoinField_management(nearTab, "IN_FID", sumTab2, "IN_FID", "MIN_NEAR_DIST")
+   ## River process
+   # Select StreamRiver and LakePond polys intersecting input features
+   printMsg("Selecting open water polygons intersecting input features...")
+   lyrStreamRiver = arcpy.SelectLayerByLocation_management (lyrStreamRiver, "INTERSECT", riverFeats)
+   lyrLakePond = arcpy.SelectLayerByLocation_management (lyrLakePond, "INTERSECT", riverFeats)
    
-   # Get final record set
-   where_clause = "StreamLeve = %s AND NEAR_DIST = MIN_NEAR_DIST"%minFld
-   arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+   # Merge selected polygons into single layer
+   printMsg("Merging widewater features...")
+   wideWater = scratchGDB + os.sep + "wideWater"
+   arcpy.Merge_management ([lyrStreamRiver, lyrLakePond], wideWater)
    
-   # Join from/to x,y fields from near table to the input features
-   arcpy.JoinField_management(inFeats, fldID, nearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
+   # Clip flowlines to merged layer
+   printMsg("Clipping flowlines to widewater features...")
+   riverLines = scratchGDB + os.sep + "riverLines"
+   arcpy.Clip_analysis (lyrFlowlines, wideWater, riverLines)
+      
+   # Run alignment separately for stream and river features
+   streamParms = [streamFeats, streamLines, "_stream"]
+   riverParms = [riverFeats, riverLines, "_river"]
+   for parms in [streamParms, riverParms]:
+      inFeats = parms[0]
+      inFlowlines = parms[1]
+      nameTag = parms[2]
+      
+      # Get (pseudo-)centroid of features to be shifted
+      centroids = scratchGDB + os.sep + "centroids%s"%nameTag
+      arcpy.FeatureToPoint_management(inFeats, centroids, "INSIDE")
+      
+      # Get near table: distance from centroids to 3 nearest flowlines, including location info
+      # Note: This output cannot be written to memory or it doesn't produce the location info, which is needed. Why, Arc, why???
+      nearTab = arcpy.env.scratchGDB + os.sep + "nearTab%s"%nameTag
+      arcpy.GenerateNearTable_analysis(centroids, inFlowlines, nearTab, "", "LOCATION", "ANGLE", "ALL", "3", "PLANAR")
+      
+      # Join centroid IDs to near table
+      arcpy.JoinField_management(nearTab, "IN_FID", centroids, "OBJECTID", fldID)
+      
+      # Join StreamLevel from flowlines to near table
+      arcpy.JoinField_management(nearTab, "NEAR_FID", inFlowlines, "OBJECTID", fldLevel)
+      
+      # Get summary statistics to determine lowest StreamLevel value for each centroid; attach to near table
+      sumTab = scratchGDB + os.sep + "sumTab%s"%nameTag
+      stats = "%s MIN"%fldLevel
+      arcpy.Statistics_analysis(nearTab, sumTab, stats, "IN_FID")
+      arcpy.JoinField_management(nearTab, "IN_FID", sumTab, "IN_FID", minFld)
+      
+      # Keep only records with lowest StreamLevel values
+      where_clause = "StreamLeve = %s"%minFld
+      arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+      
+      # Get summary statistics to determine shortest distance among remaining records; attach to near table
+      sumTab2 = scratchGDB + os.sep + "sumTab2%s"%nameTag
+      arcpy.Statistics_analysis("nearTab_View", sumTab2, "NEAR_DIST MIN", "IN_FID")
+      arcpy.JoinField_management(nearTab, "IN_FID", sumTab2, "IN_FID", "MIN_NEAR_DIST")
+      
+      # Get final record set
+      where_clause = "StreamLeve = %s AND NEAR_DIST = MIN_NEAR_DIST"%minFld
+      arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+      
+      # Join from/to x,y fields from near table to the input features
+      arcpy.JoinField_management(inFeats, fldID, nearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
+      
+      # Calculate shift in x/y directions
+      arcpy.AddField_management(inFeats, "DIFF_X", "DOUBLE")
+      arcpy.AddField_management(inFeats, "DIFF_Y", "DOUBLE")
+      arcpy.CalculateField_management(inFeats, "DIFF_X", "!NEAR_X!- !FROM_X!", "PYTHON")
+      arcpy.CalculateField_management(inFeats, "DIFF_Y", "!NEAR_Y!- !FROM_Y!", "PYTHON")
+      
+      # Calculate new position, and shift polygon
+      # Note that (FROM_X, FROM_Y) is not necessarily the same as SHAPE@XY, because the former is a pseudo-centroid forced to be contained by the input feature. If the shape of the feature is strongly curved, the true centroid may not be contained. I'm guessing (but am not 100% sure) that SHAPE@XY is the true centroid. This is why I calculated the shift rather than simply moving SHAPE@XY to (NEAR_X, NEAR_Y).
+      with arcpy.da.UpdateCursor(inFeats, ["SHAPE@XY", "DIFF_X", "DIFF_Y"]) as cursor:
+         for row in cursor:
+            x_shift = row[1]
+            y_shift = row[2]
+            x_old = row[0][0]
+            y_old = row[0][1]
+            x_new = x_old + x_shift
+            y_new = y_old + y_shift
+            row[0] = (x_new, y_new)
+            cursor.updateRow(row)
    
-   # Calculate shift in x/y directions
-   arcpy.AddField_management(inFeats, "DIFF_X", "DOUBLE")
-   arcpy.AddField_management(inFeats, "DIFF_Y", "DOUBLE")
-   arcpy.CalculateField_management(inFeats, "DIFF_X", "!NEAR_X!- !FROM_X!", "PYTHON")
-   arcpy.CalculateField_management(inFeats, "DIFF_Y", "!NEAR_Y!- !FROM_Y!", "PYTHON")
+   # Merge output to a single feature class
+   arcpy.Merge_management ([streamFeats, riverFeats], outFeats)
    
-   # Calculate new position, and shift polygon
-   # Note that (FROM_X, FROM_Y) is not necessarily the same as SHAPE@XY, because the former is a pseudo-centroid forced to be contained by the input feature. If the shape of the feature is strongly curved, the true centroid may not be contained. I'm guessing (but am not 100% sure) that SHAPE@XY is the true centroid. This is why I calculated the shift rather than simply moving SHAPE@XY to (NEAR_X, NEAR_Y).
-   with arcpy.da.UpdateCursor(inFeats, ["SHAPE@XY", "DIFF_X", "DIFF_Y"]) as cursor:
-      for row in cursor:
-         x_shift = row[1]
-         y_shift = row[2]
-         x_old = row[0][0]
-         y_old = row[0][1]
-         x_new = x_old + x_shift
-         y_new = y_old + y_shift
-         row[0] = (x_new, y_new)
-         cursor.updateRow(row)
-   
-   return
+   return outFeats

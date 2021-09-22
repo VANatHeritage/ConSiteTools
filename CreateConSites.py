@@ -1983,16 +1983,16 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    return (lyrDownTrace, lyrUpTrace)
 
-def MakeNetworkPts_scs(in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
+def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
    TO-DO: Revise process so points don't get missed in wide-water areas where PFs are very far from flowlines
    POSSIBLE TO-DO:  Attribute points to indicate if they are tidal or not
    
    Parameters:
+   - in_PF = Input Procedural Features
    - in_hydroNet = Input hydrological network dataset
    - in_Catch = Input catchments from NHDPlus
-   - in_PF = Input Procedural Features
    - out_Points = Output feature class containing points generated from procedural features
    - fld_SFID = Source Feature ID
    """
@@ -2000,23 +2000,22 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
    # timestamp
    t0 = datetime.now()
    
-   # Set up some variables
-   sr = arcpy.Describe(in_PF).spatialReference   
-   descHydro = arcpy.Describe(in_hydroNet)
-   nwDataset = descHydro.catalogPath
-   catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   nhdFlowline = catPath + os.sep + "NHDFlowline"
-   nhdArea = catPath + os.sep + "NHDArea"
-   nhdWaterbody = catPath + os.sep + "NHDWaterbody"
-   scratchGDB = arcpy.env.scratchGDB
+   # # Set up some variables
+   # descHydro = arcpy.Describe(in_hydroNet)
+   # nwDataset = descHydro.catalogPath
+   # catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
+   # nhdFlowline = catPath + os.sep + "NHDFlowline"
+   # nhdArea = catPath + os.sep + "NHDArea"
+   # nhdWaterbody = catPath + os.sep + "NHDWaterbody"
+   # scratchGDB = arcpy.env.scratchGDB
    
-   # Make feature layers  
-   arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
-   qry = "FType = 460" # StreamRiver only
-   lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
-   qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
-   lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
-   arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+   # # Make feature layers  
+   # arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
+   # qry = "FType = 460" # StreamRiver only
+   # lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
+   # qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
+   # lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
+   # arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
    
    # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
    printMsg("Buffering Procedural Features...")
@@ -2032,40 +2031,43 @@ def MakeNetworkPts_scs(in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
    buff_PF = "in_memory" + os.sep + "buff_PF"
    arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
 
-   # Make feature layer from buffered PFs
-   lyrPF = arcpy.MakeFeatureLayer_management (buff_PF, "lyr_buffPF")
+   # # Make feature layer from buffered PFs
+   # lyrPF = arcpy.MakeFeatureLayer_management (buff_PF, "lyr_buffPF")
    
-   # Select the buffered PFs intersecting StreamRiver polys: new selection
-   lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
+   # # Select the buffered PFs intersecting StreamRiver polys: new selection
+   # lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
    
-   # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
-   lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
+   # # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
+   # lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
    
-   # Save out the result: these get the river (wide-water) process
-   riverPFs = scratchGDB + os.sep + "riverPFs"
-   CopyFeatures_management (lyrPF, riverPFs)
+   # # Save out the result: these get the river (wide-water) process
+   # printMsg("Saving out the PFs for river (wide-water) process")
+   # riverPFs = scratchGDB + os.sep + "riverPFs"
+   # CopyFeatures_management (lyrPF, riverPFs)
    
-   # Switch selection and save out the result: these get the stream process
-   lyrPF = SelectLayerByAttribute_management (lyrPF, "SWITCH_SELECTION")
-   streamPFs = scratchGDB + os.sep + "streamPFs"
-   CopyFeatures_management (lyrPF, streamPFs)
+   # # Switch selection and save out the result: these get the stream process
+   # printMsg("Saving out the PFs for stream process")
+   # lyrPF = SelectLayerByAttribute_management (lyrPF, "SWITCH_SELECTION")
+   # streamPFs = scratchGDB + os.sep + "streamPFs"
+   # CopyFeatures_management (lyrPF, streamPFs)
    
-   ## Stream process
-   # Select catchments intersecting buffered PFs
-   printMsg("Selecting catchments intersecting buffered Procedural Features...")
-   arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", streamPFs)
+   # ## Stream process
+   # # Select catchments intersecting buffered PFs
+   # printMsg("Selecting catchments intersecting buffered Procedural Features...")
+   # arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", streamPFs)
    
-   # Select by location flowlines that intersect selected catchments
-   printMsg("Selecting flowlines intersecting selected catchments...")
-   arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
+   # # Select by location flowlines that intersect selected catchments
+   # printMsg("Selecting flowlines intersecting selected catchments...")
+   # arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
    
    # Shift buffered PFs to align with primary flowline
    shiftAlignToFlow(streamPFs, fld_SFID, "lyr_Flowlines")
       
-   ## River process
-   # Select StreamRiver and LakePond polys intersecting buffered PF
-   # Merge selected into single layer
-   # Clip flowlines to merged layer
+   # ## River process
+   # # Select StreamRiver and LakePond polys intersecting buffered PF
+   # # Merge selected into single layer
+   # # Clip flowlines to merged layer
+   
    # Shift buffered PFs to align with primary flowline
    shiftAlignToFlow(buff_PF, fld_SFID, "lyr_Flowlines")
       
