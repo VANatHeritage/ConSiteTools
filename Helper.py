@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-09-21
+# Last Edit: 2021-09-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -546,25 +546,27 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
    
    qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
-   lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
+   lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
 
    # Select the input features intersecting StreamRiver polys: new selection
-   lyrFeats = SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
+   printMsg("Selecting features intersecting StreamRiver...")
+   lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
    
    ### Parse out features to be assigned to stream or river (wide-water) processes
    # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
-   lyrFeats = SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
+   printMsg("Selecting features intersecting LakePond or Reservoir...")
+   lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePond, "", "ADD_TO_SELECTION", "NOT_INVERT")
    
    # Save out the result: these get the river (wide-water) process
    printMsg("Saving out the features for river (wide-water) process")
    riverFeats = scratchGDB + os.sep + "riverFeats"
-   CopyFeatures_management (lyrFeats, riverFeats)
+   arcpy.CopyFeatures_management (lyrFeats, riverFeats)
    
    # Switch selection and save out the result: these get the stream process
-   printMsg("Saving out the PFs for stream process")
-   lyrFeats = SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
+   printMsg("Switching selection and saving out the PFs for stream process")
+   lyrFeats = arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
    streamFeats = scratchGDB + os.sep + "streamFeats"
-   CopyFeatures_management (lyrFeats, streamFeats)
+   arcpy.CopyFeatures_management (lyrFeats, streamFeats)
    
    ### Select the appropriate flowline features to be used for stream or river processes
    ## Stream process

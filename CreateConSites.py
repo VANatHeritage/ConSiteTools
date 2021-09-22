@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-15
+# Last Edit: 2021-09-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2061,7 +2061,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
    # arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
    
    # Shift buffered PFs to align with primary flowline
-   shiftAlignToFlow(streamPFs, fld_SFID, "lyr_Flowlines")
+   # shiftAlignToFlow(streamPFs, fld_SFID, "lyr_Flowlines")
       
    # ## River process
    # # Select StreamRiver and LakePond polys intersecting buffered PF
@@ -2069,14 +2069,15 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
    # # Clip flowlines to merged layer
    
    # Shift buffered PFs to align with primary flowline
-   shiftAlignToFlow(buff_PF, fld_SFID, "lyr_Flowlines")
+   shift_PF = "in_memory" + os.sep + "shift_PF"
+   shiftAlignToFlow(buff_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch)
       
    # Merge shifted, buffered PFs to single layer
    
    # Clip flowlines to buffered, shifted PFs
    printMsg("Clipping flowlines...")
    clipLines = "in_memory" + os.sep + "clipLines"
-   arcpy.Clip_analysis ("lyr_Flowlines", buff_PF, clipLines)
+   arcpy.Clip_analysis ("lyr_Flowlines", shift_PF, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
    arcpy.FeatureVerticesToPoints_management (clipLines, out_Points, "BOTH_ENDS")
@@ -2404,3 +2405,18 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in
    
    return finPolys
    
+
+
+def main():
+   inFeats = r"N:\ConSites_delin\Biotics.gdb\pfStream"
+   outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
+   out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
+   fldID = "SFID"
+   in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet"
+   in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
+
+   # shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch)
+   MakeNetworkPts_scs(inFeats, in_hydroNet, in_Catch, out_Points)
+
+if __name__ == "__main__":
+   main()
