@@ -2089,17 +2089,19 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
    
    return out_Points
    
-def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_Scratch = arcpy.env.scratchGDB):
+#def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_Scratch = arcpy.env.scratchGDB):
+def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch = arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream and downstream service layers, and combines network segments to create linear SCUs.
    
    POSSIBLE TO-DO: For tidal points, run network and equal distance up and down
    
    Parameters:
-   - out_Lines = Output lines representing Stream Conservation Units
-   - in_PF = Input Procedural Features
+   
+   ##- in_PF = Input Procedural Features
    - in_Points = Input feature class containing points generated from procedural features
    - in_downTrace = Network Analyst service layer set up to run downstream
    - in_upTrace = Network Analyst service layer set up to run upstream
+   - out_Lines = Output lines representing Stream Conservation Units
    - out_Scratch = Geodatabase to contain intermediate outputs"""
    
    arcpy.CheckOutExtension("Network")
@@ -2169,18 +2171,19 @@ def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_S
    # mergedLines = out_Scratch + os.sep + "mergedLines"
    # arcpy.Merge_management ([downLines, upLines], mergedLines)
    
-   # Grab additional segments that may have been missed within large PFs in wide water areas
-   # No longer sure this is necessary...?
-   nhdFlowline = catPath + os.sep + "NHDFlowline"
-   clpLines = out_Scratch + os.sep + "clpLines"
-   qry = "FType in (460, 558)" # StreamRiver and ArtificialPath only
-   arcpy.MakeFeatureLayer_management (nhdFlowline, "StreamRiver_Line", qry)
-   CleanClip("StreamRiver_Line", in_PF, clpLines)
+   # # Grab additional segments that may have been missed within large PFs in wide water areas
+   # # No longer sure this is necessary...?
+   # nhdFlowline = catPath + os.sep + "NHDFlowline"
+   # clpLines = out_Scratch + os.sep + "clpLines"
+   # qry = "FType in (460, 558)" # StreamRiver and ArtificialPath only
+   # arcpy.MakeFeatureLayer_management (nhdFlowline, "StreamRiver_Line", qry)
+   # CleanClip("StreamRiver_Line", in_PF, clpLines)
    
    # Merge and dissolve the segments; ESRI does not make this simple
    printMsg("Merging primary segments with selected extension segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
-   arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
+   # arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
+   arcpy.Merge_management ([downLines, upLines], comboLines)
    
    printMsg("Buffering segments...")
    buffLines = out_Scratch + os.sep + "buffLines"
@@ -2210,7 +2213,7 @@ def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_S
    
    return (out_Lines, lyrDownTrace, lyrUpTrace)
 
-def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 250 ):
+def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
    """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function. 
    
    Parameters:
@@ -2218,8 +2221,9 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    in_StreamRiver = Input StreamRiver polygons from NHD
    in_LakePond = Input LakePond polygons from NHD
    in_Catch = Input catchments from NHDPlus
-   buffDist = Distance, in meters, to buffer the SCU lines and their associated NHD polygons
+   out_Buffers = Output buffered SCU lines
    out_Scratch = Geodatabase to contain output products 
+   buffDist = Distance, in meters, to buffer the SCU lines and their associated NHD polygons
    """
 
    # Set up variables
@@ -2278,7 +2282,7 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    
    return out_Buffers
 
-def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, trim = "true", buffDist = 250, out_Scratch = "in_memory"):
+def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, trim = "true", buffDist = 150, out_Scratch = "in_memory"):
    """Creates Stream Conservation Sites.
    
    STILL TO DO: Need to use existing SCS as template; append final results to blank template.
@@ -2390,8 +2394,10 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in
    printMsg("Filling in holes...")
    arcpy. EliminatePolygonPart_management (in_Polys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
    
-   # Reproject final shapes, if necessary
-   finPolys = ProjectToMatch_vec(fillPolys, in_Catch, out_ConSites, copy = 1)
+   # Reproject final shapes, if necessary, then append to template
+   finPolys = arcpy.env.scratchGDB + os.sep + "finPolys"
+   ProjectToMatch_vec(fillPolys, in_Catch, finPolys, copy = 1)
+   arcpy.Append_management (finPolys, out_ConSites, "NO_TEST")
    
    # # Coalesce to create final sites - 
    # # This takes forever! Like 9 hours. Don't include unless committee really wants it
@@ -2408,15 +2414,27 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in
 
 
 def main():
-   inFeats = r"N:\ConSites_delin\Biotics.gdb\pfStream"
-   outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
-   out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
+   in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
    fldID = "SFID"
-   in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet"
+   in_SCU = r"N:\ConSites_delin\Biotics.gdb\csStream"
+   in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet\HydroNet_ND"
+   in_downTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naDownTrace_500.lyr"
+   in_upTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naUpTrace_3000.lyr"
    in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
+   in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
+   # outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
+   out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
+   in_Points = out_Points
+   out_Lines = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsLines"
+   in_Lines = out_Lines
+   out_SCS = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPolys" 
+   
+   
 
-   # shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch)
-   MakeNetworkPts_scs(inFeats, in_hydroNet, in_Catch, out_Points)
+   # MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500)
+   # MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points)
+   # CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch = arcpy.env.scratchGDB)
+   DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_SCU, out_SCS, in_FlowBuff, trim = "true", buffDist = 150, out_Scratch = "in_memory")
 
 if __name__ == "__main__":
    main()

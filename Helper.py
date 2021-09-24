@@ -522,7 +522,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    - inFeats: Input features to be shifted
    - outFeats: Output shifted features
    - fldID: Field in inFeats, containing uniques IDs
-   - in_hydroNet = Input hydrological network dataset, assumed to contain NHDFlowline, NHDArea, and NHDWaterbody
+   - in_hydroNet = Input hydrological network dataset
    - in_Catch = Input catchments from NHDPlus, assumed to correspond with data in in_hydroNet
    - fldLevel: Field in inFlowlines indicating the stream level; lower values indicate it is the mainstem (assumed "StreamLeve" by default)
    - scratchGDB: Geodatabase for storing intermediate outputs (assumed in_memory by default
