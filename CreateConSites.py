@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-22
+# Last Edit: 2021-09-24
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1986,8 +1986,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
 def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
-   TO-DO: Revise process so points don't get missed in wide-water areas where PFs are very far from flowlines
-   POSSIBLE TO-DO:  Attribute points to indicate if they are tidal or not
+   TO-DO:  Attribute points to indicate if they are tidal or not
    
    Parameters:
    - in_PF = Input Procedural Features
@@ -2093,11 +2092,10 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch = arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream and downstream service layers, and combines network segments to create linear SCUs.
    
-   POSSIBLE TO-DO: For tidal points, run network and equal distance up and down
+   TO-DO: For tidal points, run network and equal distance up and down
    
    Parameters:
    
-   ##- in_PF = Input Procedural Features
    - in_Points = Input feature class containing points generated from procedural features
    - in_downTrace = Network Analyst service layer set up to run downstream
    - in_upTrace = Network Analyst service layer set up to run upstream
@@ -2284,8 +2282,6 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
 
 def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, trim = "true", buffDist = 150, out_Scratch = "in_memory"):
    """Creates Stream Conservation Sites.
-   
-   STILL TO DO: Need to use existing SCS as template; append final results to blank template.
    
    Parameters:
    - in_Lines: Input SCU lines, generated as output from CreateLines_scu function
