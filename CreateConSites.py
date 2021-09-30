@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-24
+# Last Edit: 2021-09-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -148,7 +148,8 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
    return outConsLands
    
 def TabParseNWI(inNWI, outTab):
-   '''Given a National Wetlands Inventory (NWI) feature class, creates a table containing one record for each unique code in the ATTRIBUTE field. The codes in the ATTRIBUTE field are then parsed into easily comprehensible fields, to facilitate processing and mapping. This may be obsolete now that NWI is providing parsed data. (Adapted from a Model-Builder tool and a script tool.) 
+   '''NOTE: This function is no longer necessary. Simply join the attributes from the parsed table now provided by NWI. I'm keeping the function here, though, as an example in case I ever need to write something similar in another situation.
+   Given a National Wetlands Inventory (NWI) feature class, creates a table containing one record for each unique code in the ATTRIBUTE field. The codes in the ATTRIBUTE field are then parsed into easily comprehensible fields, to facilitate processing and mapping. (Adapted from a Model-Builder tool and a script tool.) 
 
    The following new fields are created, based on the value in the ATTRIBUTE field:
    - Syst: contains the System name; this is tier 1 in the NWI hierarchy
@@ -1905,7 +1906,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
 def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
-   """Creates two Network Analyst service layers needed for SCU delineation. This tool only needs to be run the first time you run the suite of SCU delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCU delineation sequence.
+   """Creates three Network Analyst service layers needed for SCU delineation. 
+   This tool only needs to be run the first time you run the suite of SCU delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCU delineation sequence.
    
    NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually). If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
    
@@ -1931,6 +1933,8 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyr"%downString
    lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyr"%upString
    r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
+   
+   ### TO DO: Add service layer for tidal features
    
    printMsg("Creating upstream and downstream service layers...")
    for sl in [["naDownTrace", downDist, "FlowDownOnly"], ["naUpTrace", upDist, "FlowUpOnly"]]:
@@ -1983,38 +1987,21 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    return (lyrDownTrace, lyrUpTrace)
 
-def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFID"):
+def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
-   
-   TO-DO:  Attribute points to indicate if they are tidal or not
    
    Parameters:
    - in_PF = Input Procedural Features
    - in_hydroNet = Input hydrological network dataset
    - in_Catch = Input catchments from NHDPlus
+   - in_NWI = Input NWI feature class that has been modified to include a binary field indicating whether features is tidal (1) or not (0)
    - out_Points = Output feature class containing points generated from procedural features
-   - fld_SFID = Source Feature ID
+   - fld_SFID = field in in_PF containing the Source Feature ID
+   - fld_NWI = field in in_NWI indicating tidal status
    """
    
    # timestamp
    t0 = datetime.now()
-   
-   # # Set up some variables
-   # descHydro = arcpy.Describe(in_hydroNet)
-   # nwDataset = descHydro.catalogPath
-   # catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   # nhdFlowline = catPath + os.sep + "NHDFlowline"
-   # nhdArea = catPath + os.sep + "NHDArea"
-   # nhdWaterbody = catPath + os.sep + "NHDWaterbody"
-   # scratchGDB = arcpy.env.scratchGDB
-   
-   # # Make feature layers  
-   # arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
-   # qry = "FType = 460" # StreamRiver only
-   # lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
-   # qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
-   # lyrLakePondRes = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
-   # arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
    
    # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
    printMsg("Buffering Procedural Features...")
@@ -2029,43 +2016,6 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
    arcpy.CalculateField_management (in_PF, "BUFFER", expression, "PYTHON", code_block)
    buff_PF = "in_memory" + os.sep + "buff_PF"
    arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
-
-   # # Make feature layer from buffered PFs
-   # lyrPF = arcpy.MakeFeatureLayer_management (buff_PF, "lyr_buffPF")
-   
-   # # Select the buffered PFs intersecting StreamRiver polys: new selection
-   # lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
-   
-   # # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
-   # lyrPF = SelectLayerByLocation_management (lyrPF, "INTERSECT", lyrLakePondRes, "", "ADD_TO_SELECTION", "NOT_INVERT")
-   
-   # # Save out the result: these get the river (wide-water) process
-   # printMsg("Saving out the PFs for river (wide-water) process")
-   # riverPFs = scratchGDB + os.sep + "riverPFs"
-   # CopyFeatures_management (lyrPF, riverPFs)
-   
-   # # Switch selection and save out the result: these get the stream process
-   # printMsg("Saving out the PFs for stream process")
-   # lyrPF = SelectLayerByAttribute_management (lyrPF, "SWITCH_SELECTION")
-   # streamPFs = scratchGDB + os.sep + "streamPFs"
-   # CopyFeatures_management (lyrPF, streamPFs)
-   
-   # ## Stream process
-   # # Select catchments intersecting buffered PFs
-   # printMsg("Selecting catchments intersecting buffered Procedural Features...")
-   # arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", streamPFs)
-   
-   # # Select by location flowlines that intersect selected catchments
-   # printMsg("Selecting flowlines intersecting selected catchments...")
-   # arcpy.SelectLayerByLocation_management ("lyr_Flowlines", "INTERSECT", "lyr_Catchments")
-   
-   # Shift buffered PFs to align with primary flowline
-   # shiftAlignToFlow(streamPFs, fld_SFID, "lyr_Flowlines")
-      
-   # ## River process
-   # # Select StreamRiver and LakePond polys intersecting buffered PF
-   # # Merge selected into single layer
-   # # Clip flowlines to merged layer
    
    # Shift buffered PFs to align with primary flowline
    shift_PF = "in_memory" + os.sep + "shift_PF"
@@ -2079,7 +2029,12 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, out_Points, fld_SFID = "SFI
    arcpy.Clip_analysis ("lyr_Flowlines", shift_PF, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
-   arcpy.FeatureVerticesToPoints_management (clipLines, out_Points, "BOTH_ENDS")
+   tmpPts = "in_memory" + os.sep + "tmpPts"
+   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
+   
+   # Attribute points designating them tidal or not
+   # Spatial join allows for a 3-meter spatial error
+   arcpy.SpatialJoin_analysis(tmpPts, in_NWI, out_Points, "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "WITHIN_A_DISTANCE", "3 Meters")
    
    # timestamp
    t1 = datetime.now()
@@ -2164,43 +2119,33 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch 
       printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
       arcpy.SaveToLayerFile_management(inLyr, outLyr)
    
-   # # Merge the downstream segments with the upstream segments
-   # printMsg("Merging primary segments...")
-   # mergedLines = out_Scratch + os.sep + "mergedLines"
-   # arcpy.Merge_management ([downLines, upLines], mergedLines)
-   
-   # # Grab additional segments that may have been missed within large PFs in wide water areas
-   # # No longer sure this is necessary...?
-   # nhdFlowline = catPath + os.sep + "NHDFlowline"
-   # clpLines = out_Scratch + os.sep + "clpLines"
-   # qry = "FType in (460, 558)" # StreamRiver and ArtificialPath only
-   # arcpy.MakeFeatureLayer_management (nhdFlowline, "StreamRiver_Line", qry)
-   # CleanClip("StreamRiver_Line", in_PF, clpLines)
-   
    # Merge and dissolve the segments; ESRI does not make this simple
    printMsg("Merging primary segments with selected extension segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
    # arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
    arcpy.Merge_management ([downLines, upLines], comboLines)
    
-   printMsg("Buffering segments...")
-   buffLines = out_Scratch + os.sep + "buffLines"
-   arcpy.Buffer_analysis(comboLines, buffLines, "1 Meters", "FULL", "ROUND", "ALL") 
+   # Unsplit lines
+   UnsplitLines(comboLines, out_Lines)
    
-   printMsg("Exploding buffers...")
-   explBuff = outDir + os.sep + "explBuff"
-   arcpy.MultipartToSinglepart_management(buffLines, explBuff)
+   # printMsg("Buffering segments...")
+   # buffLines = out_Scratch + os.sep + "buffLines"
+   # arcpy.Buffer_analysis(comboLines, buffLines, "1 Meters", "FULL", "ROUND", "ALL") 
    
-   printMsg("Grouping segments...")
-   arcpy.AddField_management(explBuff, "grpID", "LONG")
-   arcpy.CalculateField_management(explBuff, "grpID", "!OBJECTID!", "PYTHON")
+   # printMsg("Exploding buffers...")
+   # explBuff = outDir + os.sep + "explBuff"
+   # arcpy.MultipartToSinglepart_management(buffLines, explBuff)
    
-   joinLines = out_Scratch + os.sep + "joinLines"
-   fldMap = 'grpID "grpID" true true false 4 Long 0 0, First, #, %s, grpID, -1, -1' % explBuff
-   arcpy.SpatialJoin_analysis(comboLines, explBuff, joinLines, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldMap, "INTERSECT")
+   # printMsg("Grouping segments...")
+   # arcpy.AddField_management(explBuff, "grpID", "LONG")
+   # arcpy.CalculateField_management(explBuff, "grpID", "!OBJECTID!", "PYTHON")
    
-   printMsg("Dissolving segments by group...")
-   arcpy.Dissolve_management(joinLines, out_Lines, "grpID", "", "MULTI_PART", "DISSOLVE_LINES")
+   # joinLines = out_Scratch + os.sep + "joinLines"
+   # fldMap = 'grpID "grpID" true true false 4 Long 0 0, First, #, %s, grpID, -1, -1' % explBuff
+   # arcpy.SpatialJoin_analysis(comboLines, explBuff, joinLines, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldMap, "INTERSECT")
+   
+   # printMsg("Dissolving segments by group...")
+   # arcpy.Dissolve_management(joinLines, out_Lines, "grpID", "", "MULTI_PART", "DISSOLVE_LINES")
    
    # timestamp
    t1 = datetime.now()

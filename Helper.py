@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-09-22
+# Last Edit: 2021-09-24
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -663,3 +663,32 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    arcpy.Merge_management ([streamFeats, riverFeats], outFeats)
    
    return outFeats
+   
+def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
+   '''Does what it seems the arcpy.UnsplitLine_management function SHOULD do, but doesn't.
+   
+   Parameters:
+   - inLines = input line feature class
+   - outLines = output line feature class
+   - scratchGDB = geodatabase to hold intermediate products
+   '''
+   printMsg("Buffering segments...")
+   buffLines = scratchGDB + os.sep + "buffLines"
+   arcpy.Buffer_analysis(inLines, buffLines, "1 Meters", "FULL", "ROUND", "ALL") 
+   
+   printMsg("Exploding buffers...")
+   explBuff = scratchGDB + os.sep + "explBuff"
+   arcpy.MultipartToSinglepart_management(buffLines, explBuff)
+   
+   printMsg("Grouping segments...")
+   arcpy.AddField_management(explBuff, "grpID", "LONG")
+   arcpy.CalculateField_management(explBuff, "grpID", "!OBJECTID!", "PYTHON")
+   
+   joinLines = scratchGDB + os.sep + "joinLines"
+   fldMap = 'grpID "grpID" true true false 4 Long 0 0, First, #, %s, grpID, -1, -1' % explBuff
+   arcpy.SpatialJoin_analysis(inLines, explBuff, joinLines, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldMap, "INTERSECT")
+   
+   printMsg("Dissolving segments by group...")
+   arcpy.Dissolve_management(joinLines, outLines, "grpID", "", "MULTI_PART", "DISSOLVE_LINES")
+   
+   return outLines
