@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-09-29
+# Last Edit: 2021-10-26
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1932,12 +1932,11 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    upString = (str(upDist)).replace(".","_")
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyr"%downString
    lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyr"%upString
+   lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyr"%upString
    r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
    
-   ### TO DO: Add service layer for tidal features
-   
    printMsg("Creating upstream and downstream service layers...")
-   for sl in [["naDownTrace", downDist, "FlowDownOnly"], ["naUpTrace", upDist, "FlowUpOnly"]]:
+   for sl in [["naDownTrace", downDist, "FlowDownOnly"], ["naUpTrace", upDist, "FlowUpOnly"], ["naTidalTrace", upDist, ""]]:
       restrictions = r + ";" + sl[2]
       serviceLayer = arcpy.MakeServiceAreaLayer_na(in_network_dataset=nwDataset,
          out_network_analysis_layer=sl[0], 
@@ -1960,9 +1959,9 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
          hierarchy="NO_HIERARCHY", 
          time_of_day="")
    
-   # Add dam barriers to both service layers and save
+   # Add dam barriers to service layers and save
    printMsg("Adding dam barriers to service layers...")
-   for sl in [["naDownTrace", lyrDownTrace], ["naUpTrace", lyrUpTrace]]:
+   for sl in [["naDownTrace", lyrDownTrace], ["naUpTrace", lyrUpTrace], ["naTidalTrace", lyrTidalTrace]]:
       barriers = arcpy.AddLocations_na(in_network_analysis_layer=sl[0], 
          sub_layer="Line Barriers", 
          in_table=in_Lines, 
@@ -1985,7 +1984,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    arcpy.CheckInExtension("Network")
    
-   return (lyrDownTrace, lyrUpTrace)
+   return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
 def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
@@ -1997,31 +1996,35 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    - in_NWI = Input NWI feature class that has been modified to include a binary field indicating whether features is tidal (1) or not (0)
    - out_Points = Output feature class containing points generated from procedural features
    - fld_SFID = field in in_PF containing the Source Feature ID
-   - fld_NWI = field in in_NWI indicating tidal status
+   - fld_Tidal = field in in_NWI indicating tidal status
    """
    
    # timestamp
    t0 = datetime.now()
    
-   # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
+   # # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
+   # printMsg("Buffering Procedural Features...")
+   # code_block = """def buff(elcode):
+      # if elcode == "ARAAD02020":
+         # b = 250
+      # else:
+         # b = 30
+      # return b
+      # """
+   # expression = "buff(!ELCODE!)"
+   # arcpy.CalculateField_management (in_PF, "BUFFER", expression, "PYTHON", code_block)
+   # buff_PF = "in_memory" + os.sep + "buff_PF"
+   # arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
+   # NOTE: Eliminating special buffer for turtles; planning to burn in catchments for this and some other elements as part of the DelinSite_scs function.
+   
+   # Buffer PFs by 30-m (standard slop factor)
    printMsg("Buffering Procedural Features...")
-   code_block = """def buff(elcode):
-      if elcode == "ARAAD02020":
-         b = 250
-      else:
-         b = 30
-      return b
-      """
-   expression = "buff(!ELCODE!)"
-   arcpy.CalculateField_management (in_PF, "BUFFER", expression, "PYTHON", code_block)
    buff_PF = "in_memory" + os.sep + "buff_PF"
-   arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
+   arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")   
    
    # Shift buffered PFs to align with primary flowline
    shift_PF = "in_memory" + os.sep + "shift_PF"
    shiftAlignToFlow(buff_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch)
-      
-   # Merge shifted, buffered PFs to single layer
    
    # Clip flowlines to buffered, shifted PFs
    printMsg("Clipping flowlines...")
@@ -2043,18 +2046,18 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    
    return out_Points
    
-#def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, out_Scratch = arcpy.env.scratchGDB):
-def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch = arcpy.env.scratchGDB):
+#def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Scratch = arcpy.env.scratchGDB):
+def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream and downstream service layers, and combines network segments to create linear SCUs.
-   
-   TO-DO: For tidal points, run network and equal distance up and down
    
    Parameters:
    
-   - in_Points = Input feature class containing points generated from procedural features
+   - in_Points = Input feature class containing points generated from procedural features; must have a 
    - in_downTrace = Network Analyst service layer set up to run downstream
    - in_upTrace = Network Analyst service layer set up to run upstream
+   - in_tidalTrace = Network Analyst service layer set up to run upstream and downstream in tidal areas
    - out_Lines = Output lines representing Stream Conservation Units
+   - fld_Tidal = field in in_Points indicating tidal status
    - out_Scratch = Geodatabase to contain intermediate outputs"""
    
    arcpy.CheckOutExtension("Network")
@@ -2076,18 +2079,27 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch 
    hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
    lyrDownTrace = hydroDir + os.sep + "naDownTrace.lyr"
    lyrUpTrace = hydroDir + os.sep + "naUpTrace.lyr"
+   lyrTidalTrace = hydroDir + os.sep + "naTidalTrace.lyr"
    downLines = out_Scratch + os.sep + "downLines"
    upLines = out_Scratch + os.sep + "upLines"
+   tidalLines = out_Scratch + os.sep + "tidalLines"
    outDir = os.path.dirname(out_Lines)
+   
+   # Split points into tidal and non-tidal layers
+   qry = "%s = 1"%fld_Tidal
+   tidalPts = arcpy.MakeFeatureLayer_management (in_Points, "lyr_tidalPts", qry)
+   qry = "%s = 0"%fld_Tidal
+   nontidalPts = arcpy.MakeFeatureLayer_management (in_Points, "lyr_nontidalPts", qry)
   
-   # Load all points as facilities into both service layers; search distance 500 meters
+   # Load points as facilities into service layers; search distance 500 meters
    printMsg("Loading points into service layers...")
-   for sa in [[in_downTrace,lyrDownTrace], [in_upTrace, lyrUpTrace]]:
+   for sa in [[in_downTrace,lyrDownTrace, nontidalPts], [in_upTrace, lyrUpTrace, nontidalPts], [in_tidalTrace, lyrTidalTrace, tidalPts]]:
       inLyr = sa[0]
       outLyr = sa[1]
+      inPoints = sa[2]
       naPoints = arcpy.AddLocations_na(in_network_analysis_layer=inLyr, 
          sub_layer="Facilities", 
-         in_table=in_Points, 
+         in_table=inPoints, 
          field_mappings="Name FID #", 
          search_tolerance="500 Meters", 
          sort_field="", 
@@ -2103,7 +2115,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch 
    del naPoints
   
    # Solve upstream and downstream service layers; save out lines and updated layers
-   for sa in [[in_downTrace, downLines, lyrDownTrace], [in_upTrace, upLines, lyrUpTrace]]:
+   for sa in [[in_downTrace, downLines, lyrDownTrace], [in_upTrace, upLines, lyrUpTrace], [in_tidalTrace, tidalLines, lyrTidalTrace]]:
       inLyr = sa[0]
       outLines = sa[1]
       outLyr = sa[2]
@@ -2123,7 +2135,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch 
    printMsg("Merging primary segments with selected extension segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
    # arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
-   arcpy.Merge_management ([downLines, upLines], comboLines)
+   arcpy.Merge_management ([downLines, upLines, tidalLines], comboLines)
    
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
@@ -2154,7 +2166,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, out_Lines, out_Scratch 
 
    arcpy.CheckInExtension("Network")
    
-   return (out_Lines, lyrDownTrace, lyrUpTrace)
+   return (out_Lines, lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
 def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
    """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function. 
@@ -2225,16 +2237,18 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    
    return out_Buffers
 
-def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, trim = "true", buffDist = 150, out_Scratch = "in_memory"):
+def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule = "RULE", trim = "true", buffDist = 150, out_Scratch = "in_memory"):
    """Creates Stream Conservation Sites.
    
    Parameters:
+   - in_PF = Input Procedural Features
    - in_Lines: Input SCU lines, generated as output from CreateLines_scu function
    - in_Catch: Input catchments from NHDPlus
    - in_hydroNet: Input hydrological network dataset
    - in_ConSites: feature class representing current Stream Conservation Sites (or, a template feature class)
    - out_ConSites: the output feature class representing updated Stream Conservation Sites
    - in_FlowBuff: Input raster where the flow distances shorter than a specified truncation distance are coded 1; output from the prepFlowBuff function. Ignored if trim = "false", in which case "None" can be entered.
+   - fld_Rule = field containing assigned processing rule (should be "SCU1" for features getting standard process or "SCU2" for alternate process)
    - trim: Indicates whether sites should be restricted to buffers ("true"; default) or encompass entire catchments ("false")
    - buffDist: Buffer distance used to make clipping buffers
    - out_Scratch: Geodatabase to contain output products 
@@ -2329,11 +2343,19 @@ def DelinSite_scs(in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in
    
    else: 
       in_Polys = dissCatch
-      
+   
+   # Burn in catchments for alternate-process PFs
+   qry = "%s = 'SCU2'"%fld_Rule
+   arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
+   arcpy.SelectLayerByLocation_management("lyr_Catchments", "INTERSECT", "lyr_altPF", "", "NEW_SELECTION")
+   printMsg("Merging select catchments with flow buffers...")
+   mergeFeats = arcpy.env.scratchGDB + os.sep + "mergeFeats"
+   arcpy.Merge_management ([in_Polys, "lyr_Catchments"], mergeFeats)
+   
    # Fill in gaps 
    # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    printMsg("Filling in holes...")
-   arcpy. EliminatePolygonPart_management (in_Polys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy. EliminatePolygonPart_management (mergeFeats, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
    
    # Reproject final shapes, if necessary, then append to template
    finPolys = arcpy.env.scratchGDB + os.sep + "finPolys"
@@ -2361,8 +2383,10 @@ def main():
    in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet\HydroNet_ND"
    in_downTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naDownTrace_500.lyr"
    in_upTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naUpTrace_3000.lyr"
+   in_tidalTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naTidalTrace_3000.lyr"
    in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
    in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
+   in_NWI = r"N:\SpatialData\USFWS\NWI\VA_geodatabase_wetlands.gdb\VA_Wetlands"
    # outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
    out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
    in_Points = out_Points
