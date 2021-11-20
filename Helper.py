@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-09-24
+# Last Edit: 2021-11-19
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -548,14 +548,16 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
    lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
 
+   ### Parse out features to be assigned to stream or river (wide-water) processes
    # Select the input features intersecting StreamRiver polys: new selection
    printMsg("Selecting features intersecting StreamRiver...")
    lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
    
-   ### Parse out features to be assigned to stream or river (wide-water) processes
-   # Select the buffered PFs intersecting LakePond or Reservoir polys: add to existing selection
+   # Select the features intersecting LakePond or Reservoir polys: add to existing selection
    printMsg("Selecting features intersecting LakePond or Reservoir...")
    lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePond, "", "ADD_TO_SELECTION", "NOT_INVERT")
+   
+   # Eliminate false wide-water features; those with centroid too far from NHD polygons
    
    # Save out the result: these get the river (wide-water) process
    printMsg("Saving out the features for river (wide-water) process")
@@ -570,9 +572,9 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    
    ### Select the appropriate flowline features to be used for stream or river processes
    ## Stream process
-   # Select catchments intersecting input features
-   printMsg("Selecting catchments intersecting input features...")
-   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats)
+   # Select catchments intersecting stream features
+   printMsg("Selecting catchments intersecting stream features...")
+   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats, "", "NEW_SELECTION")
    
    # Clip flowlines to selected catchments
    printMsg("Clipping flowlines to selected catchments...")
@@ -590,10 +592,19 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    wideWater = scratchGDB + os.sep + "wideWater"
    arcpy.Merge_management ([lyrStreamRiver, lyrLakePond], wideWater)
    
-   # Clip flowlines to merged layer
-   printMsg("Clipping flowlines to widewater features...")
+   # Select catchments intersecting river features
+   printMsg("Selecting catchments intersecting river features...")
+   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", riverFeats, "", "NEW_SELECTION")
+   
+   # Clip widewater to selected catchments
+   printMsg("Clipping widewaters to selected catchments...")
+   clipWideWater = scratchGDB + os.sep + "clipWideWater"
+   arcpy.Clip_analysis (wideWater, lyrCatch, clipWideWater)
+   
+   # Clip flowlines to clipped widewater
+   printMsg("Clipping flowlines to clipped widewater features...")
    riverLines = scratchGDB + os.sep + "riverLines"
-   arcpy.Clip_analysis (lyrFlowlines, wideWater, riverLines)
+   arcpy.Clip_analysis (lyrFlowlines, clipWideWater, riverLines)
       
    # Run alignment separately for stream and river features
    streamParms = [streamFeats, streamLines, "_stream"]
@@ -662,7 +673,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    # Merge output to a single feature class
    arcpy.Merge_management ([streamFeats, riverFeats], outFeats)
    
-   return outFeats
+   return (outFeats, clipWideWater, nhdFlowline)
    
 def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
    '''Does what it seems the arcpy.UnsplitLine_management function SHOULD do, but doesn't.

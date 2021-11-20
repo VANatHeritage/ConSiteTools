@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-11-04
+# Last Edit: 2021-11-19
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1986,7 +1986,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
-def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal"):
+def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal", out_Scratch = "in_memory"):
    """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
    
    Parameters:
@@ -2017,38 +2017,67 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    # arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
    # NOTE: Eliminating special buffer for turtles; planning to burn in catchments for this and some other elements as part of the DelinSite_scs function.
    
-   # Buffer PFs by 30-m (standard slop factor)
-   printMsg("Buffering Procedural Features...")
-   buff_PF = "in_memory" + os.sep + "buff_PF"
-   arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")   
+   # # Buffer PFs by 30-m (standard slop factor)
+   # printMsg("Buffering Procedural Features...")
+   # buff_PF = out_Scratch + os.sep + "buff_PF"
+   # arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")   
    
-   # Shift buffered PFs to align with primary flowline
-   shift_PF = "in_memory" + os.sep + "shift_PF"
-   shiftAlignToFlow(buff_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch)
+   # Set up some variables
+   descHydro = arcpy.Describe(in_hydroNet)
+   nwDataset = descHydro.catalogPath
+   catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
+   nhdArea = catPath + os.sep + "NHDArea"
+   nhdWaterbody = catPath + os.sep + "NHDWaterbody"
    
-   # Clip flowlines to buffered, shifted PFs
+   # Shift PFs to align with primary flowline
+   shift_PF = out_Scratch + os.sep + "shift_PF"
+   (shiftFeats, clipWideWater, nhdFlowline) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
+   
+   # # Select catchments intersecting shifted PFs
+   # printMsg("Selecting catchments intersecting shifted PFs...")
+   # arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+   # arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", shift_PF)
+   
+   # # Clip widewaters to selected catchments
+   # printMsg("Clipping widewaters...")
+   # clipWideWater = out_Scratch + os.sep + "clipWideWater"
+   # arcpy.Clip_analysis (wideWater, "lyr_Catchments", clipWideWater)
+   
+   # Merge shifted PFs and widewater polygons into single feature class
+   printMsg("Merging shifted PFs with clipped widewaters...")
+   mergeFeats = out_Scratch + os.sep + "mergeFeats"
+   arcpy.Merge_management ([shift_PF, clipWideWater], mergeFeats)
+   
+   # Clip flowlines to merged features
    printMsg("Clipping flowlines...")
-   clipLines = "in_memory" + os.sep + "clipLines"
-   arcpy.Clip_analysis ("lyr_Flowlines", shift_PF, clipLines)
+   clipLines = out_Scratch + os.sep + "clipLines"
+   arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
-   tmpPts = "in_memory" + os.sep + "tmpPts"
+   tmpPts = out_Scratch + os.sep + "tmpPts"
    arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
    
    # Attribute points designating them tidal or not
    # Spatial join allows for a 3-meter spatial error
    arcpy.SpatialJoin_analysis(tmpPts, in_NWI, out_Points, "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "WITHIN_A_DISTANCE", "3 Meters")
+   codeblock = """def fillNulls(tidal):
+      if not tidal:
+         return 0
+      else:
+         return tidal"""
+   expression = "fillNulls(!%s!)"%fld_Tidal
+   arcpy.management.CalculateField(out_Points, fld_Tidal, expression, "PYTHON", codeblock)
    
    # timestamp
    t1 = datetime.now()
    ds = GetElapsedTime (t0, t1)
-   printMsg("Completed function. Time elapsed: %s" % ds)
+   printMsg("Completed MakeNetworkPts_scs function. Time elapsed: %s" % ds)
    
    return out_Points
    
 #def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Scratch = arcpy.env.scratchGDB):
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = arcpy.env.scratchGDB):
-   """Loads SCU points derived from Procedural Features, solves the upstream and downstream service layers, and combines network segments to create linear SCUs.
+   """Loads SCU points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCUs.
    
    Parameters:
    
@@ -2310,6 +2339,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       nhdWaterbody = catPath + os.sep + "NHDWaterbody"
       clipBuffers = out_Scratch + os.sep + "clipBuffers"
       clipBuffers_prj = arcpy.env.scratchGDB + os.sep + "clipBuffers_prj" # Can NOT project to in_memory
+      dissPolys = out_Scratch + os.sep + "dissPolys"
       fillPolys = out_Scratch + os.sep + "fillPolys"
       
       ### Used repeatedly in loop
@@ -2379,10 +2409,12 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       arcpy.Merge_management ([in_Polys, "lyr_Catchments"], mergeFeats)
       in_Polys = mergeFeats
    
-   # Fill in gaps 
+   # Dissolve overlapping features and fill in gaps 
    # Unfortunately this does not fill the 1-pixel holes at edges of shapes
+   printMsg("Dissolving adjacent/overlapping features...")
+   arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
    printMsg("Filling in holes...")
-   arcpy. EliminatePolygonPart_management (in_Polys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy. EliminatePolygonPart_management (dissPolys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
    
    # Reproject final shapes, if necessary, then append to template
    finPolys = arcpy.env.scratchGDB + os.sep + "finPolys"
@@ -2405,6 +2437,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
 
 def main():
    in_PF = r"N:\ConSites_delin\Biotics.gdb\pfStream"
+   # in_PF = r"N:\ProProjects\ConSites\SCS_Testing.gdb\TestPF"
    in_ConSites = r"N:\ConSites_delin\Biotics.gdb\csStream"
    fldID = "SFID"
    fld_Rule = "RULE"
@@ -2418,17 +2451,19 @@ def main():
    in_NWI = r"N:\SpatialData\USFWS\NWI\VA_geodatabase_wetlands.gdb\VA_Wetlands"
    # outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
    out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
+   # out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\TestPoints"
    in_Points = out_Points
    out_Lines = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsLines"
    in_Lines = out_Lines
    out_SCS = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPolys" 
+   out_Scratch = r"N:\ProProjects\ConSites\scratch.gdb"
    
    
 
    # MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500)
-   # MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal")
-   # CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = arcpy.env.scratchGDB)
-   DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_SCS, in_FlowBuff, fld_Rule = "RULE", trim = "true", buffDist = 150, out_Scratch = "in_memory")
+   # MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal", out_Scratch = r"N:\ProProjects\ConSites\scratch.gdb")
+   CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, "Tidal", out_Scratch)
+   DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_SCS, in_FlowBuff, "RULE", "true", 150, "in_memory")
 
 if __name__ == "__main__":
    main()
