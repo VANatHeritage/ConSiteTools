@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-11-19
+# Last Edit: 2021-11-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -537,6 +537,16 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    nhdWaterbody = catPath + os.sep + "NHDWaterbody"
    minFld = "MIN_%s"%fldLevel
    
+   # Make a copy of input features, and add a field to store alignment type
+   tmpFeats = scratchGDB + os.sep + "tmpFeats"
+   arcpy.CopyFeatures_management (inFeats, tmpFeats)
+   inFeats = tmpFeats
+   arcpy.AddField_management (inFeats, "AlignType", "TEXT", "", "", 1)
+   
+   # # Get (pseudo-)centroid of features to be shifted
+   # centroids = scratchGDB + os.sep + "centroids"
+   # arcpy.FeatureToPoint_management(inFeats, centroids, "INSIDE")
+   
    # Make feature layers  
    lyrFeats = arcpy.MakeFeatureLayer_management (inFeats, "lyr_inFeats")
    lyrFlowlines = arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
@@ -548,27 +558,70 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
    lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
 
-   ### Parse out features to be assigned to stream or river (wide-water) processes
-   # Select the input features intersecting StreamRiver polys: new selection
-   printMsg("Selecting features intersecting StreamRiver...")
-   lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
+   ### Assign features to stream or river (wide-water) alignment processes
+   # # Select the input features intersecting StreamRiver polys: new selection
+   # printMsg("Selecting features intersecting StreamRiver...")
+   # lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
    
-   # Select the features intersecting LakePond or Reservoir polys: add to existing selection
-   printMsg("Selecting features intersecting LakePond or Reservoir...")
-   lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePond, "", "ADD_TO_SELECTION", "NOT_INVERT")
+   # # Select the features intersecting LakePond or Reservoir polys: add to existing selection
+   # printMsg("Selecting features intersecting LakePond or Reservoir...")
+   # lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePond, "", "ADD_TO_SELECTION", "NOT_INVERT")
    
-   # Eliminate false wide-water features; those with centroid too far from NHD polygons
+   # Calculate percentage of PF covered by widewater features
+   printMsg("Calculating percentages of PFs covered by widewater features...")
+   tabStreamRiver = scratchGDB + os.sep + "tabStreamRiver"
+   SR = arcpy.TabulateIntersection_analysis (lyrFeats, fldID, lyrStreamRiver, tabStreamRiver)
+   tabLakePond = scratchGDB + os.sep + "tabLakePond"
+   LP = arcpy.TabulateIntersection_analysis (lyrFeats, fldID, lyrLakePond, tabLakePond)
+   percTab = scratchGDB + os.sep + "percTab"
+   arcpy.Merge_management([SR, LP], percTab)
+   statsTab = scratchGDB + os.sep + "statsTab"
+   arcpy.Statistics_analysis(percTab, statsTab, [["PERCENTAGE", "SUM"]], fldID)
+   arcpy.JoinField_management (lyrFeats, fldID, statsTab, fldID, "SUM_PERCENTAGE")
    
-   # Save out the result: these get the river (wide-water) process
+   # Assign features to river (R) or stream (S) process
+   codeblock = '''def procType(percent):
+         if not percent:
+            return "S"
+         elif percent < 25:
+            return "S"
+         else:
+            return "R"
+         '''
+   expression = "procType(!SUM_PERCENTAGE!)"
+   arcpy.CalculateField_management(lyrFeats, "AlignType", expression, "PYTHON", codeblock)
+   
+   # # Assign selected features to river process
+   # count = countSelectedFeatures(lyrFeats)
+   # if count > 0:
+      # printMsg("Assigning %s features to river (wide-water) process"%str(count))
+      # arcpy.CalculateField_management (lyrFeats, "AlignType", "R", "PYTHON")
+   # else:
+      # pass
+      
+   # # Switch selection and assign to stream process
+   # lyrFeats = arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
+   # count = countSelectedFeatures(lyrFeats)
+   # if count > 0:
+      # printMsg("Assigning %s features to stream process"%str(count))
+      # arcpy.CalculateField_management (lyrFeats, "AlignType", "S", "PYTHON")
+   # else:
+      # pass
+   
+   # Save out features getting the river (wide-water) process
    printMsg("Saving out the features for river (wide-water) process")
    riverFeats = scratchGDB + os.sep + "riverFeats"
-   arcpy.CopyFeatures_management (lyrFeats, riverFeats)
+   # arcpy.CopyFeatures_management (lyrFeats, riverFeats)
+   where_clause = '"AlignType" = \'R\''
+   arcpy.Select_analysis (lyrFeats, riverFeats, where_clause)
    
-   # Switch selection and save out the result: these get the stream process
+   # Save out features getting the stream process
    printMsg("Switching selection and saving out the PFs for stream process")
    lyrFeats = arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
    streamFeats = scratchGDB + os.sep + "streamFeats"
-   arcpy.CopyFeatures_management (lyrFeats, streamFeats)
+   # arcpy.CopyFeatures_management (lyrFeats, streamFeats)
+   where_clause = '"AlignType" = \'S\''
+   arcpy.Select_analysis (lyrFeats, streamFeats, where_clause)
    
    ### Select the appropriate flowline features to be used for stream or river processes
    ## Stream process
