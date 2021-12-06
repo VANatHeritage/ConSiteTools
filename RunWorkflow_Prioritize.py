@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2020-09-15
-# Last Edit: 2021-08-31
+# Last Edit: 2021-12-02
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -39,9 +39,9 @@ from PrioritizeConSites import *
 def main():
    ### Set up input variables ###
    # Paths to input and output geodatabases and directories - change these every time
-   in_GDB = r'N:\EssentialConSites\ECS_Run_Aug2021\ECS_Inputs_Aug2021.gdb'
-   out_GDB = r'N:\EssentialConSites\ECS_Run_Aug2021\ECS_Outputs_Aug2021.gdb'
-   out_DIR = r'N:\EssentialConSites\ECS_Run_Aug2021\Spreadsheets_Aug2021' 
+   in_GDB = r'N:\EssentialConSites\ECS_Run_Dec2021\ECS_Inputs_Dec2021.gdb'
+   out_GDB = r'N:\EssentialConSites\ECS_Run_Dec2021\ECS_Outputs_Dec2021.gdb'
+   out_DIR = r'N:\EssentialConSites\ECS_Run_Dec2021\Spreadsheets_Dec2021' 
    
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -56,6 +56,7 @@ def main():
    in_cs_kcs = in_GDB + os.sep + 'csKarst'
    
    # Input other standard variables
+   # No need to change this if in_GDB is valid and naming conventions maintained
    in_elExclude = in_GDB + os.sep + 'ElementExclusions'
    in_consLands = in_GDB + os.sep + 'conslands_lam'
    in_consLands_flat = in_GDB + os.sep + 'conslands_lam_flat'
@@ -63,6 +64,7 @@ def main():
    fld_RegCode = 'GEN_REG'
    
    # Input cutoff years
+   # This should change every calendar year
    cutYear = 1996 # yyyy - 25 for TCS and SCU
    flagYear = 2001 # yyyy - 20 for TCS and SCU
    cutYear_kcs = 1981 # yyyy - 40 for KCS

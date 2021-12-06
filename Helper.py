@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2017-08-08
-# Last Edit: 2021-11-29
+# Last Edit: 2021-12-02
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -14,9 +14,9 @@
 import os, sys, traceback, numpy
 try:
    arcpy
-   print "Arcpy is already loaded"
+   print("Arcpy is already loaded")
 except:
-   print "Initiating arcpy, which takes longer than it should..."
+   print("Initiating arcpy, which takes longer than it should...")
    import arcpy   
 
 from datetime import datetime as datetime   
@@ -36,15 +36,15 @@ def getScratchMsg(scratchGDB):
    
 def printMsg(msg):
    arcpy.AddMessage(msg)
-   print msg
+   print(msg)
    
 def printWrng(msg):
    arcpy.AddWarning(msg)
-   print 'Warning: ' + msg
+   print('Warning: ' + msg)
    
 def printErr(msg):
    arcpy.AddError(msg)
-   print 'Error: ' + msg
+   print('Error: ' + msg)
 
 def garbagePickup(trashList):
    '''Deletes Arc files in list, with error handling. Argument must be a list.'''
