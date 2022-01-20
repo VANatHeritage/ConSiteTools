@@ -530,7 +530,7 @@ def prepFlowBuff(in_FlowDist, truncDist, procMask, out_Rast, snapRast = None):
    - snapRast (optional): Raster used to determine coordinate system and alignment of output. If a snap raster is specified, the output will be reprojected to match.
    '''
    
-   # TO DO: Clip by HUC boundary. Output polygons instead of raster. Repair geometry. Split features by catchments. Debug. 
+   # TO DO: Clip by HUC boundary. Output polygons instead of raster. Split features by catchments. Repair geometry. Debug. 
    
    # Check out Spatial Analyst extention
    arcpy.CheckOutExtension("Spatial")
@@ -1916,6 +1916,9 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    """
    arcpy.CheckOutExtension("Network")
    
+   ### TODO: Add dam points from NID to the service layers as well.
+   ### Use this feature server: https://ags03.sec.usace.army.mil/server/rest/services/Dams_Public/FeatureServer
+   
    # Set up some variables
    descHydro = arcpy.Describe(in_hydroNet)
    nwDataset = descHydro.catalogPath
@@ -2346,11 +2349,11 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
          arcpy.Delete_management(clipBuffers)
       arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
       
-      # Reproject input lines, if necessary
-      tmpLines = out_Scratch + os.sep + "lines_prj" # Can NOT project to in_memory
-      lines_prj = ProjectToMatch_vec(in_Lines, in_FlowBuff, tmpLines, copy = 0)
+      # # Reproject input lines, if necessary
+      # tmpLines = out_Scratch + os.sep + "lines_prj" # Can NOT project to in_memory
+      # lines_prj = ProjectToMatch_vec(in_Lines, in_FlowBuff, tmpLines, copy = 0)
       
-      with  arcpy.da.SearchCursor(lines_prj, ["SHAPE@", "OBJECTID"]) as myLines:
+      with  arcpy.da.SearchCursor(in_Lines, ["SHAPE@", "OBJECTID"]) as myLines:
          for line in myLines:
             try:
                lineShp = line[0]
@@ -2397,10 +2400,11 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       # flowPoly = arcpy.env.scratchGDB + os.sep + "flowPoly"
       # arcpy.RasterToPolygon_conversion (clipFlow, flowPoly, "NO_SIMPLIFY", "VALUE")
       
-      # Reproject final shapes, if necessary
-      prjPolys = out_Scratch + os.sep + "prjPolys"
-      finPolys = ProjectToMatch_vec(flowPoly, in_Catch, prjPolys, copy = 0)
-      in_Polys = finPolys
+      # # Reproject final shapes, if necessary
+      # prjPolys = out_Scratch + os.sep + "prjPolys"
+      # finPolys = ProjectToMatch_vec(flowBuff, in_Catch, prjPolys, copy = 0)
+      # in_Polys = finPolys
+      in_Polys = flowBuff
    
    else: 
       # Select catchments intersecting scuLines
@@ -2426,7 +2430,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       in_Polys = mergeFeats
    
    # Dissolve overlapping features and fill in gaps 
-   # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
    arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
@@ -2436,6 +2439,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    arcpy.SelectLayerByLocation_management("dissPolys", "INTERSECT", in_Lines, "", "NEW_SELECTION")
 
    printMsg("Filling in holes...")
+   # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    fillPolys = out_Scratch + os.sep + "fillPolys"
    arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
       
@@ -2467,7 +2471,9 @@ def main():
    in_tidalTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naTidalTrace_3000.lyr"
    in_Catch = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\NHDPlusCatchment"
    # in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_albers"
-   in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_Poly_clp"
+   # in_FlowBuff = r"N:\ProProjects\ConSites\ConSite_Tools_Inputs.gdb\FlowBuff150_Poly_clp_split"
+   ### Performance VASTLY improved by converting this to a shapefile. Dunno why.
+   in_FlowBuff = r"N:\ProProjects\ConSites\Shapefiles\FlowBuff150_Poly_clp_split.shp"
    in_NWI = r"N:\SpatialData\USFWS\NWI\VA_geodatabase_wetlands.gdb\VA_Wetlands"
    # outFeats = r"N:\ProProjects\ConSites\SCS_Testing.gdb\ShiftFeats"
    out_Points = r"N:\ProProjects\ConSites\SCS_Testing.gdb\scsPoints"
