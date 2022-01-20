@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2021-12-06
+# Last Edit: 2022-01-20
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2055,8 +2055,13 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
+   # Also get midpoints to take care of a bizarre situation
+   tmpPts1 = out_Scratch + os.sep + "tmpPts1"
+   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts1, "BOTH_ENDS")
+   tmpPts2 = out_Scratch + os.sep + "tmpPts2"
+   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts2, "MID")
    tmpPts = out_Scratch + os.sep + "tmpPts"
-   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
+   arcpy.Merge_management ([tmpPts1, tmpPts2], tmpPts)
    
    # Attribute points designating them tidal or not
    # Spatial join allows for a 3-meter spatial error
