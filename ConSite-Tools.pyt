@@ -4,7 +4,7 @@
 # ArcGIS version: 10.3.1
 # Python version: 2.7.8
 # Creation Date: 2017-08-11
-# Last Edit: 2021-11-17
+# Last Edit: 2022-01-21
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1066,7 +1066,7 @@ class sites_scs(object):
          pass
       parm4 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm5 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
-      parm6 = defineParam("in_FlowBuff", "Input Flow Buffer Raster", "GPRasterDataLayer", "Required", "Input")
+      parm6 = defineParam("in_FlowBuff", "Input Flow Buffer", "GPFeatureLayer", "Required", "Input")
       parm7 = defineParam("fld_Rule", "Rule field", "String", "Required", "Input", "RULE")
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
