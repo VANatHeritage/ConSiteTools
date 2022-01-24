@@ -4,7 +4,7 @@
 # ArcGIS version: 10.3.1
 # Python version: 2.7.8
 # Creation Date: 2017-08-11
-# Last Edit: 2022-01-21
+# Last Edit: 2022-01-24
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1099,7 +1099,9 @@ class sites_scs(object):
          scratchParm = "in_memory"
 
       # Run the function
-      scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, "", "", scratchParm)
+      # scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, "", "", scratchParm)
+      
+      scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, "true", 150, scratchParm)
 
       return scsPolys
       
