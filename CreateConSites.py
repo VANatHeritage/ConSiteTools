@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2022-01-21
+# Last Edit: 2022-01-24
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1903,7 +1903,7 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
-def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
+def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    """Creates three Network Analyst service layers needed for SCU delineation. 
    This tool only needs to be run the first time you run the suite of SCU delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCU delineation sequence.
    
@@ -1911,6 +1911,7 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    
    Parameters:
    - in_hydroNet = Input hydrological network dataset
+   - in_dams = Input dams (use National Inventory of Dams)
    - upDist = The distance (in map units) to traverse upstream from a point along the network
    - downDist = The distance (in map units) to traverse downstream from a point along the network
    """
@@ -1925,10 +1926,11 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
    hydroDir = os.path.dirname(catPath)
    hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
-   nwLines = catPath + os.sep + "NHDLine"
-   qry = "FType = 343" # DamWeir only
-   arcpy.MakeFeatureLayer_management (nwLines, "lyr_DamWeir", qry)
-   in_Lines = "lyr_DamWeir"
+   ###Not using dams from NHDPlus anymore, not as accurate as National Inventory of Dams
+   # nwLines = catPath + os.sep + "NHDLine"
+   # qry = "FType = 343" # DamWeir only
+   # arcpy.MakeFeatureLayer_management (nwLines, "lyr_DamWeir", qry)
+   # in_Lines = "lyr_DamWeir"
    downString = (str(downDist)).replace(".","_")
    upString = (str(upDist)).replace(".","_")
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyr"%downString
@@ -1964,9 +1966,9 @@ def MakeServiceLayers_scs(in_hydroNet, upDist = 3000, downDist = 500):
    printMsg("Adding dam barriers to service layers...")
    for sl in [["naDownTrace", lyrDownTrace], ["naUpTrace", lyrUpTrace], ["naTidalTrace", lyrTidalTrace]]:
       arcpy.AddLocations_na(in_network_analysis_layer=sl[0], 
-         sub_layer="Line Barriers", 
-         in_table=in_Lines, 
-         field_mappings="Name Permanent_Identifier #", 
+         sub_layer="Point Barriers", 
+         in_table=in_dams, 
+         field_mappings="Name NIDID #", 
          search_tolerance="100 Meters", 
          sort_field="", 
          search_criteria="NHDFlowline SHAPE_MIDDLE_END;HydroNet_ND_Junctions NONE", 
@@ -2055,14 +2057,8 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
-   ### Also get midpoints to take care of a bizarre situation 
-   ### --> THIS DIDN'T HELP - NEED MANUAL DELETION OF PROBLEM DAMS
    tmpPts = out_Scratch + os.sep + "tmpPts"
    arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
-   # tmpPts2 = out_Scratch + os.sep + "tmpPts2"
-   # arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts2, "MID")
-   # tmpPts = out_Scratch + os.sep + "tmpPts"
-   # arcpy.Merge_management ([tmpPts1, tmpPts2], tmpPts)
    
    # Attribute points designating them tidal or not
    # Spatial join allows for a 3-meter spatial error
@@ -2481,6 +2477,7 @@ def main():
    fld_Rule = "RULE"
    in_SCU = r"N:\ConSites_delin\Biotics.gdb\csStream"
    in_hydroNet = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\VA_HydroNetHR.gdb\HydroNet\HydroNet_ND"
+   in_dams = r"N:\ProProjects\ConSites\Shapefiles\NID_damsVA.shp"
    in_downTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naDownTrace_500.lyr"
    in_upTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naUpTrace_3000.lyr"
    in_tidalTrace = r"N:\SpatialData\NHD_Plus\HydroNet\VA_HydroNetHR\naTidalTrace_3000.lyr"
