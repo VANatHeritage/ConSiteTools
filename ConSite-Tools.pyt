@@ -880,11 +880,12 @@ class servLyrs_scs(object):
          parm0.value = "HydroNet_ND"
       except:
          pass
-      parm1 = defineParam("out_lyrDown", "Output Downstream Layer", "DELayer", "Derived", "Output")
-      parm2 = defineParam("out_lyrUp", "Output Upstream Layer", "DELayer", "Derived", "Output")
-      parm3 = defineParam("out_lyrTidal", "Output Tidal Layer", "DELayer", "Derived", "Output")
+      parm1 = defineParam("in_dams", "Input Dams", "GPFeatureLayer", "Required", "Input")
+      parm2 = defineParam("out_lyrDown", "Output Downstream Layer", "DELayer", "Derived", "Output")
+      parm3 = defineParam("out_lyrUp", "Output Upstream Layer", "DELayer", "Derived", "Output")
+      parm4 = defineParam("out_lyrTidal", "Output Tidal Layer", "DELayer", "Derived", "Output")
       
-      parms = [parm0, parm1, parm2, parm3]
+      parms = [parm0, parm1, parm2, parm3, parm4]
       return parms
 
    def isLicensed(self):
@@ -908,13 +909,13 @@ class servLyrs_scs(object):
       declareParams(parameters)
       
       # Run the function
-      (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet)
+      (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet, in_dams)
 
       # Update the derived parameters.
       # This enables layers to be displayed automatically if running tool from ArcMap.
-      parameters[1].value = lyrDownTrace
-      parameters[2].value = lyrUpTrace
-      parameters[3].value = lyrTidalTrace
+      parameters[2].value = lyrDownTrace
+      parameters[3].value = lyrUpTrace
+      parameters[4].value = lyrTidalTrace
       
       return 
       
