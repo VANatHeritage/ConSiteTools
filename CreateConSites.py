@@ -2217,7 +2217,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    return (out_Lines, lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
 def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
-   """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function. 
+   """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function, within a loop. 
    
    Parameters:
    in_Lines = Input SCU lines, generated as output from CreateLines_scu function
@@ -2246,12 +2246,12 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    printMsg("Clipping StreamRiver polygons...")
    CleanClip("StreamRiver_Poly", in_Catch, clipRiverPoly)
    arcpy.EliminatePolygonPart_management (clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
+   #arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
    
    printMsg("Clipping LakePond polygons...")
    CleanClip("LakePond_Poly", in_Catch, clipLakePoly)
    arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
+   #arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
    
    # printMsg("Clipping SCU lines...")
    # arcpy.Clip_analysis(in_Lines, in_Catch, clipLines)
@@ -2264,10 +2264,10 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    
    # Buffer SCU lines and selected NHD polygons
    printMsg("Buffering StreamRiver polygons...")
-   arcpy.Buffer_analysis("StreamRivers", StreamRiverBuff, buffDist, "", "ROUND", "NONE")
+   arcpy.Buffer_analysis(fillRiverPoly, StreamRiverBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering LakePond polygons...")
-   arcpy.Buffer_analysis("LakePonds", LakePondBuff, buffDist, "", "ROUND", "NONE")
+   arcpy.Buffer_analysis(fillLakePoly, LakePondBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering SCU lines...")
    arcpy.Buffer_analysis(in_Lines, LineBuff, buffDist, "", "ROUND", "NONE")
