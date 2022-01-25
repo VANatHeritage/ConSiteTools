@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2022-01-24
+# Last Edit: 2022-01-25
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2256,10 +2256,11 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    # printMsg("Clipping SCU lines...")
    # arcpy.Clip_analysis(in_Lines, in_Catch, clipLines)
    
-   # Select clipped NHD polygons intersecting SCU lines
-   printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
-   arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
-   arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   # # Select clipped NHD polygons intersecting SCU lines
+   # ###Is this step necessary?? 
+   # printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
+   # arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   # arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    
    # Buffer SCU lines and selected NHD polygons
    printMsg("Buffering StreamRiver polygons...")
@@ -2349,22 +2350,23 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
          arcpy.Delete_management(flowBuff)
       arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
       
-      # Create empty feature class to store clipping buffers
-      printMsg("Creating empty feature class for clipping buffers")
-      sr = arcpy.Describe(in_FlowBuff).spatialReference
-      fname = "clipBuffers"
-      fpath = out_Scratch
-      clipBuffers = fpath + os.sep + fname
+      # ### This is never used; why did I do this??
+      # # Create empty feature class to store clipping buffers
+      # printMsg("Creating empty feature class for clipping buffers")
+      # sr = arcpy.Describe(in_FlowBuff).spatialReference
+      # fname = "clipBuffers"
+      # fpath = out_Scratch
+      # clipBuffers = fpath + os.sep + fname
       
-      if arcpy.Exists(clipBuffers):
-         arcpy.Delete_management(clipBuffers)
-      arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
+      # if arcpy.Exists(clipBuffers):
+         # arcpy.Delete_management(clipBuffers)
+      # arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
       
       # # Reproject input lines, if necessary
       # tmpLines = out_Scratch + os.sep + "lines_prj" # Can NOT project to in_memory
       # lines_prj = ProjectToMatch_vec(in_Lines, in_FlowBuff, tmpLines, copy = 0)
       
-      with  arcpy.da.SearchCursor(in_Lines, ["SHAPE@", "OBJECTID"]) as myLines:
+      with arcpy.da.SearchCursor(in_Lines, ["SHAPE@", "OBJECTID"]) as myLines:
          for line in myLines:
             try:
                lineShp = line[0]
@@ -2395,8 +2397,9 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                printMsg("Appending feature %s..." %lineID)
                arcpy.Append_management (flowPoly, flowBuff, "NO_TEST")
                
-               printMsg("Appending feature %s..." %lineID)
-               arcpy.Append_management (clipBuff, clipBuffers, "NO_TEST")
+               # ###This is not used again; why did I do this??
+               # printMsg("Appending feature %s..." %lineID)
+               # arcpy.Append_management (clipBuff, clipBuffers, "NO_TEST")
 
             except:
                printMsg("Process failure for feature %s. Passing..." %lineID)
