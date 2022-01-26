@@ -2246,28 +2246,28 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    printMsg("Clipping StreamRiver polygons...")
    CleanClip("StreamRiver_Poly", in_Catch, clipRiverPoly)
    arcpy.EliminatePolygonPart_management (clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   #arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
+   arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
    
    printMsg("Clipping LakePond polygons...")
    CleanClip("LakePond_Poly", in_Catch, clipLakePoly)
    arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   #arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
+   arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
    
    # printMsg("Clipping SCU lines...")
    # arcpy.Clip_analysis(in_Lines, in_Catch, clipLines)
    
-   # # Select clipped NHD polygons intersecting SCU lines
-   # ###Is this step necessary?? 
-   # printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
-   # arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
-   # arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   # Select clipped NHD polygons intersecting SCU lines
+   ### Is this step necessary? Yes. Otherwise little off-network ponds influence result.
+   printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
+   arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    
    # Buffer SCU lines and selected NHD polygons
    printMsg("Buffering StreamRiver polygons...")
-   arcpy.Buffer_analysis(fillRiverPoly, StreamRiverBuff, buffDist, "", "ROUND", "NONE")
+   arcpy.Buffer_analysis("StreamRivers", StreamRiverBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering LakePond polygons...")
-   arcpy.Buffer_analysis(fillLakePoly, LakePondBuff, buffDist, "", "ROUND", "NONE")
+   arcpy.Buffer_analysis("LakePonds", LakePondBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering SCU lines...")
    arcpy.Buffer_analysis(in_Lines, LineBuff, buffDist, "", "ROUND", "NONE")
