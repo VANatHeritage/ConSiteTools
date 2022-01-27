@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS 10.3.1 / Python 2.7.8
 # Creation Date: 2016-02-25
-# Last Edit: 2022-01-25
+# Last Edit: 2022-01-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -632,6 +632,9 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - fld_SiteID: the unique site ID field in the old CS feature class
    - scratchGDB: scratch geodatabase for intermediate products'''
 
+   # Recast cutVal as a number b/c for some reasons it's acting like text
+   cutVal = float(cutVal)
+   
    # Determine how many old sites are overlapped by each automated site.  Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
    Join1 = scratchGDB + os.sep + "Join1"

@@ -4,7 +4,7 @@
 # ArcGIS version: 10.3.1
 # Python version: 2.7.8
 # Creation Date: 2017-08-11
-# Last Edit: 2022-01-24
+# Last Edit: 2022-01-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -264,6 +264,7 @@ class review_consite(object):
          scratchParm = arcpy.env.scratchWorkspace 
 
       ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, scratchParm)
+      arcpy.MakeFeatureLayer_management (out_Sites, "QC_lyr")
 
       return out_Sites
 
