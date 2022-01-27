@@ -8,10 +8,10 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 - The prioritization process for Essential Conservation Sites remains unchanged from previous version.
 
 - The delineation process for Stream Conservation Sites has been finalized (most likely). Changes include:
-   - No more support for intermediate SCU output
-   - Tidal areas treated differently than non-tidal areas. For tidal points, stream network is traversed 3 km both up- and down-stream. For other points, stream network is traversed 3 km upstream and 500 m downstream.
-   - Requires 150-m flow buffer input (polygon shapefile) which determines the amount of area to include on either side of streams and rivers.
-   - For procedural features, requires "SCU" rule to be split into either "SCU1" (regular features) or "SCU2" (for elements that may be mapped relatively far from water). For the latter type, full catchments are burned in. 
+   - No more support for the intermediate SCU output
+   - Tidal areas are treated differently than non-tidal areas. For tidal points, the stream network is traversed 3 km both up- and down-stream. For other points, the stream network is traversed 3 km upstream and 500 m downstream. 
+   - The process requires a 150-m flow buffer input (polygon shapefile derived from a raster) which determines the amount of area to include on either side of streams and rivers.
+   - For procedural features, the process requires that the "SCU" rule is replaced with either "SCU1" (regular features) or "SCU2" (for features that use the terrestrial resources and are mapped relatively far from water). For the latter type, full catchments are burned in. 
 
 
 #### Version 1.2 
