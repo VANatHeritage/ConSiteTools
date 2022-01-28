@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2020-12-11
+# Last Edit: 2022-01-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -88,7 +88,7 @@ def addRanks(in_Table, fld_Sorting, order = 'ASCENDING', fld_Ranking='RANK', thr
    - rounding: determines whether sorted values are to be rounded prior to ranking, and by how much. Must be an integer or None. With rounding = 2, 1234.5678 and 1234.5690 are treated as the equivalent number for ranking purposes. With rounding = -1, 11 and 12 are treated as equivalents for ranking. Rounding is recommended if the sorting field is a double type, otherwise the function may fail.
    '''
    valList = unique_values(in_Table, fld_Sorting)
-   if rounding <> None:
+   if rounding != None:
       valList = [round(val, rounding) for val in valList]
    if order == "DESC" or order == "DESCENDING":
       valList.reverse()
@@ -117,7 +117,7 @@ def addRanks(in_Table, fld_Sorting, order = 'ASCENDING', fld_Ranking='RANK', thr
    if not arcpy.ListFields(in_Table, fld_Ranking):
       arcpy.AddField_management(in_Table, fld_Ranking, "SHORT")
    codeblock = '''def rankVals(val, rankDict, rounding):
-      if rounding <> None:
+      if rounding != None:
          val = round(val,rounding)
       rank = rankDict[val]
       return rank'''
@@ -244,9 +244,9 @@ def UpdatePortfolio(in_procEOs,in_ConSites,in_sumTab, slopFactor = "15 METERS"):
    - slopFactor: Maximum distance allowable between features for them to still me considered coincident
    '''
    # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
-   where_clause = '("ChoiceRANK" < 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" <> -1' 
+   where_clause = '("ChoiceRANK" < 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" != -1' 
    arcpy.MakeFeatureLayer_management (in_procEOs, "lyr_EO", where_clause)
-   where_clause = '"OVERRIDE" <> -1'
+   where_clause = '"OVERRIDE" != -1'
    arcpy.MakeFeatureLayer_management (in_ConSites, "lyr_CS", where_clause)
    # arcpy.SelectLayerByLocation_management ("lyr_CS", "INTERSECT", "lyr_EO", 0, "NEW_SELECTION", "NOT_INVERT")
    arcpy.SelectLayerByLocation_management ("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
@@ -255,7 +255,7 @@ def UpdatePortfolio(in_procEOs,in_ConSites,in_sumTab, slopFactor = "15 METERS"):
    printMsg('ConSites portfolio updated')
    
    # Intersect Choice EOs with Portfolio ConSites, and set PORTFOLIO to 1
-   where_clause = '"TIER" = \'Choice\' AND "OVERRIDE" <> -1'
+   where_clause = '"TIER" = \'Choice\' AND "OVERRIDE" != -1'
    arcpy.MakeFeatureLayer_management (in_procEOs, "lyr_EO", where_clause)
    where_clause = '"PORTFOLIO" = 1'
    arcpy.MakeFeatureLayer_management (in_ConSites, "lyr_CS", where_clause)

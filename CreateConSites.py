@@ -1,6 +1,6 @@
 # ----------------------------------------------------------------------------------------
 # CreateConSites.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
+# Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
 # Last Edit: 2022-01-27
 # Creator:  Kirsten R. Hazler
@@ -2104,23 +2104,6 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    if out_Scratch == "in_memory":
       # recast to save to disk, otherwise there is no OBJECTID field for queries as needed
       out_Scratch = arcpy.env.scratchGDB
-   
-   printMsg("Designating output names for updated layer files, same as input names...")
-   lyrUpTrace = in_upTrace
-   lyrDownTrace = in_downTrace
-   lyrTidalTrace = in_tidalTrace
-   
-   printMsg("Casting strings to layer objects...")
-   in_upTrace = arcpy.mapping.Layer(in_upTrace)
-   in_downTrace = arcpy.mapping.Layer(in_downTrace)
-   in_tidalTrace = arcpy.mapping.Layer(in_tidalTrace)
-   
-   # # I think this stuff can be deleted
-   # descDT = arcpy.Describe(in_downTrace)
-   # nwDataset = descDT.network.catalogPath
-   # catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   # hydroDir = os.path.dirname(catPath)
-   # hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
 
    printMsg("Designating line and point outputs...")
    downLines = out_Scratch + os.sep + "downLines"
@@ -2140,67 +2123,44 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Load points as facilities into service layers; search distance 500 meters
    # Solve upstream and downstream service layers; save out lines and updated layers
    lines = []
-   for sa in [[in_downTrace, nontidalPts, downLines, lyrDownTrace], [in_upTrace, nontidalPts, upLines, lyrUpTrace], [in_tidalTrace, tidalPts, tidalLines, lyrTidalTrace]]:
-      try:
-         inLyr = sa[0]
-         inPoints = sa[1]
-         outLines = sa[2]
-         outLyr = sa[3]
-         count = countFeatures(inPoints)
-         if count > 0:
-            printMsg("Loading points into service layer...")
-            arcpy.AddLocations_na(in_network_analysis_layer=inLyr, 
-               sub_layer="Facilities", 
-               in_table=inPoints, 
-               field_mappings="Name FID #", 
-               search_tolerance="500 Meters", 
-               sort_field="", 
-               search_criteria="NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
-               match_type="MATCH_TO_CLOSEST", 
-               append="CLEAR", 
-               snap_to_position_along_network="SNAP", 
-               snap_offset="0 Meters", 
-               exclude_restricted_elements="EXCLUDE", 
-               search_query="NHDFlowline #;HydroNet_ND_Junctions #")
-            printMsg("Completed point loading.")
-            printMsg("Solving service area for %s..." % inLyr)
-            arcpy.Solve_na(in_network_analysis_layer=inLyr, 
-               ignore_invalids="SKIP", 
-               terminate_on_solve_error="TERMINATE", 
-               simplification_tolerance="")
-            inLines = arcpy.mapping.ListLayers(inLyr, "Lines")[0]
-            printMsg("Saving out lines...")
-            arcpy.CopyFeatures_management(inLines, outLines)
-            arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
-            printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
-            arcpy.SaveToLayerFile_management(inLyr, outLyr)
-            lines.append(outLines)
-         else:
-            pass
-      except:
+   for sa in [[in_downTrace, nontidalPts, downLines], [in_upTrace, nontidalPts, upLines], [in_tidalTrace, tidalPts, tidalLines]]:
+      inLyr = sa[0]
+      inPoints = sa[1]
+      outLines = sa[2]
+      count = countFeatures(inPoints)
+      if count > 0:
+         printMsg("Loading points into service layer...")
+         arcpy.AddLocations_na(in_network_analysis_layer=inLyr, 
+            sub_layer="Facilities", 
+            in_table=inPoints, 
+            field_mappings="Name FID #", 
+            search_tolerance="500 Meters", 
+            sort_field="", 
+            search_criteria="NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
+            match_type="MATCH_TO_CLOSEST", 
+            append="CLEAR", 
+            snap_to_position_along_network="SNAP", 
+            snap_offset="0 Meters", 
+            exclude_restricted_elements="EXCLUDE", 
+            search_query="NHDFlowline #;HydroNet_ND_Junctions #")
+         printMsg("Completed point loading.")
+         printMsg("Solving service area for %s..." % inLyr)
+         arcpy.Solve_na(in_network_analysis_layer=inLyr, 
+            ignore_invalids="SKIP", 
+            terminate_on_solve_error="TERMINATE", 
+            simplification_tolerance="")
+         inLines = inLyr + "\Lines"
+         printMsg("Saving out lines...")
+         arcpy.CopyFeatures_management(inLines, outLines)
+         arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
+         # printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
+         # arcpy.SaveToLayerFile_management(inLyr, outLyr)
+         lines.append(outLines)
+      else:
          pass
    
-   #del naPoints
-  
-   # # Solve upstream and downstream service layers; save out lines and updated layers
-   # for sa in [[in_downTrace, downLines, lyrDownTrace], [in_upTrace, upLines, lyrUpTrace], [in_tidalTrace, tidalLines, lyrTidalTrace]]:
-      # inLyr = sa[0]
-      # outLines = sa[1]
-      # outLyr = sa[2]
-      # printMsg("Solving service area for %s..." % inLyr)
-      # arcpy.Solve_na(in_network_analysis_layer=inLyr, 
-         # ignore_invalids="SKIP", 
-         # terminate_on_solve_error="TERMINATE", 
-         # simplification_tolerance="")
-      # inLines = arcpy.mapping.ListLayers(inLyr, "Lines")[0]
-      # printMsg("Saving out lines...")
-      # arcpy.CopyFeatures_management(inLines, outLines)
-      # arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
-      # printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
-      # arcpy.SaveToLayerFile_management(inLyr, outLyr)
-   
    # Merge and dissolve the segments; ESRI does not make this simple
-   printMsg("Merging primary segments with selected extension segments...")
+   printMsg("Merging segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
    # arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
    arcpy.Merge_management (lines, comboLines)
@@ -2217,7 +2177,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
 
    arcpy.CheckInExtension("Network")
    
-   return (out_Lines, lyrDownTrace, lyrUpTrace, lyrTidalTrace)
+   return (out_Lines, in_downTrace, in_upTrace, in_tidalTrace)
 
 def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
    """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function, within a loop. 

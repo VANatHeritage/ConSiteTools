@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 1.2
-# ArcGIS version: 10.3.1
-# Python version: 2.7.8
+# Toolbox version: 2.0
+# ArcGIS version: Pro 2.9.x
+# Python version: 3.x
 # Creation Date: 2017-08-11
 # Last Edit: 2022-01-27
 # Creator:  Kirsten R. Hazler
@@ -957,6 +957,10 @@ class ntwrkPts_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[3].altered:
+         fc = parameters[3].valueAsText
+         field_names = [f.name for f in arcpy.ListFields(fc)]
+         parameters[6].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -995,8 +999,20 @@ class lines_scs(object):
       except:
          pass
       parm1 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
+      try:
+         parm1.value = "naDownTrace"
+      except:
+         pass
       parm2 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
+      try:
+         parm2.value = "naUpTrace"
+      except:
+         pass
       parm3 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
+      try:
+         parm3.value = "naTidalTrace"
+      except:
+         pass
       parm4 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
       parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
       parm6 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")

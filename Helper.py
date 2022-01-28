@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------------------------
 # Helper.py
-# Version:  ArcGIS 10.3.1 / Python 2.7.8
+# Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2021-12-02
+# Last Edit: 2022-02-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
