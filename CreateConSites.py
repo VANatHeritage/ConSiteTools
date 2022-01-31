@@ -1920,9 +1920,6 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    """
    arcpy.CheckOutExtension("Network")
    
-   ### TODO: Add dam points from NID to the service layers as well.
-   ### Use this feature server: https://ags03.sec.usace.army.mil/server/rest/services/Dams_Public/FeatureServer
-   
    # Set up some variables
    descHydro = arcpy.Describe(in_hydroNet)
    nwDataset = descHydro.catalogPath
@@ -1984,10 +1981,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
          
       printMsg("Saving service layer to %s..." %sl[1])      
       arcpy.SaveToLayerFile_management(sl[0], sl[1]) 
-      #del barriers
-      
-   #del serviceLayer
-   
+
    arcpy.CheckInExtension("Network")
    
    return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
