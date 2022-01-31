@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-01-27
+# Last Edit: 2022-01-28
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -15,6 +15,7 @@
 # ----------------------------------------------------------------------------------------
 
 import CreateConSites
+import importlib
 from CreateConSites import *
 from PrioritizeConSites import *
 
@@ -870,7 +871,7 @@ class servLyrs_scs(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
       self.label = "0: Make Network Analyst Service Layers"
-      self.description = 'Make two service layers needed for tracking upstream and downstream distances along hydro network.'
+      self.description = 'Make service layers needed for tracking upstream and downstream distances along hydro network.'
       self.canRunInBackground = False
       self.category = "Site Delineation Tools: SCS"
 
@@ -882,6 +883,10 @@ class servLyrs_scs(object):
       except:
          pass
       parm1 = defineParam("in_dams", "Input Dams", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm1.value = "NID_damsVA"
+      except:
+         pass
       parm2 = defineParam("out_lyrDown", "Output Downstream Layer", "DELayer", "Derived", "Output")
       parm3 = defineParam("out_lyrUp", "Output Upstream Layer", "DELayer", "Derived", "Output")
       parm4 = defineParam("out_lyrTidal", "Output Tidal Layer", "DELayer", "Derived", "Output")
@@ -918,7 +923,7 @@ class servLyrs_scs(object):
       parameters[3].value = lyrUpTrace
       parameters[4].value = lyrTidalTrace
       
-      return 
+      return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
       
 class ntwrkPts_scs(object):
    def __init__(self):
@@ -935,14 +940,22 @@ class ntwrkPts_scs(object):
          parm0.value = "pfStream"
       except:
          pass
-      parm1 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
+      parm1 = defineParam("out_Points", "Output Network Points", "DEFeatureClass", "Required", "Output", "scsPoints")
+      parm2 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
       try:
-         parm1.value = "HydroNet_ND"
+         parm2.value = "HydroNet_ND"
       except:
          pass
-      parm2 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
-      parm3 = defineParam("in_NWI", "Input NWI Wetlands", "GPFeatureLayer", "Required", "Input")
-      parm4 = defineParam("out_Points", "Output Network Points", "DEFeatureClass", "Required", "Output", "scuPoints")
+      parm3 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm3.value = "NHDPlusCatchment"
+      except:
+         pass
+      parm4 = defineParam("in_NWI", "Input NWI Wetlands", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm4.value = "VA_Wetlands"
+      except:
+         pass
       parm5 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
       parm6 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
       parm7 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
@@ -957,8 +970,8 @@ class ntwrkPts_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[3].altered:
-         fc = parameters[3].valueAsText
+      if parameters[4].altered:
+         fc = parameters[4].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc)]
          parameters[6].filter.list = field_names
       return
@@ -993,27 +1006,27 @@ class lines_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      parm0 = defineParam("in_Points", "Input SCU Points", "GPFeatureLayer", "Required", "Input")
+      parm0 = defineParam("in_Points", "Input Network Points", "GPFeatureLayer", "Required", "Input")
       try:
-         parm0.value = "scuPoints"
+         parm0.value = "scsPoints"
       except:
          pass
-      parm1 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
+      parm1 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
+      parm2 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
       try:
-         parm1.value = "naDownTrace"
+         parm2.value = "naDownTrace"
       except:
          pass
-      parm2 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
+      parm3 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
       try:
-         parm2.value = "naUpTrace"
+         parm3.value = "naUpTrace"
       except:
          pass
-      parm3 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
+      parm4 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
       try:
-         parm3.value = "naTidalTrace"
+         parm4.value = "naTidalTrace"
       except:
          pass
-      parm4 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
       parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
       parm6 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
@@ -1050,9 +1063,9 @@ class lines_scs(object):
           
       # Update the derived parameters.
       # This enables layers to be displayed automatically if running tool from ArcMap.
-      parameters[1].value = lyrDownTrace
-      parameters[2].value = lyrUpTrace
-      parameters[3].value = lyrTidalTrace
+      parameters[2].value = lyrDownTrace
+      parameters[3].value = lyrUpTrace
+      parameters[4].value = lyrTidalTrace
       
       return scsLines
 
@@ -1071,21 +1084,33 @@ class sites_scs(object):
          parm0.value = "pfStream"
       except:
          pass
-      parm1 = defineParam("in_Lines", "Input SCU lines", "GPFeatureLayer", "Required", "Input")
+      parm1 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
       try:
-         parm1.value = "scuLines"
-      except: 
-         pass
-      parm2 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
-      parm3 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
-      try:
-         parm3.value = "HydroNet_ND"
+         parm1.value = "csStream"
       except:
          pass
-      parm4 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      parm5 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
+      parm2 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
+      parm3 = defineParam("in_Lines", "Input SCU lines", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm3.value = "scsLines"
+      except: 
+         pass
+      parm4 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm4.value = "NHDPlusCatchment"
+      except: 
+         pass
+      parm5 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
+      try:
+         parm5.value = "HydroNet_ND"
+      except:
+         pass
       parm6 = defineParam("in_FlowBuff", "Input Flow Buffer", "GPFeatureLayer", "Required", "Input")
-      parm7 = defineParam("fld_Rule", "Rule field", "String", "Required", "Input", "RULE")
+      try:
+         parm6.value = "FlowBuff150"
+      except: 
+         pass
+      parm7 = defineParam("fld_Rule", "Site rule field", "String", "Required", "Input", "RULE")
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8]
