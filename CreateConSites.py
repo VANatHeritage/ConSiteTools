@@ -2334,7 +2334,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
             try:
                lineShp = line[0]
                lineID = line[1]
-               arcpy.env.Extent = "MAXOF"
+               arcpy.env.extent = "MAXOF"
                         
                # Select catchments intersecting scuLine
                printMsg("Selecting catchments containing SCU line...")
@@ -2350,7 +2350,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
 
                # Clip the flow buffer to the clipping buffer 
                printMsg("Clipping the flow buffer ...")
-               arcpy.env.Extent = clipBuff
+               arcpy.env.extent = clipBuff
                # clipRasterToPoly(in_FlowBuff, clipBuff, clipFlow)
                arcpy.Clip_analysis (in_FlowBuff, clipBuff, flowPoly)
                
