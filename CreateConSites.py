@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-01-28
+# Last Edit: 2022-01-31
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2381,30 +2381,31 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       # prjPolys = out_Scratch + os.sep + "prjPolys"
       # finPolys = ProjectToMatch_vec(flowBuff, in_Catch, prjPolys, copy = 0)
       # in_Polys = finPolys
+      
+      
+      # Burn in full catchments for alternate-process PFs
+      qry = "%s = 'SCU2'"%fld_Rule
+      arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
+      count = countFeatures("lyr_altPF")
+      if count > 0:
+         arcpy.SelectLayerByLocation_management(catch, "INTERSECT", "lyr_altPF", "", "NEW_SELECTION")
+         printMsg("Appending full catchments for selected features...")
+         arcpy.Append_management (catch, flowBuff, "NO_TEST")
+         
       in_Polys = flowBuff
    
    else: 
       # Select catchments intersecting scuLines
       printMsg("Selecting catchments containing SCU lines...")
-      arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
-      arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", in_Lines)
+      catch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+      arcpy.SelectLayerByLocation_management (catch, "INTERSECT", in_Lines)
+      in_Polys = catch
    
-      # Dissolve catchments
-      printMsg("Dissolving catchments...")
-      dissCatch = out_Scratch + os.sep + "dissCatch"
-      arcpy.Dissolve_management ("lyr_Catchments", dissCatch, "", "", "SINGLE_PART", "")
-      in_Polys = dissCatch
-   
-   # Burn in catchments for alternate-process PFs
-   qry = "%s = 'SCU2'"%fld_Rule
-   arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
-   count = countFeatures("lyr_altPF")
-   if count > 0:
-      arcpy.SelectLayerByLocation_management("lyr_Catchments", "INTERSECT", "lyr_altPF", "", "NEW_SELECTION")
-      printMsg("Merging selected catchments with flow buffers...")
-      mergeFeats = arcpy.env.scratchGDB + os.sep + "mergeFeats"
-      arcpy.Merge_management ([in_Polys, "lyr_Catchments"], mergeFeats)
-      in_Polys = mergeFeats
+      # # Dissolve catchments
+      # printMsg("Dissolving catchments...")
+      # dissCatch = out_Scratch + os.sep + "dissCatch"
+      # arcpy.Dissolve_management ("lyr_Catchments", dissCatch, "", "", "SINGLE_PART", "")
+      # in_Polys = dissCatch
    
    # Dissolve overlapping features and fill in gaps 
    printMsg("Dissolving adjacent/overlapping features...")
