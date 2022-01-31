@@ -2368,27 +2368,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                printMsg("Process failure for feature %s. Passing..." %lineID)
                tback()
       
-      # # Clip the flow buffer raster to the clipping buffer and convert to polygon
-      # printMsg("Clipping the flow buffer raster...")
-      # clipFlow = arcpy.env.scratchGDB + os.sep + "clipFlow"
-      # clipRasterToPoly(in_FlowBuff, clipBuffers, clipFlow)
-      
-      # printMsg("Converting flow buffer raster to polygon...")
-      # flowPoly = arcpy.env.scratchGDB + os.sep + "flowPoly"
-      # arcpy.RasterToPolygon_conversion (clipFlow, flowPoly, "NO_SIMPLIFY", "VALUE")
-      
-      # # Reproject final shapes, if necessary
-      # prjPolys = out_Scratch + os.sep + "prjPolys"
-      # finPolys = ProjectToMatch_vec(flowBuff, in_Catch, prjPolys, copy = 0)
-      # in_Polys = finPolys
-      
-      
+      arcpy.env.extent = "MAXOF"
       # Burn in full catchments for alternate-process PFs
       qry = "%s = 'SCU2'"%fld_Rule
-      arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
-      count = countFeatures("lyr_altPF")
+      altPF = arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
+      count = countFeatures(altPF)
+      print(count)
       if count > 0:
-         arcpy.SelectLayerByLocation_management(catch, "INTERSECT", "lyr_altPF", "", "NEW_SELECTION")
+         arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
+         fullCatch = out_Scratch + os.sep + "fullCatchments"
          printMsg("Appending full catchments for selected features...")
          arcpy.Append_management (catch, flowBuff, "NO_TEST")
          
@@ -2407,7 +2395,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       # arcpy.Dissolve_management ("lyr_Catchments", dissCatch, "", "", "SINGLE_PART", "")
       # in_Polys = dissCatch
    
-   # Dissolve overlapping features and fill in gaps 
+   # Dissolve adjacent/overlapping features and fill in gaps 
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
    arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
