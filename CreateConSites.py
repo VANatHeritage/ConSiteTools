@@ -2070,7 +2070,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    return out_Points
    
 #def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Scratch = arcpy.env.scratchGDB):
-def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = arcpy.env.scratchGDB):
+def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): #arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCUs.
    
    Parameters:
@@ -2089,9 +2089,9 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    t0 = datetime.now()
    
    # Set up some variables
-   if out_Scratch == "in_memory":
-      # recast to save to disk, otherwise there is no OBJECTID field for queries as needed
-      out_Scratch = arcpy.env.scratchGDB
+   # if out_Scratch == "in_memory":
+      # # recast to save to disk, otherwise there is no OBJECTID field for queries as needed
+      # out_Scratch = arcpy.env.scratchGDB
 
    printMsg("Designating line and point outputs...")
    downLines = out_Scratch + os.sep + "downLines"
@@ -2118,25 +2118,29 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
       count = countFeatures(inPoints)
       if count > 0:
          printMsg("Loading points into service layer...")
-         arcpy.AddLocations_na(in_network_analysis_layer=inLyr, 
-            sub_layer="Facilities", 
-            in_table=inPoints, 
-            field_mappings="Name FID #", 
-            search_tolerance="500 Meters", 
-            sort_field="", 
-            search_criteria="NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
-            match_type="MATCH_TO_CLOSEST", 
-            append="CLEAR", 
-            snap_to_position_along_network="SNAP", 
-            snap_offset="0 Meters", 
-            exclude_restricted_elements="EXCLUDE", 
-            search_query="NHDFlowline #;HydroNet_ND_Junctions #")
+         arcpy.na.AddLocations(in_network_analysis_layer = inLyr, 
+         sub_layer = "Facilities", 
+         in_table = inPoints, 
+         field_mappings = "Name FID #", 
+         search_tolerance = "500 Meters", 
+         sort_field = "", 
+         search_criteria = "NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
+         match_type = "MATCH_TO_CLOSEST", 
+         append = "CLEAR", 
+         snap_to_position_along_network = "SNAP", 
+         snap_offset = "0 Meters", 
+         exclude_restricted_elements = "INCLUDE", 
+         search_query = "NHDFlowline #;HydroNet_ND_Junctions #")
+         
          printMsg("Completed point loading.")
          printMsg("Solving service area for %s..." % inLyr)
-         arcpy.Solve_na(in_network_analysis_layer=inLyr, 
-            ignore_invalids="SKIP", 
-            terminate_on_solve_error="TERMINATE", 
-            simplification_tolerance="")
+         
+         arcpy.na.Solve(in_network_analysis_layer = inLyr, 
+            ignore_invalids = "SKIP", 
+            terminate_on_solve_error = "TERMINATE", 
+            simplification_tolerance = "", 
+            overrides = "")
+
          inLines = inLyr + "\Lines"
          printMsg("Saving out lines...")
          arcpy.CopyFeatures_management(inLines, outLines)
