@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-01-31
+# Last Edit: 2022-02-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1926,61 +1926,55 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
    hydroDir = os.path.dirname(catPath)
    hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
-   ###Not using dams from NHDPlus anymore, not as accurate as National Inventory of Dams
-   # nwLines = catPath + os.sep + "NHDLine"
-   # qry = "FType = 343" # DamWeir only
-   # arcpy.MakeFeatureLayer_management (nwLines, "lyr_DamWeir", qry)
-   # in_Lines = "lyr_DamWeir"
    downString = (str(downDist)).replace(".","_")
    upString = (str(upDist)).replace(".","_")
-   lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyr"%downString
-   lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyr"%upString
-   lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyr"%upString
-   r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
+   lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyrx"%downString
+   lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyrx"%upString
+   lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyrx"%upString
+   #r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
    
    printMsg("Creating upstream, downstream, and tidal service layers...")
-   for sl in [["naDownTrace", downDist, "FlowDownOnly"], ["naUpTrace", upDist, "FlowUpOnly"], ["naTidalTrace", upDist, ""]]:
-      restrictions = r + ";" + sl[2]
-      arcpy.MakeServiceAreaLayer_na(in_network_dataset=nwDataset,
-         out_network_analysis_layer=sl[0], 
-         impedance_attribute="Length", 
-         travel_from_to="TRAVEL_FROM", 
-         default_break_values=sl[1], 
-         polygon_type="NO_POLYS", 
-         merge="NO_MERGE", 
-         nesting_type="RINGS", 
-         line_type="TRUE_LINES_WITH_MEASURES", 
-         overlap="NON_OVERLAP", 
-         split="SPLIT", 
-         excluded_source_name="", 
-         accumulate_attribute_name="Length", 
-         UTurn_policy="ALLOW_UTURNS", 
-         restriction_attribute_name=restrictions, 
-         polygon_trim="TRIM_POLYS", 
-         poly_trim_value="100 Meters", 
-         lines_source_fields="LINES_SOURCE_FIELDS", 
-         hierarchy="NO_HIERARCHY", 
-         time_of_day="")
-   
-   # Add dam barriers to service layers and save
-   printMsg("Adding dam barriers to service layers...")
-   for sl in [["naDownTrace", lyrDownTrace], ["naUpTrace", lyrUpTrace], ["naTidalTrace", lyrTidalTrace]]:
-      arcpy.AddLocations_na(in_network_analysis_layer=sl[0], 
-         sub_layer="Point Barriers", 
-         in_table=in_dams, 
-         field_mappings="Name NIDID #", 
-         search_tolerance="100 Meters", 
-         sort_field="", 
-         search_criteria="NHDFlowline SHAPE_MIDDLE_END;HydroNet_ND_Junctions NONE", 
-         match_type="MATCH_TO_CLOSEST", 
-         append="CLEAR", 
-         snap_to_position_along_network="SNAP", 
-         snap_offset="0 Meters", 
-         exclude_restricted_elements="INCLUDE", 
-         search_query="NHDFlowline #;HydroNet_ND_Junctions #")
-         
-      printMsg("Saving service layer to %s..." %sl[1])      
-      arcpy.SaveToLayerFile_management(sl[0], sl[1]) 
+   for sl in [["naDownTrace", downDist, "SCS Downstream", lyrDownTrace], ["naUpTrace", upDist, "SCS Upstream", lyrUpTrace], ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace]]:
+      #restrictions = r + ";" + sl[2]
+      saLyr = sl[0]
+      cutDist = sl[1]
+      travMode = sl[2]
+      outLyrx = sl[3]
+      
+      # Set up the analysis layer
+      arcpy.na.MakeServiceAreaAnalysisLayer(network_data_source = nwDataset, 
+         layer_name = saLyr, 
+         travel_mode = travMode, 
+         travel_direction = "FROM_FACILITIES", 
+         cutoffs = cutDist, 
+         time_of_day = "", 
+         time_zone = "", 
+         output_type = "LINES", 
+         polygon_detail = "", 
+         geometry_at_overlaps = "SPLIT", 
+         geometry_at_cutoffs = "RINGS", 
+         polygon_trim_distance = "", 
+         exclude_sources_from_polygon_generation = "", 
+         accumulate_attributes = "Length", 
+         ignore_invalid_locations = "SKIP")
+      
+      # Add dam barriers
+      arcpy.na.AddLocations(in_network_analysis_layer = saLyr, 
+         sub_layer = "Point Barriers", 
+         in_table = in_dams, 
+         field_mappings = "Name NIDID #", 
+         search_tolerance "100 Meters", 
+         sort_field = "", 
+         search_criteria = "NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
+         match_type = "MATCH_TO_CLOSEST", 
+         append = "CLEAR", 
+         snap_to_position_along_network = "SNAP", 
+         snap_offset = "0 Meters", 
+         exclude_restricted_elements = "INCLUDE", 
+         search_query = "NHDFlowline #;HydroNet_ND_Junctions #")
+      
+      printMsg("Saving service layer to %s..." %outLyrx)      
+      arcpy.SaveToLayerFile_management(saLyr, outLyrx) 
 
    arcpy.CheckInExtension("Network")
    
