@@ -1973,6 +1973,13 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
          exclude_restricted_elements = "INCLUDE", 
          search_query = "NHDFlowline #;HydroNet_ND_Junctions #")
       
+      # Delete the "not located" dams. I shouldn't have to do this, but NA is not working correctly.
+      printMsg("Deleting problematic dams because Network Analyst has a bug...")
+      printMsg("I am annoyed by having to do this workaround.")
+      barriers = "%s\Point Barriers"%saLyr
+      arcpy.management.SelectLayerByAttribute(barriers, "NEW_SELECTION", "Status = 1", None)
+      arcpy.management.DeleteFeatures(barriers)
+      
       printMsg("Saving service layer to %s..." %outLyrx)      
       arcpy.SaveToLayerFile_management(saLyr, outLyrx) 
 
