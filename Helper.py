@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-02-27
+# Last Edit: 2022-02-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -178,8 +178,8 @@ def TabToDict(inTab, fldKey, fldValue):
 def GetElapsedTime (t1, t2):
    """Gets the time elapsed between the start time (t1) and the finish time (t2)."""
    delta = t2 - t1
-   (d, m, s) = (delta.days, delta.seconds/60, delta.seconds%60)
-   (h, m) = (m/60, m%60)
+   (d, m, s) = (delta.days, delta.seconds//60, delta.seconds%60)
+   (h, m) = (m//60, m%60)
    deltaString = '%s days, %s hours, %s minutes, %s seconds' % (str(d), str(h), str(m), str(s))
    return deltaString
 

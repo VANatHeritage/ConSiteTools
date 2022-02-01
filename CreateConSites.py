@@ -2076,7 +2076,6 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    
    return out_Points
    
-#def CreateLines_scs(out_Lines, in_PF, in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Scratch = arcpy.env.scratchGDB):
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): #arcpy.env.scratchGDB):
    """Loads SCU points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCUs.
    
@@ -2094,11 +2093,6 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    
    # timestamp
    t0 = datetime.now()
-   
-   # Set up some variables
-   # if out_Scratch == "in_memory":
-      # # recast to save to disk, otherwise there is no OBJECTID field for queries as needed
-      # out_Scratch = arcpy.env.scratchGDB
 
    printMsg("Designating line and point outputs...")
    downLines = out_Scratch + os.sep + "downLines"
@@ -2161,12 +2155,9 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Merge and dissolve the segments; ESRI does not make this simple
    printMsg("Merging segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
-   # arcpy.Merge_management ([downLines, upLines, clpLines], comboLines)
    arcpy.Merge_management (lines, comboLines)
    
    # Unsplit lines
-   # For some reason this is not working completely, for larger complexes. 
-   # Yet the function runs correctly in Pro.
    UnsplitLines(comboLines, out_Lines)
    
    # timestamp
