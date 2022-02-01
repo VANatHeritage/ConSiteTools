@@ -1963,7 +1963,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
          sub_layer = "Point Barriers", 
          in_table = in_dams, 
          field_mappings = "Name NIDID #", 
-         search_tolerance "100 Meters", 
+         search_tolerance = "100 Meters", 
          sort_field = "", 
          search_criteria = "NHDFlowline SHAPE;HydroNet_ND_Junctions NONE", 
          match_type = "MATCH_TO_CLOSEST", 
