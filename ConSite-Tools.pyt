@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-01-28
+# Last Edit: 2022-02-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1162,7 +1162,7 @@ class tabulate_exclusions(object):
       parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "DEFile", "GPValueTable", "Input")
       parm00.columns = [["DEFile","CSV Files"]]
       parm00.filters[0].list = ["csv"]
-      parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output")
+      parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output", "ElementExclusions")
 
       parms = [parm00, parm01]
       return parms
@@ -1202,13 +1202,21 @@ class attribute_eo(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_ProcFeats", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
-      parm01 = defineParam("in_elExclude", "Input Elements Exclusion Table", "GPTableView", "Required", "Input")
-      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
-      parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input")
-      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input")
-      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input")
+      parm01 = defineParam("in_elExclude", "Input Elements Exclusion Table", "GPTableView", "Required", "Input", "ElementExclusions")
+      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam")
+      parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam_flat")
+      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "tncEcoRegions_lam")
+      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input", "GEN_REG")
       parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input")
+      try:
+         parm06.value = datetime.now().year - 25
+      except:
+         pass
       parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input")
+      try:
+         parm07.value = datetime.now().year - 20
+      except:
+         pass
       parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab")
 
@@ -1318,12 +1326,13 @@ class build_portfolio(object):
       except:
          pass
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input")
+      parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam_flat")
       parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
       parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab_upd")
       parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")  
+      parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls") 
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
 
    def isLicensed(self):
@@ -1347,7 +1356,7 @@ class build_portfolio(object):
       declareParams(parameters)
 
       # Run function
-      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, in_consLands_flat, build)
+      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_ConSites_XLS, in_consLands_flat, build)
       
       return (out_sortedEOs, out_sumTab, out_ConSites)      
       
@@ -1362,7 +1371,11 @@ class build_element_lists(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
-      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input")
+      try:
+         parm00.value = "priorConSites"
+      except:
+         pass
+      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input", "SITENAME")
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input")
       try:
          parm02.value = "priorEOs"
@@ -1374,8 +1387,8 @@ class build_element_lists(object):
          parm03.value = "sumTab_upd"
       except:
          pass
-      parm04 = defineParam("out_Tab", "Output Element-Boundary Summary", "DETable", "Required", "Output")
-      parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
+      parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")
+      parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output", "elementList.xls")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms

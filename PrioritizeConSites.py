@@ -244,9 +244,9 @@ def UpdatePortfolio(in_procEOs,in_ConSites,in_sumTab, slopFactor = "15 METERS"):
    - slopFactor: Maximum distance allowable between features for them to still me considered coincident
    '''
    # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
-   where_clause = '("ChoiceRANK" < 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" != -1' 
+   where_clause = '("ChoiceRANK" < 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" <> -1' 
    arcpy.MakeFeatureLayer_management (in_procEOs, "lyr_EO", where_clause)
-   where_clause = '"OVERRIDE" != -1'
+   where_clause = '"OVERRIDE" <> -1'
    arcpy.MakeFeatureLayer_management (in_ConSites, "lyr_CS", where_clause)
    # arcpy.SelectLayerByLocation_management ("lyr_CS", "INTERSECT", "lyr_EO", 0, "NEW_SELECTION", "NOT_INVERT")
    arcpy.SelectLayerByLocation_management ("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
@@ -255,7 +255,7 @@ def UpdatePortfolio(in_procEOs,in_ConSites,in_sumTab, slopFactor = "15 METERS"):
    printMsg('ConSites portfolio updated')
    
    # Intersect Choice EOs with Portfolio ConSites, and set PORTFOLIO to 1
-   where_clause = '"TIER" = \'Choice\' AND "OVERRIDE" != -1'
+   where_clause = '"TIER" = \'Choice\' AND "OVERRIDE" <> -1'
    arcpy.MakeFeatureLayer_management (in_procEOs, "lyr_EO", where_clause)
    where_clause = '"PORTFOLIO" = 1'
    arcpy.MakeFeatureLayer_management (in_ConSites, "lyr_CS", where_clause)
@@ -973,6 +973,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # Lesson learned: Don't try to write to in_memory for this, because then the "SHAPE_Area" field no longer exists and then your code fails and then you haz a sad.
    
    # Make copies of inputs
+   printMsg('Making temporary copies of inputs...')
    tmpEOs = scratchGDB + os.sep + "tmpEOs"
    arcpy.CopyFeatures_management(in_sortedEOs, tmpEOs)
    in_sortedEOs = tmpEOs
