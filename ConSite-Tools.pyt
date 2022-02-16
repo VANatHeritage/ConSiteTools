@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-02-09
+# Last Edit: 2022-02-16
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -52,13 +52,15 @@ class Toolbox(object):
 
       # List of tool classes associated with this toolbox
       Subroutine_Tools = [coalesceFeats, shrinkwrapFeats]
-      PrepReview_Tools = [extract_biotics, review_consite, parse_siteTypes, assign_brank, calc_bmi, flat_conslands]
-      NWI_Proc_Tools = [tabparse_nwi, sbb2nwi, subset_nwi]
+      PrepReview_Tools = [rules2nwi, extract_biotics, review_consite, parse_siteTypes, assign_brank, calc_bmi, flat_conslands]
+      # NWI_Proc_Tools = [tabparse_nwi, sbb2nwi, subset_nwi]
       TCS_AHZ_Tools = [create_sbb, expand_sbb, parse_sbb, create_consite]
       SCS_Tools = [servLyrs_scs, ntwrkPts_scs, lines_scs, sites_scs] 
       Portfolio_Tools = [tabulate_exclusions, attribute_eo, score_eo, build_portfolio, build_element_lists]
       
-      self.tools = Subroutine_Tools + PrepReview_Tools + NWI_Proc_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
+      #self.tools = Subroutine_Tools + PrepReview_Tools + NWI_Proc_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
+      
+      self.tools = Subroutine_Tools + PrepReview_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
 
 ### Define the tools
 # Subroutine Tools
@@ -454,21 +456,19 @@ class calc_bmi(object):
       ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename)
       
       return in_Feats  
-
-
-# NWI Processing Tools
-class tabparse_nwi(object):
+  
+class rules2nwi(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
-      self.label = "1: Parse NWI codes"
-      self.description = 'Tabulates unique NWI codes, then parses them into user-friendly attribute fields.'
+      self.label = "Assign rules to NWI wetlands"
+      self.description = 'Assigns SBB rules 5, 6, 7, and 9 and tidal status to applicable NWI codes'
       self.canRunInBackground = True
-      self.category = "NWI Processing Tools"
+      self.category = "Preparation and Review Tools"
 
    def getParameterInfo(self):
       """Define parameters"""
-      parm0 = defineParam("in_NWI", "Input NWI polygons", "GPFeatureLayer", "Required", "Input", "VA_Wetlands")
-      parm1 = defineParam("out_Tab", "Output code table", "DETable", "Required", "Output", "[yourpath]\VA_Wetlands_Codes")
+      parm0 = defineParam("inTab", "Input NWI code table", "GPTableView", "Required", "Input", "NWI_Code_Definitions")
+      parm1 = defineParam("inPolys", "Input NWI wetland polygons", "GPFeatureLayer", "Required", "Input", "VA_Wetlands")
       parms = [parm0, parm1]
       return parms
 
@@ -492,91 +492,10 @@ class tabparse_nwi(object):
       # Set up parameter names and values
       declareParams(parameters)
 
-      TabParseNWI(in_NWI, out_Tab)
+      RulesToNWI(inTab, inPolys)
       
-      return out_Tab
-      
-class sbb2nwi(object):
-   def __init__(self):
-      """Define the tool (tool name is the name of the class)."""
-      self.label = "2: Assign SBB rules to NWI"
-      self.description = 'Assigns SBB rules 5, 6, 7, and 9 to applicable NWI codes'
-      self.canRunInBackground = True
-      self.category = "NWI Processing Tools"
+      return (inTab, inPolys)      
 
-   def getParameterInfo(self):
-      """Define parameters"""
-      parm0 = defineParam("in_Tab", "Input NWI code table", "GPTableView", "Required", "Input", "VA_Wetlands_Codes")
-      parms = [parm0]
-      return parms
-
-   def isLicensed(self):
-      """Set whether tool is licensed to execute."""
-      return True
-
-   def updateParameters(self, parameters):
-      """Modify the values and properties of parameters before internal
-      validation is performed.  This method is called whenever a parameter
-      has been changed."""
-      return
-
-   def updateMessages(self, parameters):
-      """Modify the messages created by internal validation for each tool
-      parameter.  This method is called after internal validation."""
-      return
-
-   def execute(self, parameters, messages):
-      """The source code of the tool."""
-      # Set up parameter names and values
-      declareParams(parameters)
-
-      SbbToNWI(in_Tab)
-      
-      return in_Tab      
-      
-class subset_nwi(object):
-   def __init__(self):
-      """Define the tool (tool name is the name of the class)."""
-      self.label = "3: Create NWI subsets"
-      self.description = 'Creates NWI subsets applicable to SBB rules 5, 6, 7, and 9'
-      self.canRunInBackground = True
-      self.category = "NWI Processing Tools"
-
-   def getParameterInfo(self):
-      """Define parameters"""
-      parm0 = defineParam("in_NWI", "Input NWI polygons", "GPFeatureLayer", "Required", "Input", "VA_Wetlands")
-      parm1 = defineParam("in_Tab", "Input NWI code table", "GPTableView", "Required", "Input", "VA_Wetlands_Codes")
-      parm2 = defineParam('in_GDB', "Geodatabase for storing outputs", "DEWorkspace", "Required", "Input")
-      parm2.filter.list = ["Local Database"]
-      
-      parms = [parm0, parm1, parm2]
-      return parms
-
-   def isLicensed(self):
-      """Set whether tool is licensed to execute."""
-      return True
-
-   def updateParameters(self, parameters):
-      """Modify the values and properties of parameters before internal
-      validation is performed.  This method is called whenever a parameter
-      has been changed."""
-      return
-
-   def updateMessages(self, parameters):
-      """Modify the messages created by internal validation for each tool
-      parameter.  This method is called after internal validation."""
-      return
-
-   def execute(self, parameters, messages):
-      """The source code of the tool."""
-      # Set up parameter names and values
-      declareParams(parameters)
-
-      SubsetNWI(in_NWI, in_Tab, in_GDB)
-      
-      return in_Tab  
-   
-      
 # TCS/AHZ Delineation Tools 
 class create_sbb(object):
    def __init__(self):
@@ -884,7 +803,7 @@ class servLyrs_scs(object):
          pass
       parm1 = defineParam("in_dams", "Input Dams", "GPFeatureLayer", "Required", "Input")
       try:
-         parm1.value = "NID_damsVA"
+         parm1.value = "Dams"
       except:
          pass
       parm2 = defineParam("out_lyrDown", "Output Downstream Layer", "DELayer", "Derived", "Output")
@@ -953,7 +872,7 @@ class ntwrkPts_scs(object):
          pass
       parm4 = defineParam("in_NWI", "Input NWI Wetlands", "GPFeatureLayer", "Required", "Input")
       try:
-         parm4.value = "VA_Wetlands"
+         parm4.value = "Tidal Waters and Wetlands"
       except:
          pass
       parm5 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
@@ -1041,6 +960,10 @@ class lines_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         field_names = [f.name for f in arcpy.ListFields(fc)]
+         parameters[5].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -1107,13 +1030,16 @@ class sites_scs(object):
          pass
       parm6 = defineParam("in_FlowBuff", "Input Flow Buffer", "GPFeatureLayer", "Required", "Input")
       try:
-         parm6.value = "FlowBuff150"
+         parm6.value = "Flow Buffers"
       except: 
          pass
       parm7 = defineParam("fld_Rule", "Site rule field", "String", "Required", "Input", "RULE")
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+      parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCU")
+      parm9.filter.type = "ValueList"
+      parm9.filter.list = ["SCU", "SCS"]
       
-      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8]
+      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9]
       return parms
 
    def isLicensed(self):
@@ -1124,6 +1050,10 @@ class sites_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         field_names = [f.name for f in arcpy.ListFields(fc)]
+         parameters[7].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -1142,9 +1072,12 @@ class sites_scs(object):
          scratchParm = "in_memory"
 
       # Run the function
-      # scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, "", "", scratchParm)
-      
-      scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, "true", 150, scratchParm)
+      if siteType == "SCU":
+         buffDist = 5
+      else:
+         buffDist = 150
+      trim = "true"
+      scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, trim, buffDist, scratchParm)
 
       return scsPolys
       
