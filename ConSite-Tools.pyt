@@ -334,7 +334,7 @@ class assign_brank(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      parm0 = defineParam("in_EO", "Input site-worthy EOs", "GPFeatureLayer", "Required", "Input")
+      parm0 = defineParam("in_PF", "Input site-worthy Procedural Features", "GPFeatureLayer", "Required", "Input")
       parm1 = defineParam("in_CS", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
 
       parms = [parm0, parm1]
@@ -360,9 +360,9 @@ class assign_brank(object):
       # Set up parameter names and values
       declareParams(parameters)
       
-      getBRANK(in_EO, in_CS)
+      getBRANK(in_PF, in_CS)
 
-      return (in_EO, in_CS)
+      return (in_CS)
 
 class flat_conslands(object):
    def __init__(self):
@@ -375,7 +375,7 @@ class flat_conslands(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_CL", "Input Conservation Lands polygons", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam("out_CL", "Output flattened Conservaton Lands", "DEFeatureClass", "Required", "Output")
+      parm1 = defineParam("out_CL", "Output flattened Conservaton Lands", "DEFeatureClass", "Required", "Output", "conslands_flat")
       parm2 = defineParam('scratch_GDB', "Geodatabase for storing scratch outputs", "DEWorkspace", "Optional", "Input")
       parm2.filter.list = ["Local Database"]
       

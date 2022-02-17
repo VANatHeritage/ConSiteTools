@@ -116,7 +116,7 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
    arcpy.env.extent = 'MAXOF'
    
    if not scratchGDB:
-      # For some reason this function does not work reliably if "in_memory" is used for scratchGDB, at least on my crappy computer, so set to scratchGDB on disk.
+      # For some reason this function runs more slowly if "in_memory" is used for scratchGDB, at least on my dinosaur computer, so set to scratchGDB on disk.
       scratchGDB = arcpy.env.scratchGDB
    
    for val in ["U", "5", "4", "3", "2", "1"]:
@@ -137,8 +137,8 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
          inFeats = dissFeats
       else:
          printMsg('Updating with bmi %s...'%val)
-         printMsg('input features: %s'%inFeats)
-         printMsg('update features: %s'%dissFeats)
+         # printMsg('input features: %s'%inFeats)
+         # printMsg('update features: %s'%dissFeats)
          if val == "1":
             updatedFeats = outConsLands
          else:

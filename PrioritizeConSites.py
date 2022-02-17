@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-01-27
+# Last Edit: 2022-02-16
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -308,10 +308,20 @@ def buildSlotDict(in_sumTab):
    
 
 ### MAIN FUNCTIONS ###
-def getBRANK(in_EOs, in_ConSites):
+def getBRANK(in_PF, in_ConSites):
    '''Automates the assignment of Biodiversity Ranks to conservation sites
    NOTE: Should only be run on one site type at a time, with type-specific inputs. Needs to run in foreground so tables update attributes. Best to close attribute tables prior to running.
+   
+   Parameters:
+   in_PF = Input site-worthy procedural features for a specific site type
+   in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
    '''
+   
+   # Dissolve procedural features on SF_EOID
+   printMsg("Dissolving procedural features by EO ID...")
+   in_EOs = "in_memory" + os.sep + "EOs"
+   arcpy.Dissolve_management(in_PF, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
+   
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR", "TEXT", 2)
@@ -372,7 +382,7 @@ def getBRANK(in_EOs, in_ConSites):
          return "BU"
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!)"
-   arcpy.CalculateField_management(in_EOs, "IBR", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
    
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
@@ -396,10 +406,16 @@ def getBRANK(in_EOs, in_ConSites):
    
    ### For the ConSites, calculate the B-rank and flag if it conflicts with previous B-rank
    printMsg('Adding several fields to ConSites...')
+   oldFlds = [f.name for f in arcpy.ListFields(in_ConSites)]
+   for fld in ["IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK"]:
+      if fld in oldFlds:
+         arcpy.management.DeleteField(in_ConSites, fld)
+      else:
+         pass
    arcpy.AddField_management(in_ConSites, "IBR_SUM", "LONG")
    arcpy.AddField_management(in_ConSites, "IBR_MAX", "LONG")
-   arcpy.AddField_management(in_ConSites, "AUTO_BRANK", "TEXT", 2)
-   arcpy.AddField_management(in_ConSites, "FLAG_BRANK", "LONG")
+   # arcpy.AddField_management(in_ConSites, "AUTO_BRANK", "TEXT", 2)
+   # arcpy.AddField_management(in_ConSites, "FLAG_BRANK", "LONG")
 
    # Calculate B-rank scores 
    printMsg('Calculating B-rank sums and maximums in loop...')
@@ -457,7 +473,7 @@ def getBRANK(in_EOs, in_ConSites):
       '''
    
    expression= "brank(!IBR_SUM!,!IBR_MAX!)"
-   arcpy.CalculateField_management(in_ConSites, "AUTO_BRANK", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(in_ConSites, "AUTO_BRANK", expression, "PYTHON3", codeblock, "TEXT")
    
    printMsg('Calculating flag status...')
    codeblock = '''def flag(brank, auto_brank):
@@ -469,11 +485,11 @@ def getBRANK(in_EOs, in_ConSites):
          return 1
    '''
    expression = "flag(!BRANK!, !AUTO_BRANK!)"
-   arcpy.CalculateField_management(in_ConSites, "FLAG_BRANK", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "LONG")
 
    if len(failList) > 0:
       printMsg("Processing incomplete for some sites %s"%failList)
-   return (in_EOs, in_ConSites)
+   return (in_ConSites)
    printMsg('Finished.')
 
 def MakeExclusionList(in_Tabs, out_Tab):
