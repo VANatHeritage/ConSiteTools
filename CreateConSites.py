@@ -1634,6 +1634,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    # Parse out transportation datasets
    if site_Type == 'TERRESTRIAL':
       Trans = in_TranSurf.split(';')
+      for i in range(len(Trans)):
+         Trans[i] = Trans[i].replace("'","")
    
    # If applicable, clear any selections on non-SBB inputs
    for fc in [in_PF, in_Hydro]:
