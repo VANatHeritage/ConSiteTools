@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-02-15
+# Last Edit: 2022-02-24
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1080,7 +1080,7 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    return out_SBB
 
 def ChopSBBs(in_PF, in_SBB, in_EraseFeats, out_Clusters, out_subErase, dilDist = "5 METERS", scratchGDB = "in_memory"):
-   '''Uses Erase Features to chop out sections of SBBs. Stitches SBB fragments back together only if within twice the dilDist of each other. Subsequently uses output to erase EraseFeats.'''
+   '''Uses Erase Features to chop out sections of SBBs. Stitches "major" SBB fragments back together only if within twice the dilDist of each other. Subsequently uses output to erase EraseFeats.'''
 
    # Use in_EraseFeats to chop out sections of SBB
    # Use regular Erase, not Clean Erase; multipart is good output at this point
@@ -1649,22 +1649,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    
    ### Start data prep
    tStartPrep = datetime.now()
+   # Change for ArcGIS Pro: Need to limit processing to relevant features
    
-   # Merge the transportation layers, if necessary
-   if site_Type == 'TERRESTRIAL':
-      if len(Trans) == 1:
-         Trans = Trans[0]
-      else:
-         printMsg('Merging transportation surfaces')
-         # Must absolutely write this to disk (myWorkspace) not to memory (scratchGDB), or for some reason there is no OBJECTID field and as a result, code for CullEraseFeats will fail.
-         mergeTrans = myWorkspace + os.sep + 'mergeTrans'
-         arcpy.Merge_management(Trans, mergeTrans)
-         Trans = mergeTrans
-
-   # Get relevant hydro features
-   openWater = scratchGDB + os.sep + 'openWater'
-   arcpy.Select_analysis (in_Hydro, openWater, hydroQry)
-
    # Set up output locations for subsets of SBBs and PFs to process
    SBB_sub = scratchGDB + os.sep + 'SBB_sub'
    PF_sub = scratchGDB + os.sep + 'PF_sub'
@@ -1677,12 +1663,46 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
       # Subset PFs and SBBs
       printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
       SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
-
+   
+   # Buffer the SBBs; output used for selecting relevant features and setting processing extent
+   procBuff = scratchGDB + os.sep + "procBuff"
+   printMsg("Creating the processing buffer")
+   arcpy.analysis.Buffer(SBB_sub, procBuff, "500 METERS")
+   arcpy.env.extent = procBuff
+   
    # Make Feature Layers
-   arcpy.MakeFeatureLayer_management(PF_sub, "PF_lyr") 
-   arcpy.MakeFeatureLayer_management(SBB_sub, "SBB_lyr") 
-   arcpy.MakeFeatureLayer_management(openWater, "Hydro_lyr")
-   sub_Hydro = "Hydro_lyr"
+   printMsg("Making feature layers...")
+   pf = arcpy.management.MakeFeatureLayer(PF_sub, "PF_lyr") 
+   sbb = arcpy.management.MakeFeatureLayer(SBB_sub, "SBB_lyr") 
+   proc = arcpy.management.MakeFeatureLayer(procBuff, "proc_lyr") 
+   water = arcpy.management.MakeFeatureLayer(in_Hydro, "Hydro_lyr", hydroQry)
+   water = arcpy.management.SelectLayerByLocation(water, "INTERSECT", proc, "", "SUBSET_SELECTION")
+   
+   if site_Type == 'TERRESTRIAL':
+      excl = arcpy.management.MakeFeatureLayer(in_Exclude, "Excl_lyr")
+      excl = arcpy.management.SelectLayerByLocation(excl, "INTERSECT", proc, "", "SUBSET_SELECTION")
+      
+      transLyr = []
+      i = 1
+      for t in Trans:
+         name = "trans%s_lyr"%i
+         arcpy.management.MakeFeatureLayer(t, name)
+         arcpy.management.SelectLayerByLocation(name, "INTERSECT", proc, "", "SUBSET_SELECTION")
+         transLyr.append(name)
+         i += 1
+   
+   # Merge the transportation layers, if applicable
+   if site_Type == 'TERRESTRIAL':
+      # Note: It takes WAY longer to clip and then merge, than to simply merge the whole extent, so I eliminated the clipping step.
+
+      if len(transLyr) == 1:
+         Trans = transLyr[0]
+      else:
+         printMsg("Merging transportation surfaces")
+         mergeTrans = scratchGDB + os.sep + "mergeTrans"
+         arcpy.management.Merge(transLyr, mergeTrans)
+         Trans = arcpy.management.MakeFeatureLayer(mergeTrans, "mergeTrans_lyr")
+         #Trans = mergeTrans
    
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
@@ -1757,10 +1777,10 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
                CleanClip(Trans, tmpBuff, tranClp, scratchParm)
                printMsg('Clipping exclusion features to buffer...')
                efClp = scratchGDB + os.sep + 'efClp'
-               CleanClip(in_Exclude, tmpBuff, efClp, scratchParm)
+               CleanClip(excl, tmpBuff, efClp, scratchParm)
             printMsg('Clipping hydro features to buffer...')
             hydroClp = scratchGDB + os.sep + 'hydroClp'
-            CleanClip(sub_Hydro, tmpBuff, hydroClp, scratchParm)
+            CleanClip(water, tmpBuff, hydroClp, scratchParm)
                         
             # Cull Transportation Surface and Exclusion Features 
             # This is to eliminate features intended to be ignored in automation process
@@ -1821,6 +1841,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             CullFrags(sbbFrags, tmpPF, searchDist, sbbRtn)
             arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
             
+            ### TODO: Could I apply the ChopSBB function to ProtoSites as well??
+            
             # Use erase features to chop out areas of ProtoSites
             printMsg('Erasing portions of ProtoSites...')
             psFrags = scratchGDB + os.sep + 'psFrags'
@@ -1866,6 +1888,7 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
                      printMsg('Excising manually delineated exclusion features...')
                      ssErased = scratchGDB + os.sep + 'ssBnd' + str(counter2)
                      CleanErase (csInt, efClp, ssErased, scratchParm) 
+                     ### TODO: Should I actually be using the protosite equivalent of sbbErase as erase features here?
                   else:
                      ssErased = csInt
                   
