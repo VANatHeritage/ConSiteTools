@@ -1830,6 +1830,7 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             sbbErase = scratchGDB + os.sep + 'sbbErase'
             ChopSBBs(tmpPF, tmpSBB, coalErase, sbbClusters, sbbErase, "5 METERS", scratchParm)
             
+            #### Next two blocks seem to duplicate what I already did??
             # Use erase features to chop out areas of SBBs
             printMsg('Erasing portions of SBBs...')
             sbbFrags = scratchGDB + os.sep + 'sbbFrags'
