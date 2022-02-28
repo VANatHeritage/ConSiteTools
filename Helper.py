@@ -270,7 +270,8 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Buffer
    Buff1 = scratchGDB + os.sep + "Buff1"
-   arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, "FULL", "ROUND", dissolve1, "", "GEODESIC")
+   # arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, "FULL", "ROUND", dissolve1, "", "GEODESIC")
+   arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, dissolve1)
 
    # Process: Clean Features
    Clean_Buff1 = scratchGDB + os.sep + "CleanBuff1"
@@ -287,7 +288,7 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Buffer
    Buff2 = scratchGDB + os.sep + "NegativeBuffer"
-   arcpy.analysis.PairwiseBuffer(Clean_Buff1_ng, Buff2, negMeas, "FULL", "ROUND", dissolve2, "", "GEODESIC")
+   arcpy.analysis.PairwiseBuffer(Clean_Buff1_ng, Buff2, negMeas, dissolve2)
 
    # Process: Clean Features to get final dilated features
    CleanFeatures(Buff2, outFeats)
@@ -346,7 +347,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    #arcpy.AddMessage("Buffering features...")
    #buffFeats = tmpWorkspace + os.sep + "buffFeats"
    buffFeats = scratchGDB + os.sep + "buffFeats"
-   arcpy.analysis.PairwiseBuffer (dissFeats, buffFeats, meas, "", "", "ALL")
+   arcpy.analysis.PairwiseBuffer (dissFeats, buffFeats, meas, "ALL")
    trashList.append(buffFeats)
 
    # Process:  Explode Multiparts
