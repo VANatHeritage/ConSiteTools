@@ -338,6 +338,10 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    dissFeats = scratchGDB + os.sep + "dissFeats"
    arcpy.management.Dissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART", "")
    trashList.append(dissFeats)
+   
+   # Process:  Make Feature Layer
+   arcpy.management.MakeFeatureLayer(dissFeats, "dissFeatsLyr")
+   trashList.append("dissFeatsLyr")
 
    # Process:  Generalize Features
    # This should prevent random processing failures on features with many vertices, and also speed processing in general
@@ -368,19 +372,17 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
       for Feat in myFeats:
          arcpy.AddMessage('Working on shrink feature %s' % str(counter))
          featSHP = Feat[0]
-         tmpFeat = scratchGDB + os.sep + "tmpFeat"
-         arcpy.management.CopyFeatures(featSHP, tmpFeat)
-         trashList.append(tmpFeat)
+         # tmpFeat = scratchGDB + os.sep + "tmpFeat"
+         # arcpy.management.CopyFeatures(featSHP, tmpFeat)
+         # trashList.append(tmpFeat)
          
          # Process:  Repair Geometry
-         arcpy.management.RepairGeometry(tmpFeat, "DELETE_NULL")
-         
-         # Process:  Make Feature Layer
-         arcpy.management.MakeFeatureLayer(dissFeats, "dissFeatsLyr", "", "", "")
-         trashList.append("dissFeatsLyr")
+         # arcpy.management.RepairGeometry(tmpFeat, "DELETE_NULL")
+         arcpy.management.RepairGeometry(featSHP, "DELETE_NULL")
 
          # Process: Select Layer by Location (Get dissolved features within each exploded buffer feature)
-         arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", tmpFeat, "", "NEW_SELECTION")
+         # arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", tmpFeat, "", "NEW_SELECTION")
+         arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", featSHP, "", "NEW_SELECTION")
          
          # Process:  Coalesce features (expand)
          coalFeats = scratchGDB + os.sep + 'coalFeats'
