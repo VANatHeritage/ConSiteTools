@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-02-24
+# Last Edit: 2022-02-28
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1249,6 +1249,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 #     7.  Clip the merged feature to the maximum buffer.'''
 
    # Process: Select PFs
+   ## TODO: Could I make this a feature layer instead, instead of saving to disk?
    sub_PF = tmpWorkspace + os.sep + 'sub_PF'
    arcpy.Select_analysis (in_PF, sub_PF, selQry)
    
@@ -1286,6 +1287,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
                # Process:  Select (Analysis)
                # Create a temporary feature class including only the current PF
+               ## TODO: Could this be saved to in_memory instead of on-disk?
                selQry = fld_SFID + " = '%s'" % myID
                arcpy.Select_analysis (in_PF, "tmpPF", selQry)
 
@@ -1331,7 +1333,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   else:
                      printMsg("Merging buffered PF with buffered NWI feature(s)...")
                      feats2merge = ["myMinBuffer", "nwiBuff"]
-                  printMsg(str(feats2merge))
+                  # printMsg(str(feats2merge))
                   arcpy.Merge_management(feats2merge, "tmpMerged")
 
                   # Dissolve features into a single polygon
