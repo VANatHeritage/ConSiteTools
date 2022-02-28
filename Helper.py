@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-02-23
+# Last Edit: 2022-02-28
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -270,7 +270,7 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Buffer
    Buff1 = scratchGDB + os.sep + "Buff1"
-   arcpy.Buffer_analysis(inFeats, Buff1, meas, "FULL", "ROUND", dissolve1, "", "GEODESIC")
+   arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, "FULL", "ROUND", dissolve1, "", "GEODESIC")
 
    # Process: Clean Features
    Clean_Buff1 = scratchGDB + os.sep + "CleanBuff1"
@@ -287,7 +287,7 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Buffer
    Buff2 = scratchGDB + os.sep + "NegativeBuffer"
-   arcpy.Buffer_analysis(Clean_Buff1_ng, Buff2, negMeas, "FULL", "ROUND", dissolve2, "", "GEODESIC")
+   arcpy.analysis.PairwiseBuffer(Clean_Buff1_ng, Buff2, negMeas, "FULL", "ROUND", dissolve2, "", "GEODESIC")
 
    # Process: Clean Features to get final dilated features
    CleanFeatures(Buff2, outFeats)
@@ -322,7 +322,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    Output_fname = filename
 
    # Process:  Create Feature Class (to store output)
-   arcpy.CreateFeatureclass_management (myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
+   arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
 
    # Process:  Clean Features
    #cleanFeats = tmpWorkspace + os.sep + "cleanFeats"
@@ -335,7 +335,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    # Writing to disk in hopes of stopping geoprocessing failure
    #arcpy.AddMessage("This feature class is stored here: %s" % dissFeats)
    dissFeats = scratchGDB + os.sep + "dissFeats"
-   arcpy.Dissolve_management (cleanFeats, dissFeats, "", "", "SINGLE_PART", "")
+   arcpy.management.Dissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART", "")
    trashList.append(dissFeats)
 
    # Process:  Generalize Features
@@ -346,7 +346,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    #arcpy.AddMessage("Buffering features...")
    #buffFeats = tmpWorkspace + os.sep + "buffFeats"
    buffFeats = scratchGDB + os.sep + "buffFeats"
-   arcpy.Buffer_analysis (dissFeats, buffFeats, meas, "", "", "ALL")
+   arcpy.analysis.PairwiseBuffer (dissFeats, buffFeats, meas, "", "", "ALL")
    trashList.append(buffFeats)
 
    # Process:  Explode Multiparts
@@ -354,7 +354,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    # Writing to disk in hopes of stopping geoprocessing failure
    #arcpy.AddMessage("This feature class is stored here: %s" % explFeats)
    explFeats = scratchGDB + os.sep + "explFeats"
-   arcpy.MultipartToSinglepart_management (buffFeats, explFeats)
+   arcpy.management.MultipartToSinglepart(buffFeats, explFeats)
    trashList.append(explFeats)
 
    # Process:  Get Count
@@ -368,18 +368,18 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
          arcpy.AddMessage('Working on shrink feature %s' % str(counter))
          featSHP = Feat[0]
          tmpFeat = scratchGDB + os.sep + "tmpFeat"
-         arcpy.CopyFeatures_management (featSHP, tmpFeat)
+         arcpy.management.CopyFeatures(featSHP, tmpFeat)
          trashList.append(tmpFeat)
          
          # Process:  Repair Geometry
-         arcpy.RepairGeometry_management (tmpFeat, "DELETE_NULL")
+         arcpy.management.RepairGeometry(tmpFeat, "DELETE_NULL")
          
          # Process:  Make Feature Layer
-         arcpy.MakeFeatureLayer_management (dissFeats, "dissFeatsLyr", "", "", "")
+         arcpy.management.MakeFeatureLayer(dissFeats, "dissFeatsLyr", "", "", "")
          trashList.append("dissFeatsLyr")
 
          # Process: Select Layer by Location (Get dissolved features within each exploded buffer feature)
-         arcpy.SelectLayerByLocation_management ("dissFeatsLyr", "INTERSECT", tmpFeat, "", "NEW_SELECTION")
+         arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", tmpFeat, "", "NEW_SELECTION")
          
          # Process:  Coalesce features (expand)
          coalFeats = scratchGDB + os.sep + 'coalFeats'
@@ -389,16 +389,16 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
          
          # Merge coalesced feature with original features, and coalesce again.
          mergeFeats = scratchGDB + os.sep + 'mergeFeats'
-         arcpy.Merge_management([coalFeats, "dissFeatsLyr"], mergeFeats, "")
+         arcpy.management.Merge([coalFeats, "dissFeatsLyr"], mergeFeats, "")
          Coalesce(mergeFeats, "5 METERS", coalFeats, scratchGDB)
          
          # Eliminate gaps
          noGapFeats = scratchGDB + os.sep + "noGapFeats"
-         arcpy. EliminatePolygonPart_management (coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
+         arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
          
          # Process:  Append the final geometry to the ShrinkWrap feature class
          arcpy.AddMessage("Appending feature...")
-         arcpy.Append_management(noGapFeats, outFeats, "NO_TEST", "", "")
+         arcpy.management.Append(noGapFeats, outFeats, "NO_TEST", "", "")
          
          counter +=1
          del Feat

@@ -1197,16 +1197,16 @@ def CreateStandardSBB(in_PF, out_SBB, scratchGDB = "in_memory"):
    try:
       # Process: Select (Defined Buffer Rules)
       selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14)) AND (fltBuffer <> 0)"
-      arcpy.MakeFeatureLayer_management(in_PF, "tmpLyr", selQry)
+      arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
 
       # Count records and proceed accordingly
       count = countFeatures("tmpLyr")
       if count > 0:
          # Process: Buffer
          tmpSBB = scratchGDB + os.sep + 'tmpSBB'
-         arcpy.Buffer_analysis("tmpLyr", tmpSBB, "fltBuffer", "FULL", "ROUND", "NONE", "", "PLANAR")
+         arcpy.analysis.PairwiseBuffer("tmpLyr", tmpSBB, "fltBuffer", "FULL", "ROUND", "NONE", "", "PLANAR")
          # Append to output and cleanup
-         arcpy.Append_management (tmpSBB, out_SBB, "NO_TEST")
+         arcpy.management.Append (tmpSBB, out_SBB, "NO_TEST")
          printMsg('Simple buffer SBBs completed')
          garbagePickup([tmpSBB])
       else:
@@ -1222,13 +1222,13 @@ def CreateNoBuffSBB(in_PF, out_SBB):
       ## selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
       ## Above selection query replaced 7/29/21 
       selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
-      arcpy.MakeFeatureLayer_management(in_PF, "tmpLyr", selQry)
+      arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
 
       # Count records and proceed accordingly
       count = countFeatures("tmpLyr")
       if count > 0:
          # Append to output and cleanup
-         arcpy.Append_management ("tmpLyr", out_SBB, "NO_TEST")
+         arcpy.management.Append ("tmpLyr", out_SBB, "NO_TEST")
          printMsg('No-buffer SBBs completed')
       else:
          printMsg('There are no PFs using the no-buffer rules')
@@ -1250,11 +1250,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
    # Process: Select PFs
    ## TODO: Could I make this a feature layer instead, instead of saving to disk?
-   sub_PF = tmpWorkspace + os.sep + 'sub_PF'
-   arcpy.Select_analysis (in_PF, sub_PF, selQry)
+   # "tmpLyr" = tmpWorkspace + os.sep + '"tmpLyr"'
+   arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
+   # arcpy.Select_analysis (in_PF, "tmpLyr", selQry)
    
    # Count records and proceed accordingly
-   count = countFeatures(sub_PF)
+   count = countFeatures("tmpLyr")
    if count > 0:
       # Declare some additional parameters
       # These can be tweaked as desired
@@ -1272,7 +1273,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
-      with arcpy.da.SearchCursor(sub_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
+      with arcpy.da.SearchCursor("tmpLyr", [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
          for myPF in myProcFeats:
          # for each Procedural Feature in the set, do the following...
             try: # Even if one feature fails, script can proceed to next feature
@@ -1416,9 +1417,10 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, 
    getScratchMsg(scratchGDB)
 
    # Set up some variables
-   tmpWorkspace = createTmpWorkspace()
+   # tmpWorkspace = createTmpWorkspace()
+   tmpWorkspace = scratchGDB
    sr = arcpy.Describe(in_PF).spatialReference
-   printMsg("Additional critical temporary products will be stored here: %s" % tmpWorkspace)
+   # printMsg("Additional critical temporary products will be stored here: %s" % tmpWorkspace)
    sub_PF = scratchGDB + os.sep + 'sub_PF' # for storing PF subsets
 
    # Set up trashList for later garbage collection
