@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-02-28
+# Last Edit: 2022-03-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -50,7 +50,7 @@ def garbagePickup(trashList):
    '''Deletes Arc files in list, with error handling. Argument must be a list.'''
    for t in trashList:
       try:
-         arcpy.Delete_management(t)
+         arcpy.management.Delete(t)
       except:
          pass
    return
@@ -59,7 +59,7 @@ def CleanFeatures(inFeats, outFeats):
    '''Repairs geometry, then explodes multipart polygons to prepare features for geoprocessing.'''
    
    # Process: Repair Geometry
-   arcpy.RepairGeometry_management(inFeats, "DELETE_NULL")
+   arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
 
    # Have to add the while/try/except below b/c polygon explosion sometimes fails inexplicably.
    # This gives it 10 tries to overcome the problem with repeated geometry repairs, then gives up.
@@ -67,7 +67,7 @@ def CleanFeatures(inFeats, outFeats):
    while counter <= 10:
       try:
          # Process: Multipart To Singlepart
-         arcpy.MultipartToSinglepart_management(inFeats, outFeats)
+         arcpy.management.MultipartToSinglepart(inFeats, outFeats)
          
          counter = 11
          
@@ -75,13 +75,13 @@ def CleanFeatures(inFeats, outFeats):
          arcpy.AddMessage("Polygon explosion failed.")
          # Process: Repair Geometry
          arcpy.AddMessage("Trying to repair geometry (try # %s)" %str(counter))
-         arcpy.RepairGeometry_management(inFeats, "DELETE_NULL")
+         arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
          
          counter +=1
          
          if counter == 11:
             arcpy.AddMessage("Polygon explosion problem could not be resolved.  Copying features.")
-            arcpy.CopyFeatures_management (inFeats, outFeats)
+            arcpy.management.CopyFeatures(inFeats, outFeats)
    
    return outFeats
 
@@ -93,7 +93,7 @@ def CleanClip(inFeats, clipFeats, outFeats, scratchGDB = "in_memory"):
    
    # Process: Clip
    tmpClip = scratchGDB + os.sep + "tmpClip"
-   arcpy.Clip_analysis(inFeats, clipFeats, tmpClip)
+   arcpy.analysis.PairwiseClip(inFeats, clipFeats, tmpClip)
 
    # Process: Clean Features
    CleanFeatures(tmpClip, outFeats)
@@ -112,7 +112,7 @@ def CleanErase(inFeats, eraseFeats, outFeats, scratchGDB = "in_memory"):
    
    # Process: Erase
    tmpErased = scratchGDB + os.sep + "tmpErased"
-   arcpy.Erase_analysis(inFeats, eraseFeats, tmpErased, "")
+   arcpy.analysis.PairwiseErase(inFeats, eraseFeats, tmpErased)
 
    # Process: Clean Features
    CleanFeatures(tmpErased, outFeats)
@@ -284,7 +284,7 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
    # Eliminate gaps
    # Added step due to weird behavior on some buffers
    Clean_Buff1_ng = scratchGDB + os.sep + "Clean_Buff1_ng"
-   arcpy.EliminatePolygonPart_management (Clean_Buff1, Clean_Buff1_ng, "AREA", "900 SQUAREMETERS", "", "CONTAINED_ONLY")
+   arcpy.management.EliminatePolygonPart(Clean_Buff1, Clean_Buff1_ng, "AREA", "900 SQUAREMETERS", "", "CONTAINED_ONLY")
 
    # Process: Buffer
    Buff2 = scratchGDB + os.sep + "NegativeBuffer"
@@ -336,7 +336,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    # Writing to disk in hopes of stopping geoprocessing failure
    #arcpy.AddMessage("This feature class is stored here: %s" % dissFeats)
    dissFeats = scratchGDB + os.sep + "dissFeats"
-   arcpy.management.Dissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART", "")
+   arcpy.management.PairwiseDissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART")
    trashList.append(dissFeats)
    
    # Process:  Make Feature Layer
@@ -345,7 +345,7 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
 
    # Process:  Generalize Features
    # This should prevent random processing failures on features with many vertices, and also speed processing in general
-   arcpy.Generalize_edit(dissFeats, "0.1 Meters")
+   arcpy.edit.Generalize(dissFeats, "0.1 Meters")
 
    # Process:  Buffer Features
    #arcpy.AddMessage("Buffering features...")

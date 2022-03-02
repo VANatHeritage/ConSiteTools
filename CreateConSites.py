@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-02-28
+# Last Edit: 2022-03-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -124,12 +124,12 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
       lyr = "bmi%s"%val
       where_clause = "BMI = '%s'"%val
       printMsg('Making feature layer...')
-      arcpy.MakeFeatureLayer_management(inConsLands, lyr, where_clause)
+      arcpy.management.MakeFeatureLayer(inConsLands, lyr, where_clause)
       
       # Dissolve
       dissFeats = scratchGDB + os.sep + "bmiDiss" + val
       printMsg('Dissolving...')
-      arcpy.Dissolve_management(lyr, dissFeats, "BMI", "", "SINGLE_PART")
+      arcpy.analysis.PairwiseDissolve(lyr, dissFeats, "BMI", "", "SINGLE_PART")
       
       # Update
       if val == "U":
@@ -143,7 +143,7 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
             updatedFeats = outConsLands
          else:
             updatedFeats = scratchGDB + os.sep + "upd_bmi%s"%val
-         arcpy.Update_analysis(inFeats, dissFeats, updatedFeats)
+         arcpy.analysis.Update(inFeats, dissFeats, updatedFeats)
          inFeats = updatedFeats
    return outConsLands
    
@@ -500,7 +500,8 @@ def RulesToNWI(inTab, inPolys):
    return 
    
 def SubsetNWI(inNWI, inTab, inGDB):
-   '''Creates subsets of National Wetlands Inventory (NWI) polygons specific to Site Building Blocks (SBB) rules. This function is specific to the Virginia Natural Heritage Program. (Adapted from a Model-Builder tool.)
+   '''NOTE: This function is no longer necessary. I simply created view layers in ArcGIS Online, one for each rule. No need to create subsets here. 
+   Creates subsets of National Wetlands Inventory (NWI) polygons specific to Site Building Blocks (SBB) rules. This function is specific to the Virginia Natural Heritage Program. (Adapted from a Model-Builder tool.)
    
    Each subset contains only the polygons applicable to each rule, and adjacent polygons have boundaries dissolved. Three subsets are created:
    - Rule 5 polygons
@@ -647,7 +648,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
 
    Finally, adds additional fields for QC purposes, and flags records that should be examined by a human (all N, M, and S sites, plus and B sites with change greater than the threshold).
 
-   In the output feature class, the output geometry is identical to the input new Conservation Sites features, but attributes have been added for QC purposes.  The addeded attributes are as follows:
+   In the output feature class, the output geometry is identical to the input new Conservation Sites features, but attributes have been added for QC purposes.  The added attributes are as follows:
    - ModType:  Text field indicating how the site has been modified, relative to existing old sites.  Values are "N". "M", "S", "I", or "B" as described above.
    - PercDiff:  Numeric field indicating the percent difference between old and new boundaries, as described above.  Applies only to sites where ModType = "B".
    - AssignID:  Long integer field containing the old SITEID associated with the new site.  This field is automatically populated only for sites where ModType is "B" or "I".  For other sites, the ID should be manually assigned during site review.  Attributes associated with this ID may be transferred, in whole or in part, from the old site to the new site.  
@@ -665,130 +666,179 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Recast cutVal as a number b/c for some reasons it's acting like text
    cutVal = float(cutVal)
    
-   # Determine how many old sites are overlapped by each automated site.  Automated sites provide the output geometry
+   # Determine how many old sites are overlapped by each automated site.  
+   # Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
-   Join1 = scratchGDB + os.sep + "Join1"
+   # Join1 = scratchGDB + os.sep + "Join1"
    fldmap = "Shape_Length \"Shape_Length\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Length,-1,-1;Shape_Area \"Shape_Area\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Area,-1,-1"
-   arcpy.SpatialJoin_analysis(auto_CS, orig_CS, Join1, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldmap, "INTERSECT", "", "")
+   arcpy.analysis.SpatialJoin(auto_CS, orig_CS, out_Sites, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldmap, "INTERSECT")
+   
+   # Add a field to indicate site type
+   arcpy.management.AddField(out_Sites, "ModType", "TEXT", "", "", 1)
 
    # Get the new sites.
    # These are automated sites with no corresponding old site
    printMsg("Separating out brand new sites...")
-   NewSites = scratchGDB + os.sep + "NewSites"
-   arcpy.Select_analysis(Join1, NewSites, "Join_Count = 0")
+   # NewSites = scratchGDB + os.sep + "NewSites"
+   # arcpy.analysis.Select(Join1, NewSites, "Join_Count = 0")
+   qry = "Join_Count = 0"
+   arcpy.management.MakeFeatureLayer(out_Sites, "newLyr", qry)
+   arcpy.management.CalculateField("newLyr", "ModType", "N")
 
    # Get the single and split sites.
    # These are sites that overlap exactly one old site each. This may be a one-to-one correspondence or a split.
    printMsg("Separating out sites that may be singles or splits...")
-   ssSites = scratchGDB + os.sep + "ssSites"
-   arcpy.Select_analysis(Join1, ssSites, "Join_Count = 1")
-   arcpy.MakeFeatureLayer_management(ssSites, "ssLyr")
+   # ssSites = scratchGDB + os.sep + "ssSites"
+   # arcpy.analysis.Select(Join1, ssSites, "Join_Count = 1")
+   qry = "Join_Count = 1"
+   arcpy.management.MakeFeatureLayer(out_Sites, "ssLyr", qry)
+   arcpy.management.CalculateField("ssLyr", "ModType", '"S"')
 
-   # Get the merger sites.
+   # Get the merged sites.
    # These are sites overlapping multiple old sites. Some may be pure merges, others combo merge/split sites.
    printMsg("Separating out merged sites...")
-   mSites = scratchGDB + os.sep + "mSites"
-   arcpy.Select_analysis(Join1, mSites, "Join_Count > 1")
-   arcpy.MakeFeatureLayer_management(mSites, "mergeLyr")
+   # mSites = scratchGDB + os.sep + "mSites"
+   # arcpy.Select_analysis(Join1, mSites, "Join_Count > 1")
+   qry = "Join_Count > 1"
+   arcpy.management.MakeFeatureLayer(out_Sites, "mergeLyr", qry)
+   arcpy.management.CalculateField("mergeLyr", "ModType", '"M"')
 
-   # Process: Remove extraneous fields as needed
-   for tbl in [NewSites, ssSites, mSites]:
-      for fld in ["Join_Count", "TARGET_FID"]:
-         try:
-            arcpy.DeleteField_management (tbl, fld)
-         except:
-            pass
-
-   # Determine how many automated sites are overlapped by each old site.  Old sites provide the output geometry
+   # Process: Remove extraneous fields and make new layers
+   for fld in ["Join_Count", "TARGET_FID"]:
+      try:
+         arcpy.DeleteField_management (out_Sites, fld)
+      except:
+         pass
+   qry = "ModType = 'S'"
+   arcpy.management.MakeFeatureLayer(out_Sites, "ssLyr", qry)
+   qry = "ModType = 'M'"
+   arcpy.management.MakeFeatureLayer(out_Sites, "mergeLyr", qry)
+   
+   # Determine how many automated sites are overlapped by each old site.  
+   # Old sites provide the output geometry
    printMsg("Performing second spatial join...")
    Join2 = scratchGDB + os.sep + "Join2"
-   arcpy.SpatialJoin_analysis(orig_CS, auto_CS, Join2, "JOIN_ONE_TO_ONE", "KEEP_COMMON", fldmap, "INTERSECT", "", "")
-   arcpy.JoinField_management (Join2, "TARGET_FID", orig_CS, "OBJECTID", "%s" %fld_SiteID)
+   arcpy.analysis.SpatialJoin(orig_CS, auto_CS, Join2, "JOIN_ONE_TO_ONE", "KEEP_COMMON", fldmap, "INTERSECT")
+   arcpy.management.JoinField(Join2, "TARGET_FID", orig_CS, "OBJECTID", "%s" %fld_SiteID)
 
    # Make separate layers for old sites that were or were not split
-   arcpy.MakeFeatureLayer_management(Join2, "NoSplitLyr", "Join_Count = 1")
-   arcpy.MakeFeatureLayer_management(Join2, "SplitLyr", "Join_Count > 1")
-
-   # Get the single sites (= no splits, no merges; one-to-one relationship with old sites)
-   printMsg("Separating out single sites...")
-   arcpy.SelectLayerByLocation_management("ssLyr", "INTERSECT", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   SingleSites = scratchGDB + os.sep + "SingleSites"
-   arcpy.CopyFeatures_management("ssLyr", SingleSites, "", "0", "0", "0")
-
-   # Get the old site IDs to attach to SingleSites.  SingleSites provide the output geometry
-   printMsg("Performing third spatial join...")
-   Join3 = scratchGDB + os.sep + "Join3"
-   arcpy.SpatialJoin_analysis(SingleSites, orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT", "", "")
-   arcpy.JoinField_management (SingleSites, "OBJECTID", Join3, "TARGET_FID", "%s" %fld_SiteID) 
-
-   # Save out the single sites that are identical to old sites
-   arcpy.MakeFeatureLayer_management(SingleSites, "SingleLyr")
-   printMsg("Separating out single sites that are identical to old sites...")
-   arcpy.SelectLayerByLocation_management("SingleLyr", "ARE_IDENTICAL_TO", orig_CS, "", "NEW_SELECTION", "NOT_INVERT")
-   IdentSites = scratchGDB + os.sep + "IdentSites"
-   arcpy.CopyFeatures_management("SingleLyr", IdentSites, "", "0", "0", "0")
-
-   # Save out the single sites that are NOT identical to old sites
-   printMsg("Separating out single sites where boundaries have changed...")
-   arcpy.SelectLayerByAttribute_management("SingleLyr", "SWITCH_SELECTION", "")
-   BndChgSites = scratchGDB + os.sep + "BndChgSites"
-   arcpy.CopyFeatures_management("SingleLyr", BndChgSites, "", "0", "0", "0")
+   arcpy.management.MakeFeatureLayer(Join2, "NoSplitLyr", "Join_Count = 1")
+   arcpy.management.MakeFeatureLayer(Join2, "SplitLyr", "Join_Count > 1")
    
-   # Save out the split sites
-   printMsg("Separating out split sites...")
-   arcpy.SelectLayerByAttribute_management("ssLyr", "SWITCH_SELECTION", "")
-   SplitSites = scratchGDB + os.sep + "SplitSites"
-   arcpy.CopyFeatures_management("ssLyr", SplitSites, "", "0", "0", "0")
+   # Get the single sites (= no splits or merges; one-to-one relationship with old sites)
+   printMsg("Separating out identical and boundary-change-only sites...")
+   arcpy.management.SelectLayerByLocation("ssLyr", "INTERSECT", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+   # SingleSites = scratchGDB + os.sep + "SingleSites"
+   # arcpy.management.CopyFeatures("ssLyr", SingleSites)
+   c = countSelectedFeatures("ssLyr")
+   if c > 0:
+      printMsg("There are %s single sites (no splits or merges)"%str(c))
+      arcpy.management.CalculateField("ssLyr", "ModType", '"B"')
+      qry = "ModType = 'B'"
+      arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
+      # Get the old site IDs to attach to SingleSites.  
+      # Single Sites provide the output geometry
+      printMsg("Attaching site IDs...")
+      Join3 = scratchGDB + os.sep + "Join3"
+      arcpy.analysis.SpatialJoin("bLyr", orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT")
+      arcpy.management.JoinField("ssLyr", "OBJECTID", Join3, "TARGET_FID", fld_SiteID)
+      arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
+   else:
+      arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
    
-   # Save out the combo merger sites (those that also involve splits)
-   printMsg("Separating out combo merger sites...")
-   arcpy.SelectLayerByLocation_management("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   ComboSites = scratchGDB + os.sep + "ComboSites"
-   arcpy.CopyFeatures_management("mergeLyr", ComboSites, "", "0", "0", "0")
+   # Get the subset of single sites that are identical to old sites
+   arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+   c = countSelectedFeatures("ssLyr")
+   if c > 0:
+      printMsg("%s sites are identical to the old ones..."%str(c))
+      arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
    
-   # Save out the simple merger sites (no splits)
-   printMsg("Separating out simple merger sites...")
-   arcpy.SelectLayerByAttribute_management("mergeLyr", "SWITCH_SELECTION", "")
-   MergeSites = scratchGDB + os.sep + "MergeSites"
-   arcpy.CopyFeatures_management("mergeLyr", MergeSites, "", "0", "0", "0")
+   # # Get the simple split sites
+   # printMsg("Separating out simple split sites...")
+   # # arcpy.SelectLayerByAttribute_management("ssLyr", "SWITCH_SELECTION", "")
+   # arcpy.management.SelectLayerByLocation("ssLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+   # # SplitSites = scratchGDB + os.sep + "SplitSites"
+   # # arcpy.management.CopyFeatures("ssLyr", SplitSites)
+   # c = countSelectedFeatures("ssLyr")
+   # if c > 0:
+      # printMsg("There are %s simple split sites"%str(c))
+      # arcpy.management.CalculateField("ssLyr", "ModType", '"S"')
+   
+   # # Get the simple merge sites
+   # printMsg("Separating out simple merge sites...")
+   # # arcpy.SelectLayerByAttribute_management("mergeLyr", "SWITCH_SELECTION", "")
+   # arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "INVERT")
+   # # MergeSites = scratchGDB + os.sep + "MergeSites"
+   # # arcpy.management.CopyFeatures("mergeLyr", MergeSites)
+   # c = countSelectedFeatures("mergeLyr")
+   # if c > 0:
+      # printMsg("There are %s simple merge sites"%str(c))
+      # arcpy.management.CalculateField("mergeLyr", "ModType", '"M"')
+   
+   # Get the combo split-merge sites
+   printMsg("Separating out combo split-merge sites...")
+   arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+   # ComboSites = scratchGDB + os.sep + "ComboSites"
+   # arcpy.management.CopyFeatures("mergeLyr")
+   c = countSelectedFeatures("mergeLyr")
+   if c > 0:
+      printMsg("There are %s combo split-merge sites"%str(c))
+      arcpy.management.CalculateField("mergeLyr", "ModType", '"C"')
+
+   # # Save out the single sites that are identical to old sites
+   # arcpy.MakeFeatureLayer_management(SingleSites, "SingleLyr")
+   # printMsg("Separating out single sites that are identical to old sites...")
+   # arcpy.SelectLayerByLocation_management("SingleLyr", "ARE_IDENTICAL_TO", orig_CS, "", "NEW_SELECTION", "NOT_INVERT")
+   # IdentSites = scratchGDB + os.sep + "IdentSites"
+   # arcpy.CopyFeatures_management("SingleLyr", IdentSites, "", "0", "0", "0")
+
+   # # Save out the single sites that are NOT identical to old sites
+   # printMsg("Separating out single sites where boundaries have changed...")
+   # arcpy.SelectLayerByAttribute_management("SingleLyr", "SWITCH_SELECTION", "")
+   # BndChgSites = scratchGDB + os.sep + "BndChgSites"
+   # arcpy.CopyFeatures_management("SingleLyr", BndChgSites, "", "0", "0", "0")
 
    # Process:  Add Fields; Calculate Fields
    printMsg("Calculating fields...")
-   for tbl in [(NewSites, "N"), (MergeSites, "M"), (ComboSites, "C"), (SplitSites, "S"), (IdentSites, "I"), (BndChgSites, "B")]: 
-      for fld in [("ModType", "TEXT", 1), ("PercDiff", "DOUBLE", ""), ("AssignID", "TEXT", 40), ("Flag", "SHORT", ""), ("Comment", "TEXT", 250)]:
-         arcpy.AddField_management (tbl[0], fld[0], fld[1], "", "", fld[2]) 
-      arcpy.CalculateField_management (tbl[0], "ModType", '"%s"' %tbl[1], "PYTHON") 
-      CodeBlock = """def Flag(ModType):
-         if ModType in ("N", "M", "C", "S", "B"):
-            flg = 1
-         else:
-            flg = 0
-         return flg"""
-      Expression = "Flag(!ModType!)"
-      arcpy.CalculateField_management (tbl[0], "Flag", Expression, "PYTHON", CodeBlock) 
+   for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 250)]:
+      arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2]) 
+   CodeBlock = """def Flag(ModType):
+      if ModType in ("N", "M", "C", "S", "B"):
+         flg = 1
+      else:
+         flg = 0
+      return flg"""
+   Expression = "Flag(!ModType!)"
+   arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock) 
       
-   for tbl in [IdentSites, BndChgSites]:
-      arcpy.CalculateField_management (tbl, "AssignID", "!%s!" %fld_SiteID, "PYTHON") 
-      arcpy.DeleteField_management (tbl, "%s" %fld_SiteID) 
+   # for tbl in [IdentSites, BndChgSites]:
+      # arcpy.CalculateField_management (tbl, "AssignID", "!%s!" %fld_SiteID, "PYTHON") 
+      # arcpy.DeleteField_management (tbl, "%s" %fld_SiteID) 
       
    # Loop through the individual Boundary Change sites and check for amount of change
+   qry = "ModType = 'B'"
+   arcpy.management.MakeFeatureLayer(out_Sites, "B_Lyr", qry)
    myIndex = 1 # Set a counter index
    printMsg("Examining boundary changes for boundary change only sites...")
-   with arcpy.da.UpdateCursor(BndChgSites, ["AssignID", "PercDiff", "Flag"]) as mySites: 
+   with arcpy.da.UpdateCursor("B_Lyr", ["SHAPE@", "AssignID", "PercDiff", "Flag"]) as mySites: 
       for site in mySites: 
          try: # put all this in a TRY block so that even if one feature fails, script can proceed to next feature
-            # Extract the unique ID from the data record
-            myID = site[0]
+            # Extract the shape and ID from the data record
+            myShape = site[0]
+            myID = site[1]
             printMsg("\nWorking on Site ID %s" %myID)
             
             # Process:  Select (Analysis)
             # Create temporary feature classes including only the current new and old sites
-            myWhereClause_AutoSites = '"AssignID" = \'%s\'' %myID
-            tmpAutoSite = "in_memory" + os.sep + "tmpAutoSite"
-            arcpy.Select_analysis (BndChgSites, tmpAutoSite, myWhereClause_AutoSites)
-            tmpOldSite = "in_memory" + os.sep + "tmpOldSite"
-            myWhereClause_OldSite = '"%s" = \'%s\'' %(fld_SiteID, myID)
-            arcpy.Select_analysis (orig_CS, tmpOldSite, myWhereClause_OldSite)
+            # myWhereClause_AutoSites = '"AssignID" = \'%s\'' %myID
+            # qry1 = "AssignID = '%s'" %myID
+            # tmpAutoSite = "in_memory" + os.sep + "tmpAutoSite"
+            # arcpy.Select_analysis (BndChgSites, tmpAutoSite, myWhereClause_AutoSites)
+            # tmpOldSite = "in_memory" + os.sep + "tmpOldSite"
+            # myWhereClause_OldSite = '"%s" = \'%s\'' %(fld_SiteID, myID)
+            # arcpy.Select_analysis (orig_CS, tmpOldSite, myWhereClause_OldSite)
+            qry = '"%s" = \'%s\'' %(fld_SiteID, myID)
+            tmpOldSite = arcpy.management.MakeFeatureLayer(orig_CS, "tmpLyr", qry)
 
             # Get the area of the old site
             OldArea = arcpy.SearchCursor(tmpOldSite).next().shape.area
@@ -796,12 +846,12 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
             # Process:  Symmetrical Difference (Analysis)
             # Create features from the portions of the old and new sites that do NOT overlap
             tmpSymDiff = "in_memory" + os.sep + "tmpSymDiff"
-            arcpy.SymDiff_analysis (tmpOldSite, tmpAutoSite, tmpSymDiff, "ONLY_FID", "")
+            arcpy.analysis.SymDiff(tmpOldSite, myShape, tmpSymDiff, "ONLY_FID", "")
 
             # Process:  Dissolve (Data Management)
             # Dissolve the Symmetrical Difference polygons into a single (multi-part) polygon
             tmpDissolve = "in_memory" + os.sep + "tmpDissolve"
-            arcpy.Dissolve_management (tmpSymDiff, tmpDissolve, "", "", "", "")
+            arcpy.analysis.PairwiseDissolve(tmpSymDiff, tmpDissolve)
 
             # Get the area of the difference shape
             DiffArea = arcpy.SearchCursor(tmpDissolve).next().shape.area
@@ -809,15 +859,15 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
             # Calculate the percent difference from old shape, and set the value in the record
             PercDiff = 100*DiffArea/OldArea
             printMsg("The shapes differ by " + str(PercDiff) + " percent of original site area")
-            site[1] = PercDiff
+            site[2] = PercDiff
 
             # If the difference is greater than the cutoff, set the flag value to "Suspect", otherwise "Okay"
             if PercDiff > cutVal:
                printMsg("Shapes are significantly different; flagging record")
-               site[2] = 1
+               site[3] = 1
             else:
                printMsg("Shapes are similar; unflagging record")
-               site[2] = 0
+               site[3] = 0
 
             # Update the data table
             mySites.updateRow(site) 
@@ -844,10 +894,10 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
             myIndex += 1 
             arcpy.Delete_management("in_memory")
 
-   # Process:  Merge
-   printMsg("Merging sites into final feature class...")
-   fcList = [NewSites, MergeSites, ComboSites, SplitSites, IdentSites, BndChgSites]
-   arcpy.Merge_management (fcList, out_Sites) 
+   # # Process:  Merge
+   # printMsg("Merging sites into final feature class...")
+   # fcList = [NewSites, MergeSites, ComboSites, SplitSites, IdentSites, BndChgSites]
+   # arcpy.Merge_management (fcList, out_Sites) 
    
    return out_Sites
 
@@ -1362,7 +1412,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                   else:
                      myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
 
-               # Update the PF shape
+               # Update the PF shape, replacing it with SBB shape
                # myCurrentPF_rows = arcpy.UpdateCursor("tmpPF", "", "", "Shape", "")
                # myPF_row = myCurrentPF_rows.next()
                # myPF_row.Shape = myFinalShape
@@ -1411,6 +1461,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
       else:
          printWrng("Processing failed for the following features: " + str(myFailList))
       
+      # Append the SBBs to the SBB feature class
       printMsg("Appending final shapes to SBB feature class...")
       arcpy.management.Append("tmpLyr", out_SBB, "NO_TEST")
    else:
