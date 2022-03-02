@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2020-09-15
-# Last Edit: 2021-12-02
+# Last Edit: 2022-03-02
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -39,9 +39,9 @@ from PrioritizeConSites import *
 def main():
    ### Set up input variables ###
    # Paths to input and output geodatabases and directories - change these every time
-   in_GDB = r'N:\EssentialConSites\ECS_Run_Dec2021\ECS_Inputs_Dec2021.gdb'
-   out_GDB = r'N:\EssentialConSites\ECS_Run_Dec2021\ECS_Outputs_Dec2021.gdb'
-   out_DIR = r'N:\EssentialConSites\ECS_Run_Dec2021\Spreadsheets_Dec2021' 
+   in_GDB = r'N:\EssentialConSites\ECS_Run_Mar2022\ECS_Inputs_Mar2022.gdb'
+   out_GDB = r'N:\EssentialConSites\ECS_Run_Mar2022\ECS_Outputs_Mar2022.gdb'
+   out_DIR = r'N:\EssentialConSites\ECS_Run_Mar2022\Spreadsheets_Mar2022' 
    
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -65,10 +65,10 @@ def main():
    
    # Input cutoff years
    # This should change every calendar year
-   cutYear = 1996 # yyyy - 25 for TCS and SCU
-   flagYear = 2001 # yyyy - 20 for TCS and SCU
-   cutYear_kcs = 1981 # yyyy - 40 for KCS
-   flagYear_kcs = 1986 # yyyy - 35 for KCS
+   cutYear = 1997 # yyyy - 25 for TCS and SCU
+   flagYear = 2002 # yyyy - 20 for TCS and SCU
+   cutYear_kcs = 1982 # yyyy - 40 for KCS
+   flagYear_kcs = 1987 # yyyy - 35 for KCS
 
    # Set up outputs by type - no need to change these as long as your out_GDB and out_DIR above are valid
    attribEOs_tcs = out_GDB + os.sep + 'attribEOs_tcs'
