@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-01
+# Last Edit: 2022-03-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -31,27 +31,29 @@ def ExtractBiotics(BioticsPF, BioticsCS, outGDB):
    ts = datetime.now().strftime("%Y%m%d_%H%M%S") # timestamp
    
    # Inform user
-   printMsg('This process can only be run in the foreground, and takes a few minutes...')
+   printMsg('Patience grasshopper; this will take a few minutes...')
 
    # Process: Copy Features (ConSites)
-   printMsg('Copying ConSites')
+   printMsg('Copying ConSites...')
    outCS = outGDB + os.sep + 'ConSites_' + ts
    arcpy.CopyFeatures_management(BioticsCS, outCS)
    printMsg('Conservation Sites successfully exported to %s' %outCS)
 
    # Process: Copy Features (ProcFeats)
-   printMsg('Copying Procedural Features')
+   printMsg('Copying Procedural Features...')
    unprjPF = r'in_memory\unprjProcFeats'
    arcpy.CopyFeatures_management(BioticsPF, unprjPF)
    
    # Process: Project
-   printMsg('Projecting ProcFeats features')
+   printMsg('Projecting ProcFeats features...')
    outPF = outGDB + os.sep + 'ProcFeats_' + ts
    outCoordSyst = "PROJCS['NAD_1983_Virginia_Lambert',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Lambert_Conformal_Conic'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-79.5],PARAMETER['Standard_Parallel_1',37.0],PARAMETER['Standard_Parallel_2',39.5],PARAMETER['Latitude_Of_Origin',36.0],UNIT['Meter',1.0]]"
    transformMethod = "WGS_1984_(ITRF00)_To_NAD_1983"
    inCoordSyst = "PROJCS['WGS_1984_Web_Mercator_Auxiliary_Sphere',GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Mercator_Auxiliary_Sphere'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',0.0],PARAMETER['Standard_Parallel_1',0.0],PARAMETER['Auxiliary_Sphere_Type',0.0],UNIT['Meter',1.0]]"
    arcpy.Project_management(unprjPF, outPF, outCoordSyst, transformMethod, inCoordSyst, "PRESERVE_SHAPE", "")
    printMsg('Procedural Features successfully exported to %s' %outPF)
+   
+   return (outPF, outCS)
 
 def ParseSiteTypes(in_ProcFeats, in_ConSites, out_GDB):
    '''Splits input Procedural Features and Conservation Sites into 3 feature classes each, one for each of site types subject to ConSite delineation and prioritization processes.
@@ -1243,34 +1245,32 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
       quit()
 
 def CreateStandardSBB(in_PF, out_SBB, scratchGDB = "in_memory"):
-   '''Creates standard buffer SBBs for specified subset of PFs'''
+   '''OBSOLETE FUNCTION - DELETE
+   Creates standard buffer SBBs for specified subset of PFs.
+   Parameters:
+   - in_PF: Input procedural features
+   - out_SBB: An SBB feature class to which the output from this function will be appended
+   '''
    try:
-      # Process: Select (Defined Buffer Rules)
-      selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14)) AND (fltBuffer <> 0)"
-      arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
+      # Set workspace
+      arcpy.env.workspace = scratchGDB
 
-      # Count records and proceed accordingly
-      count = countFeatures("tmpLyr")
-      if count > 0:
-         # Process: Buffer
-         tmpSBB = scratchGDB + os.sep + 'tmpSBB'
-         arcpy.analysis.PairwiseBuffer("tmpLyr", tmpSBB, "fltBuffer", "NONE")
-         # Append to output and cleanup
-         arcpy.management.Append (tmpSBB, out_SBB, "NO_TEST")
-         printMsg('Simple buffer SBBs completed')
-         garbagePickup([tmpSBB])
-      else:
-         printMsg('There are no PFs using the simple buffer rules')
+      # Run simple buffer
+      arcpy.analysis.PairwiseBuffer("tmpLyr", "tmpSBB", "fltBuffer", "NONE")
+      
+      # Append to specified SBB feature class and cleanup
+      arcpy.management.Append ("tmpSBB", out_SBB, "NO_TEST")
+      msg = ("Simple buffer SBBs completed successfully")
+      garbagePickup(["tmpSBB"])
    except:
       printWrng('Unable to process the simple buffer features')
       tback()
 
 def CreateNoBuffSBB(in_PF, out_SBB):
-   '''Creates SBBs that are simple copies of PFs for specified subset'''
+   '''OBSOLETE FUNCTION - DELETE
+   Creates SBBs that are simple copies of PFs for specified subset'''
    try:
       # Process: Select (No-Buffer Rules)
-      ## selQry = "(intRule in (-1,13,15) AND (fltBuffer = 0))"
-      ## Above selection query replaced 7/29/21 
       selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
       arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
 
@@ -1286,26 +1286,24 @@ def CreateNoBuffSBB(in_PF, out_SBB):
       printWrng('Unable to process the no-buffer features.')
       tback()
 
-def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "in_memory", scratchGDB = "in_memory"):
+def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory"):
    '''Creates standard wetland SBBs from Rule 5, 6, 7, or 9 Procedural Features (PFs). The procedures are the same for all rules, the only difference being the rule-specific inputs.
    
 #     Carries out the following general procedures:
 #     1.  Buffer the PF by 250-m.  This is the minimum buffer. [Exception: zero buffer overrides.]
 #     2.  Buffer the PF by 500-m.  This is the maximum buffer.
-#     3.  Clip any NWI wetland features to the maximum buffer, then shrinkwrap features.
-#     4.  Select clipped NWI features within 15-m of the PF.
+#     3.  Clip any NWI wetland features to the maximum buffer.
+#     4.  Select any clipped NWI features within 15-m of the PF, then expand the selection.
 #     5.  Buffer the selected NWI feature(s), if applicable, by 100-m.
-#     6.  Merge the minimum buffer with the buffered NWI feature(s).
+#     6.  Merge the minimum buffer with the buffered NWI feature(s), if applicable.
 #     7.  Clip the merged feature to the maximum buffer.'''
 
-   # Process: Select PFs
-   ## TODO: Could I make this a feature layer instead, instead of saving to disk?
-   # "tmpLyr" = tmpWorkspace + os.sep + '"tmpLyr"'
-   arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
-   # arcpy.Select_analysis (in_PF, "tmpLyr", selQry)
+   # Make feature layers
+   # arcpy.management.MakeFeatureLayer(in_PF, in_PF, selQry)
+   arcpy.management.MakeFeatureLayer (in_NWI, "NWI_lyr")
    
    # Count records and proceed accordingly
-   count = countFeatures("tmpLyr")
+   count = countFeatures(in_PF)
    if count > 0:
       # Declare some additional parameters
       # These can be tweaked as desired
@@ -1320,16 +1318,19 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
 
       # Create an empty list to store IDs of features that fail to get processed
       myFailList = []
-
+      
+      # Set extent
+      arcpy.env.extent = "MAXOF"
+      
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
-      # with arcpy.da.SearchCursor("tmpLyr", [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
-      with arcpy.da.UpdateCursor("tmpLyr", [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
+      with arcpy.da.UpdateCursor(in_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
          for myPF in myProcFeats:
          # for each Procedural Feature in the set, do the following...
+         
             try: # Even if one feature fails, script can proceed to next feature
 
-               # Extract the unique Source Feature ID and geometry object
+               # Extract the unique Source Feature ID, geometry object, and buffer specification
                myID = myPF[0]
                myShape = myPF[1]
                myBuff = myPF[2]
@@ -1337,94 +1338,71 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                # Add a progress message
                printMsg("\nWorking on feature %s, with SFID = %s" %(str(myIndex), myID))
 
-               # Process:  Select (Analysis)
-               # Create a temporary feature class including only the current PF
-               ## TODO: Could this be saved to in_memory instead of on-disk?
-               # selQry = fld_SFID + " = '%s'" % myID
-               # arcpy.management.MakeFeatureLayer(in_PF, "tmpPF", selQry)
-               # arcpy.Select_analysis (in_PF, "tmpPF", selQry)
-
                # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
                if myBuff==0:
                   printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
+                  maxBuff = minBuff
+                  minBuff = 0
                else:
                   printMsg("Creating minimum buffer")
-                  # arcpy.analysis.PairwiseBuffer ("tmpPF", "myMinBuffer", minBuff)
-                  arcpy.analysis.PairwiseBuffer (myShape, "myMinBuffer", minBuff)
+               arcpy.analysis.PairwiseBuffer (myShape, "myMinBuffer", minBuff)
+                  
+               # Get default shape to use if NWI doesn't come into play
+               defaultShape = arcpy.SearchCursor("myMinBuffer").next().Shape
 
                # Step 2: Create a maximum buffer around the Procedural Feature
-               if myBuff==0:
-                  printMsg("Creating reduced maximum buffer")
-                  # arcpy.analysis.PairwiseBuffer ("tmpPF", "myMaxBuffer", minBuff)
-                  arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", minBuff)
-               else:
-                  printMsg("Creating maximum buffer")
-                  # arcpy.analysis.PairwiseBuffer ("tmpPF", "myMaxBuffer", maxBuff)
-                  arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", maxBuff)
+               arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", maxBuff)
+               arcpy.env.extent = "myMaxBuffer"
+               # Added the extent steps because it doesn't seem to be grabbing all the NWI features from the feature service, otherwise
                
-               # Step 3: Clip the NWI to the maximum buffer, and shrinkwrap
-               printMsg("Clipping NWI features to maximum buffer and shrinkwrapping...")
-               arcpy.analysis.PairwiseClip(in_NWI, "myMaxBuffer", "tmpClipNWI")
-               shrinkNWI = scratchGDB + os.sep + "shrinkNWI"
-               ShrinkWrap("tmpClipNWI", newMeas, shrinkNWI)
+               # Step 3: Clip the NWI to the maximum buffer
+               # First check if there are any NWI features in range to work with
+               arcpy.management.SelectLayerByLocation ("NWI_lyr", "INTERSECT", "myMaxBuffer", "", "NEW_SELECTION")
+               c = countSelectedFeatures("NWI_lyr")
+               
+               if c > 0:
+                  printMsg("Clipping NWI features to maximum buffer...")
+                  arcpy.analysis.PairwiseClip("NWI_lyr", "myMaxBuffer", "clipNWI")
+                  arcpy.management.MakeFeatureLayer ("clipNWI", "clipNWI_lyr")
 
-               # Step 4: Select shrinkwrapped NWI features within range
-               printMsg("Selecting nearby NWI features")
-               arcpy.management.MakeFeatureLayer ("shrinkNWI", "NWI_lyr")
-               arcpy.management.SelectLayerByLocation ("NWI_lyr", "WITHIN_A_DISTANCE", myShape, searchDist, "NEW_SELECTION")
+                  # Step 4: Select clipped NWI features within range
+                  printMsg("Selecting nearby NWI features...")
+                  arcpy.management.SelectLayerByLocation("clipNWI_lyr", "WITHIN_A_DISTANCE", myShape, searchDist, "NEW_SELECTION")
 
-               # Determine how many NWI features were selected
-               selFeats = int(arcpy.GetCount_management("NWI_lyr")[0])
+                  # If NWI features are in range, then process
+                  c = countSelectedFeatures("clipNWI_lyr")
+                  if c > 0:
+                     # Iteratively expand the selection
+                     ExpandSelection("clipNWI_lyr", searchDist)
+                     
+                     # Step 5: Create a buffer around the NWI feature(s)
+                     printMsg("Buffering selected NWI features...")
+                     arcpy.analysis.PairwiseBuffer("clipNWI_lyr", "nwiBuff", nwiBuff)
 
-               # If NWI features are in range, then process
-               if selFeats > 0:
-                  # Step 5: Create a buffer around the NWI feature(s)
-                  printMsg("Buffering selected NWI features...")
-                  arcpy.analysis.PairwiseBuffer("NWI_lyr", "nwiBuff", nwiBuff)
-
-                  # Step 6: Merge the minimum buffer with the NWI buffer
-                  if myBuff==0:
-                     printMsg("Merging unbuffered PF with buffered NWI feature(s)...")
-                     # feats2merge = ["tmpPF", "nwiBuff"]
-                     feats2merge = [myShape, "nwiBuff"]
-                  else:
-                     printMsg("Merging buffered PF with buffered NWI feature(s)...")
+                     # Step 6: Merge the minimum buffer with the NWI buffer
                      feats2merge = ["myMinBuffer", "nwiBuff"]
-                  # printMsg(str(feats2merge))
-                  arcpy.management.Merge(feats2merge, "tmpMerged")
+                     arcpy.management.Merge(feats2merge, "tmpMerged")
 
-                  # Dissolve features into a single polygon
-                  printMsg("Dissolving buffered PF and NWI features into a single feature...")
-                  arcpy.management.Dissolve ("tmpMerged", "tmpDissolved", "", "", "", "")
+                     # Dissolve features into a single polygon
+                     printMsg("Dissolving buffered PF and NWI features into a single feature...")
+                     arcpy.management.Dissolve ("tmpMerged", "tmpDissolved", "", "", "", "")
 
-                  # Step 7: Clip the dissolved feature to the maximum buffer
-                  printMsg("Clipping dissolved feature to maximum buffer...")
-                  arcpy.analysis.PairwiseClip ("tmpDissolved", "myMaxBuffer", "tmpClip")
+                     # Step 7: Clip the dissolved feature to the maximum buffer
+                     printMsg("Clipping dissolved feature to maximum buffer...")
+                     arcpy.analysis.PairwiseClip ("tmpDissolved", "myMaxBuffer", "tmpClip")
 
-                  # Use the clipped, combined feature geometry as the final shape
-                  myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
-               else:
-                  # Use the simple minimum buffer or the PF as the final shape
-                  printMsg("No NWI features found within specified search distance")
-                  if myBuff==0:
-                     # myFinalShape = arcpy.SearchCursor("tmpPF").next().Shape
-                     myFinalShape = myShape
+                     # Use the clipped, combined feature geometry as the final shape
+                     myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
                   else:
-                     myFinalShape = arcpy.SearchCursor("myMinBuffer").next().Shape
+                     printMsg("No appropriate NWI features in range...")
+                     myFinalShape = defaultShape
+               else:
+                  printMsg("No appropriate NWI features in range...")
+                  myFinalShape = defaultShape
 
                # Update the PF shape, replacing it with SBB shape
-               # myCurrentPF_rows = arcpy.UpdateCursor("tmpPF", "", "", "Shape", "")
-               # myPF_row = myCurrentPF_rows.next()
-               # myPF_row.Shape = myFinalShape
-               # myCurrentPF_rows.updateRow(myPF_row)
                myPF[1] = myFinalShape
                myProcFeats.updateRow(myPF)
-
-               # Process:  Append
-               # Append the final geometry to the SBB feature class.
-               # printMsg("Appending final shape to SBB feature class...")
-               # arcpy.Append_management("tmpPF", out_SBB, "NO_TEST", "", "")
-               # arcpy.management.Append(myPF, out_SBB, "NO_TEST", "", "")
 
                # Add final progress message
                printMsg("Finished processing feature " + str(myIndex))
@@ -1448,7 +1426,9 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
                printMsg("\nMoving on to the next feature.  Note that the SBB output will be incomplete.")
 
             finally:
-              # Increment the index by one
+               arcpy.env.extent = "MAXOF"
+               
+               # Increment the index by one
                myIndex += 1
                
                # Release cursor row
@@ -1458,14 +1438,17 @@ def CreateWetlandSBB(in_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace = "i
       # features failed
       if len(myFailList) == 0:
          printMsg("All features successfully processed")
+         msg = None
       else:
-         printWrng("Processing failed for the following features: " + str(myFailList))
-      
+         msg = "WARNING: Processing failed for the following features: " + str(myFailList)
+         printWrng(msg)
       # Append the SBBs to the SBB feature class
       printMsg("Appending final shapes to SBB feature class...")
-      arcpy.management.Append("tmpLyr", out_SBB, "NO_TEST")
+      arcpy.management.Append(in_PF, out_SBB, "NO_TEST")
    else:
-      printMsg('There are no PFs with this rule; passing...')
+      printMsg("There are no PFs with this rule; passing...")
+      msg = None
+   return msg
 
 def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, out_SBB, scratchGDB = "in_memory"):
    '''Creates SBBs for all input PFs, subsetting and applying rules as needed.
@@ -1481,84 +1464,105 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, 
    getScratchMsg(scratchGDB)
 
    # Set up some variables
-   # tmpWorkspace = createTmpWorkspace()
-   tmpWorkspace = scratchGDB
    sr = arcpy.Describe(in_PF).spatialReference
-   # printMsg("Additional critical temporary products will be stored here: %s" % tmpWorkspace)
-   # sub_PF = scratchGDB + os.sep + 'sub_PF' # for storing PF subsets
-
-   # Set up trashList for later garbage collection
-   # trashList = []
+   arcpy.env.workspace = scratchGDB
+   sbbWarnings = []
 
    # Prepare input procedural featuers
-   printMsg('Prepping input procedural features')
-   tmp_PF = PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace)
-   # trashList.append(tmp_PF)
+   printMsg("Prepping input procedural features")
+   tmp_PF = PrepProcFeats(in_PF, fld_Rule, fld_Buff, scratchGDB)
 
-   printMsg('Beginning SBB creation...')
+   printMsg("Beginning SBB creation...")
 
    # Create empty feature class to store SBBs
-   printMsg('Creating empty feature class for output')
+   printMsg("Creating empty feature class for output")
    if arcpy.Exists(out_SBB):
       arcpy.Delete_management(out_SBB)
    outDir = os.path.dirname(out_SBB)
    outName = os.path.basename(out_SBB)
-   printMsg('Creating %s in %s' %(outName, outDir))
+   printMsg("Creating %s in %s" %(outName, outDir))
    arcpy.CreateFeatureclass_management (outDir, outName, "POLYGON", tmp_PF, '', '', sr)
 
-   # Standard buffer SBBs
-   printMsg('Processing the simple defined-buffer features...')
-   CreateStandardSBB(tmp_PF, out_SBB)
+   # Create simple buffer SBBs
+   selQry = "intRule in (-1,1,2,3,4,8,10,11,12,13,14) AND fltBuffer <> 0"
+   arcpy.management.MakeFeatureLayer(tmp_PF, "tmpLyr", selQry)
+   c = countFeatures("tmpLyr")
+   if c > 0:
+      printMsg("Processing the simple defined-buffer features...")
+      try:
+         # Run simple buffer
+         arcpy.analysis.PairwiseBuffer("tmpLyr", "tmpSBB", "fltBuffer", "NONE")
+         
+         # Append to SBB feature class and cleanup
+         arcpy.management.Append ("tmpSBB", out_SBB, "NO_TEST")
+         printMsg("Simple buffer SBBs completed successfully.")
+         garbagePickup(["tmpSBB"])
+      except:
+         printWrng("Unable to process the simple buffer features")
+         tback()
+         msg = "WARNING: There was a problem creating the simple buffer SBBS."
+         sbbWarnings.append(msg)
+   else:
+      printMsg("There are no PFs using the simple buffer rules. Passing...")
+   
+   # Create no-buffer SBBs
+   selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
+   arcpy.management.MakeFeatureLayer(tmp_PF, "tmpLyr", selQry)
+   c = countFeatures("tmpLyr")
+   if c > 0:
+      printMsg("Processing the no-buffer features...")
+      try:
+         # Use PFs as SBBs
+         arcpy.management.Append ("tmpLyr", out_SBB, "NO_TEST")
+         printMsg('No-buffer SBBs completed')
+      except:
+         printWrng('Unable to process the no-buffer features.')
+         tback()
+         msg = "WARNING: There was a problem creating the no-buffer SBBS."
+         sbbWarnings.append(msg)
+   else:
+      printMsg('There are no PFs using the no-buffer rules. Passing...')
 
-   # No buffer SBBs
-   printMsg('Processing the no-buffer features')
-   CreateNoBuffSBB(tmp_PF, out_SBB)
+   # Create wetland SBBs
+   # Set up rule dictionary and keys
+   d = dict()
+   d["5"] = in_nwi5
+   d["6"] = in_nwi67
+   d["7"] = in_nwi67
+   d["9"] = in_nwi9
+   keys = d.keys()
+   
+   # Loop through the rule sets
+   for k in keys:
+      selQry = "intRule = %s"%k
+      in_NWI = d[k]
+      arcpy.management.MakeFeatureLayer(tmp_PF, "tmpLyr", selQry)
+      c = countFeatures("tmpLyr")
+      if c > 0:
+         printMsg("Processing the Rule %s features"%k)
+         try:
+            msg = CreateWetlandSBB("tmpLyr", fld_SFID, in_NWI, out_SBB, scratchGDB)
+            warnMsgs = arcpy.GetMessages(1)
+            if warnMsgs:
+               printWrng("Finished processing Rule %s, but there were some problems."%k)
+               printWrng(warnMsgs)
+               sbbWarnings.append(msg)
+            else:
+               printMsg("Rule %s SBBs completed"%k)
+         except:
+            printWrng("Unable to process Rule %s features"%k)
+            tback()
+            msg = "WARNING: There was a problem creating the Rule %s features"%k
+            sbbWarnings.append(msg)
+      else:
+         printMsg("There are no PFs with Rule %s. Passing..."%k)
 
-   # Rule 5 SBBs
-   printMsg('Processing the Rule 5 features')
-   selQry = "intRule = 5"
-   in_NWI = in_nwi5
-   try:
-      CreateWetlandSBB(tmp_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace, "in_memory")
-      sbbStatus(5)
-   except:
-      printWrng('Unable to process Rule 5 features')
-      tback()
-
-   # Rule 6 SBBs
-   printMsg('Processing the Rule 6 features')
-   selQry = "intRule = 6"
-   in_NWI = in_nwi67
-   try:
-      CreateWetlandSBB(tmp_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace, "in_memory")
-      sbbStatus(6)
-   except:
-      printWrng('Unable to process Rule 6 features')
-      tback()
-
-   # Rule 7 SBBs
-   printMsg('Processing the Rule 7 features')
-   selQry = "intRule = 7"
-   in_NWI = in_nwi67
-   try:
-      CreateWetlandSBB(tmp_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace, "in_memory")
-      sbbStatus(7)
-   except:
-      printWrng('Unable to process Rule 7 features')
-      tback()
-
-   # Rule 9 SBBs
-   printMsg('Processing the Rule 9 features')
-   selQry = "intRule = 9"
-   in_NWI = in_nwi9
-   try:
-      CreateWetlandSBB(tmp_PF, fld_SFID, selQry, in_NWI, out_SBB, tmpWorkspace, "in_memory")
-      sbbStatus(9)
-   except:
-      printWrng('Unable to process Rule 9 features')
-      tback()
-
-   printMsg('SBB processing complete')
+   printMsg("SBB processing complete")
+   if len(sbbWarnings) > 0:
+      for w in sbbWarnings:
+         printWrng(w)
+   else:
+      printMsg("All SBBs created successfully. Margarita time!")
    
    tFinish = datetime.now()
    deltaString = GetElapsedTime (tStart, tFinish)

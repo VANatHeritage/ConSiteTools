@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-02-23
+# Last Edit: 2022-03-03
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -174,7 +174,7 @@ class extract_biotics(object):
       """Define the tool (tool name is the name of the class)."""
       self.label = "1: Extract Biotics data"
       self.description = ""
-      self.canRunInBackground = False
+      self.canRunInBackground = True
       # For some reason, this tool fails if run in the background.
       self.category = "Biotics Tools"
 
@@ -214,8 +214,18 @@ class extract_biotics(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      ExtractBiotics(BioticsPF, BioticsCS, outGDB)
-
+      
+      # Run the function
+      (outPF, outCS) = ExtractBiotics(BioticsPF, BioticsCS, outGDB)
+      
+      # Display the output in the current map
+      try:
+         aprx = arcpy.mp.ArcGISProject("CURRENT")
+         map = aprx.activeMap
+         map.addDataFromPath(outPF).name = "Biotics ProcFeats"
+         map.addDataFromPath(outCS).name = "Biotics ConSites"
+      except:
+         printMsg("Cannot add layers; no current map.")
       return
 
 class parse_siteTypes(object):
@@ -229,7 +239,15 @@ class parse_siteTypes(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm0.value = "Biotics ProcFeats"
+      except:
+         pass
       parm1 = defineParam("in_CS", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
+      try:
+         parm1.value = "Biotics ConSites"
+      except:
+         pass
       parm2 = defineParam("out_GDB", "Geodatabase to store outputs", "DEWorkspace", "Required", "Input")
 
       parms = [parm0, parm1, parm2]
@@ -254,9 +272,21 @@ class parse_siteTypes(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      fcList = ParseSiteTypes(in_PF, in_CS, out_GDB)
       
-      # Extra code to get layers added to current map
+      # Run function
+      fcList = ParseSiteTypes(in_PF, in_CS, out_GDB)
+
+      # Display the output in the current map
+      try:
+         aprx = arcpy.mp.ArcGISProject("CURRENT")
+         map = aprx.activeMap
+         for fc in fcList:
+            map.addDataFromPath(fc)
+
+      except:
+         printMsg("Cannot add layers; no current map.")
+      return
+      
       try:
          mxd = arcpy.mapping.MapDocument("CURRENT")
          df = mxd.activeDataFrame

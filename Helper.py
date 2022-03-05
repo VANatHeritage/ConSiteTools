@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-01
+# Last Edit: 2022-03-03
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -159,6 +159,28 @@ def SelectCopy(in_FeatLyr, selFeats, selDist, out_Feats):
       
    return out_Feats
 
+def ExpandSelection(inLyr, SearchDist):
+   '''Given an initial selection of features in a feature layer, selects additional features within the search distance, and iteratively adds to the selection until no more features are within distance.
+   
+   Parameters:
+   - inLyr: a feature layer with a selection on it (NOT a feature class)
+   - SearchDist: distance within which features should be added to the selection
+   '''
+   # Initialize row count variables
+   c0 = 0
+   c1 = 1
+   
+   while c0 < c1:
+      # Keep adding to the selection as long as the counts of selected records keep changing
+      # Get count of records in initial selection
+      c0 = countSelectedFeatures(inLyr)
+      
+      # Select features within distance of current selection
+      arcpy.management.SelectLayerByLocation(inLyr, "WITHIN_A_DISTANCE", inLyr, SearchDist, "ADD_TO_SELECTION")
+      
+      # Get updated selection count
+      c1 = countSelectedFeatures(inLyr)
+   
 def unique_values(table, field):
    '''This function was obtained from:
    https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
@@ -270,7 +292,6 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Buffer
    Buff1 = scratchGDB + os.sep + "Buff1"
-   # arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, "FULL", "ROUND", dissolve1, "", "GEODESIC")
    arcpy.analysis.PairwiseBuffer(inFeats, Buff1, meas, dissolve1)
 
    # Process: Clean Features
@@ -279,7 +300,7 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
 
    # Process:  Generalize Features
    # This should prevent random processing failures on features with many vertices, and also speed processing in general
-   #arcpy.Generalize_edit(Clean_Buff1, "0.1 Meters")
+   arcpy.edit.Generalize(Clean_Buff1, "0.1 Meters")
    
    # Eliminate gaps
    # Added step due to weird behavior on some buffers
@@ -300,6 +321,8 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
    return outFeats
    
 def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memory"):
+   '''Like Coalesce, but with a smoothing routine
+   '''
    # Parse dilation distance, and increase it to get smoothing distance
    smthMulti = float(smthMulti)
    origDist, units, meas = multiMeasure(dilDist, 1)
@@ -309,9 +332,6 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    if origDist <= 0:
       arcpy.AddError("You need to enter a positive, non-zero value for the dilation distance")
       raise arcpy.ExecuteError   
-
-   #tmpWorkspace = arcpy.env.scratchGDB
-   #arcpy.AddMessage("Additional critical temporary products will be stored here: %s" % tmpWorkspace)
    
    # Set up empty trashList for later garbage collection
    trashList = []
@@ -326,17 +346,13 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
    arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
 
    # Process:  Clean Features
-   #cleanFeats = tmpWorkspace + os.sep + "cleanFeats"
    cleanFeats = scratchGDB + os.sep + "cleanFeats"
    CleanFeatures(inFeats, cleanFeats)
    trashList.append(cleanFeats)
 
    # Process:  Dissolve Features
-   #dissFeats = tmpWorkspace + os.sep + "dissFeats"
-   # Writing to disk in hopes of stopping geoprocessing failure
-   #arcpy.AddMessage("This feature class is stored here: %s" % dissFeats)
    dissFeats = scratchGDB + os.sep + "dissFeats"
-   arcpy.management.PairwiseDissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART")
+   arcpy.analysis.PairwiseDissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART")
    trashList.append(dissFeats)
    
    # Process:  Make Feature Layer
@@ -349,15 +365,11 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
 
    # Process:  Buffer Features
    #arcpy.AddMessage("Buffering features...")
-   #buffFeats = tmpWorkspace + os.sep + "buffFeats"
    buffFeats = scratchGDB + os.sep + "buffFeats"
    arcpy.analysis.PairwiseBuffer (dissFeats, buffFeats, meas, "ALL")
    trashList.append(buffFeats)
 
    # Process:  Explode Multiparts
-   #explFeats = tmpWorkspace + os.sep + "explFeats"
-   # Writing to disk in hopes of stopping geoprocessing failure
-   #arcpy.AddMessage("This feature class is stored here: %s" % explFeats)
    explFeats = scratchGDB + os.sep + "explFeats"
    arcpy.management.MultipartToSinglepart(buffFeats, explFeats)
    trashList.append(explFeats)
@@ -372,16 +384,10 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
       for Feat in myFeats:
          arcpy.AddMessage('Working on shrink feature %s' % str(counter))
          featSHP = Feat[0]
-         # tmpFeat = scratchGDB + os.sep + "tmpFeat"
-         # arcpy.management.CopyFeatures(featSHP, tmpFeat)
-         # trashList.append(tmpFeat)
-         
-         # Process:  Repair Geometry
-         # arcpy.management.RepairGeometry(tmpFeat, "DELETE_NULL")
+
          arcpy.management.RepairGeometry(featSHP, "DELETE_NULL")
 
-         # Process: Select Layer by Location (Get dissolved features within each exploded buffer feature)
-         # arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", tmpFeat, "", "NEW_SELECTION")
+         # Process: Get dissolved features within each exploded buffer feature
          arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", featSHP, "", "NEW_SELECTION")
          
          # Process:  Coalesce features (expand)
