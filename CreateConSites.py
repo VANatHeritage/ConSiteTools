@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-04
+# Last Edit: 2022-03-05
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1244,48 +1244,6 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
       tback()
       quit()
 
-def CreateStandardSBB(in_PF, out_SBB, scratchGDB = "in_memory"):
-   '''OBSOLETE FUNCTION - DELETE
-   Creates standard buffer SBBs for specified subset of PFs.
-   Parameters:
-   - in_PF: Input procedural features
-   - out_SBB: An SBB feature class to which the output from this function will be appended
-   '''
-   try:
-      # Set workspace
-      arcpy.env.workspace = scratchGDB
-
-      # Run simple buffer
-      arcpy.analysis.PairwiseBuffer("tmpLyr", "tmpSBB", "fltBuffer", "NONE")
-      
-      # Append to specified SBB feature class and cleanup
-      arcpy.management.Append ("tmpSBB", out_SBB, "NO_TEST")
-      msg = ("Simple buffer SBBs completed successfully")
-      garbagePickup(["tmpSBB"])
-   except:
-      printWrng('Unable to process the simple buffer features')
-      tback()
-
-def CreateNoBuffSBB(in_PF, out_SBB):
-   '''OBSOLETE FUNCTION - DELETE
-   Creates SBBs that are simple copies of PFs for specified subset'''
-   try:
-      # Process: Select (No-Buffer Rules)
-      selQry = "(intRule in (-1,1,2,3,4,8,10,11,12,13,14,15) AND (fltBuffer = 0))"
-      arcpy.management.MakeFeatureLayer(in_PF, "tmpLyr", selQry)
-
-      # Count records and proceed accordingly
-      count = countFeatures("tmpLyr")
-      if count > 0:
-         # Append to output and cleanup
-         arcpy.management.Append ("tmpLyr", out_SBB, "NO_TEST")
-         printMsg('No-buffer SBBs completed')
-      else:
-         printMsg('There are no PFs using the no-buffer rules')
-   except:
-      printWrng('Unable to process the no-buffer features.')
-      tback()
-
 def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory"):
    '''Creates standard wetland SBBs from Rule 5, 6, 7, or 9 Procedural Features (PFs). The procedures are the same for all rules, the only difference being the rule-specific inputs.
    
@@ -1298,20 +1256,26 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 #     6.  Merge the minimum buffer with the buffered NWI feature(s), if applicable.
 #     7.  Clip the merged feature to the maximum buffer.'''
 
-   # Make feature layers
-   # arcpy.management.MakeFeatureLayer(in_PF, in_PF, selQry)
+   # Prepare data
    arcpy.management.MakeFeatureLayer (in_NWI, "NWI_lyr")
    
+   # I added a step to save PFs to disk b/c procedure is not working correctly when full dataset is processed. Memory issue??
+   tmpWorkspace = createTmpWorkspace()
+   tmp_PF = tmpWorkspace + os.sep + "tmp_PF"
+   arcpy.CopyFeatures_management(in_PF, tmp_PF)
+   printMsg("Temporary PFs/SBBs stored here: %s"%tmp_PF)
+   printMsg("PF shapes will be updated to SBB shapes on the fly, in the same dataset.")
+   
+   # Declare some additional parameters
+   # These can be tweaked as desired
+   nwiBuff = "100 METERS"# buffer to be used for NWI features (may or may not equal minBuff)
+   minBuff = "250 METERS" # minimum buffer to include in SBB
+   maxBuff = "500 METERS" # maximum buffer to include in SBB
+   searchDist = "15 METERS" # search distance for inclusion of NWI features
+   
    # Count records and proceed accordingly
-   count = countFeatures(in_PF)
+   count = countFeatures(tmp_PF)
    if count > 0:
-      # Declare some additional parameters
-      # These can be tweaked as desired
-      nwiBuff = "100 METERS"# buffer to be used for NWI features (may or may not equal minBuff)
-      minBuff = "250 METERS" # minimum buffer to include in SBB
-      maxBuff = "500 METERS" # maximum buffer to include in SBB
-      searchDist = "15 METERS" # search distance for inclusion of NWI features
-
       # Set workspace and some additional variables
       arcpy.env.workspace = scratchGDB
       num, units, newMeas = multiMeasure(searchDist, 0.5)
@@ -1324,7 +1288,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
       
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
-      with arcpy.da.UpdateCursor(in_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
+      with arcpy.da.UpdateCursor(tmp_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
          for myPF in myProcFeats:
          # for each Procedural Feature in the set, do the following...
          
@@ -1444,7 +1408,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
          printWrng(msg)
       # Append the SBBs to the SBB feature class
       printMsg("Appending final shapes to SBB feature class...")
-      arcpy.management.Append(in_PF, out_SBB, "NO_TEST")
+      arcpy.management.Append(tmp_PF, out_SBB, "NO_TEST")
    else:
       printMsg("There are no PFs with this rule; passing...")
       msg = None
