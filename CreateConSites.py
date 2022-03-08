@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-05
+# Last Edit: 2022-03-07
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -996,7 +996,9 @@ def CullFrags (inFrags, in_PF, searchDist, outFrags):
    return outFrags
 
 def ExpandSBBselection(inSBB, inPF, fld_SFID, inConSites, SearchDist, outSBB, outPF):
-   '''Given an initial selection of Site Building Blocks (SBB) features, selects additional SBB features in the vicinity that should be included in any Conservation Site update. Also selects the Procedural Features (PF) corresponding to selected SBBs. Outputs the selected SBBs and PFs to new feature classes.'''
+   '''Given an initial selection of Site Building Blocks (SBB) features, selects additional SBB features in the vicinity that should be included in any Conservation Site update. Also selects the Procedural Features (PF) corresponding to selected SBBs. Outputs the selected SBBs and PFs to new feature classes.
+   OBSOLETE FUNCTION: Should expand at the PF level instead.
+   '''
    # If applicable, clear any selections on the PFs and ConSites inputs
    typePF = (arcpy.Describe(inPF)).dataType
    typeCS = (arcpy.Describe(inConSites)).dataType
@@ -1248,8 +1250,8 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
    '''Creates standard wetland SBBs from Rule 5, 6, 7, or 9 Procedural Features (PFs). The procedures are the same for all rules, the only difference being the rule-specific inputs.
    
 #     Carries out the following general procedures:
-#     1.  Buffer the PF by 250-m.  This is the minimum buffer. [Exception: zero buffer overrides.]
-#     2.  Buffer the PF by 500-m.  This is the maximum buffer.
+#     1.  Buffer the PF by 250-m.  This is the minimum buffer. [Exception: buffer overrides.]
+#     2.  Buffer the PF by 500-m.  This is the maximum buffer. [Exception: buffer overrides.]
 #     3.  Clip any NWI wetland features to the maximum buffer.
 #     4.  Select any clipped NWI features within 15-m of the PF, then expand the selection.
 #     5.  Buffer the selected NWI feature(s), if applicable, by 100-m.
@@ -1258,34 +1260,28 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 
    # Prepare data
    arcpy.management.MakeFeatureLayer (in_NWI, "NWI_lyr")
-   
-   # I added a step to save PFs to disk b/c procedure is not working correctly when full dataset is processed. Memory issue??
-   tmpWorkspace = createTmpWorkspace()
-   tmp_PF = tmpWorkspace + os.sep + "tmp_PF"
-   arcpy.CopyFeatures_management(in_PF, tmp_PF)
-   printMsg("Temporary PFs/SBBs stored here: %s"%tmp_PF)
-   printMsg("PF shapes will be updated to SBB shapes on the fly, in the same dataset.")
+   tmp_PF = in_PF
    
    # Declare some additional parameters
-   # These can be tweaked as desired
+   # These can be tweaked if desired in the future
    nwiBuff = "100 METERS"# buffer to be used for NWI features (may or may not equal minBuff)
    minBuff = "250 METERS" # minimum buffer to include in SBB
    maxBuff = "500 METERS" # maximum buffer to include in SBB
    searchDist = "15 METERS" # search distance for inclusion of NWI features
    
+   # Set workspace and some additional variables
+   arcpy.env.workspace = scratchGDB
+   num, units, newMeas = multiMeasure(searchDist, 0.5)
+
+   # Create an empty list to store IDs of features that fail to get processed
+   myFailList = []
+   
+   # Set extent
+   arcpy.env.extent = "MAXOF"
+   
    # Count records and proceed accordingly
    count = countFeatures(tmp_PF)
    if count > 0:
-      # Set workspace and some additional variables
-      arcpy.env.workspace = scratchGDB
-      num, units, newMeas = multiMeasure(searchDist, 0.5)
-
-      # Create an empty list to store IDs of features that fail to get processed
-      myFailList = []
-      
-      # Set extent
-      arcpy.env.extent = "MAXOF"
-      
       # Loop through the individual Procedural Features
       myIndex = 1 # Set a counter index
       with arcpy.da.UpdateCursor(tmp_PF, [fld_SFID, "SHAPE@", "fltBuffer"]) as myProcFeats:
@@ -1304,18 +1300,23 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 
                # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
                if myBuff==0:
+                  # This is the "buffer override" specification
                   printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
-                  maxBuff = minBuff
-                  minBuff = 0
+                  buff1 = 0
+                  buff2 = minBuff
                else:
+                  # This is the standard specification
                   printMsg("Creating minimum buffer")
-               arcpy.analysis.PairwiseBuffer (myShape, "myMinBuffer", minBuff)
+                  buff1 = minBuff
+                  buff2 = maxBuff
+                  
+               arcpy.analysis.PairwiseBuffer (myShape, "myMinBuffer", buff1)
                   
                # Get default shape to use if NWI doesn't come into play
                defaultShape = arcpy.SearchCursor("myMinBuffer").next().Shape
 
                # Step 2: Create a maximum buffer around the Procedural Feature
-               arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", maxBuff)
+               arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", buff2)
                arcpy.env.extent = "myMaxBuffer"
                # Added the extent steps because it doesn't seem to be grabbing all the NWI features from the feature service, otherwise
                
@@ -1398,8 +1399,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                # Release cursor row
                del myPF
 
-      # Once the script as a whole has succeeded, let the user know if any individual
-      # features failed
+      # Once the script as a whole has succeeded, let the user know if any individual features failed
       if len(myFailList) == 0:
          printMsg("All features successfully processed")
          msg = None
@@ -1608,7 +1608,9 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    return out_SBB
 
 def ParseSBBs(in_SBB, out_terrSBB, out_ahzSBB):
-   '''Splits input SBBs into two feature classes, one for standard terrestrial SBBs and one for AHZ SBBs.'''
+   '''Splits input SBBs into two feature classes, one for standard terrestrial SBBs and one for AHZ SBBs.
+   OBSOLETE function because now we parse the PFs by site type instead.
+   '''
    terrQry = "intRule <> -1" 
    ahzQry = "intRule = -1"
    arcpy.Select_analysis (in_SBB, out_terrSBB, terrQry)
@@ -1617,10 +1619,9 @@ def ParseSBBs(in_SBB, out_terrSBB, out_ahzSBB):
    sbbTuple = (out_terrSBB, out_ahzSBB)
    return sbbTuple
 
-def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type, in_Hydro, in_TranSurf = None, in_Exclude = None, scratchGDB = "in_memory"):
+def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type, in_Hydro, in_TranSurf = None, in_Exclude = None, scratchGDB = "in_memory"):
    '''Creates Conservation Sites from the specified inputs:
    - in_SBB: feature class representing Site Building Blocks
-   - ysn_Expand: ["true"/"false"] - determines whether to expand the selection of SBBs to include more in the vicinity
    - in_PF: feature class representing Procedural Features
    - fld_SFID: name of the field containing the unique ID linking SBBs to PFs. Field name is must be the same for both.
    - in_ConSites: feature class representing current Conservation Sites (or, a template feature class)
@@ -1691,14 +1692,9 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    SBB_sub = scratchGDB + os.sep + 'SBB_sub'
    PF_sub = scratchGDB + os.sep + 'PF_sub'
    
-   if ysn_Expand == "true":
-      # Expand SBB selection
-      printMsg('Expanding the current SBB selection and making copies of the SBBs and PFs...')
-      ExpandSBBselection(in_SBB, in_PF, fld_SFID, in_ConSites, selDist, SBB_sub, PF_sub)
-   else:
-      # Subset PFs and SBBs
-      printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
-      SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
+   # Subset PFs and SBBs
+   printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
+   SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
    
    # Buffer the SBBs; output used for selecting relevant features and setting processing extent
    procBuff = scratchGDB + os.sep + "procBuff"
@@ -1753,7 +1749,8 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
    tProtoStart = datetime.now()
    printMsg("Creating ProtoSites by shrink-wrapping SBBs...")
    outPS = myWorkspace + os.sep + 'ProtoSites'
-      # Saving ProtoSites to hard drive, just in case...
+   
+   # Saving ProtoSites to hard drive, just in case...
    printMsg('ProtoSites will be stored here: %s' % outPS)
    ShrinkWrap("SBB_lyr", dilDist, outPS)
 
@@ -1777,15 +1774,22 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             printMsg('Working on ProtoSite %s' % str(counter))
             tProtoStart = datetime.now()
             
-            psSHP = myPS[0]
-            tmpPS = scratchGDB + os.sep + "tmpPS"
-            arcpy.CopyFeatures_management (psSHP, tmpPS) 
+            # psSHP = myPS[0]
+            # tmpPS = scratchGDB + os.sep + "tmpPS"
+            # arcpy.CopyFeatures_management (psSHP, tmpPS) 
+            tmpPS = myPS[0]
             tmpSS_grp = scratchGDB + os.sep + "tmpSS_grp"
-            arcpy.CreateFeatureclass_management (scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites) 
+            arcpy.management.CreateFeatureclass(scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites) 
+            
+            # Buffer around the ProtoSite
+            printMsg('Buffering ProtoSite to get processing area...')
+            tmpBuff = scratchGDB + os.sep + 'tmpBuff'
+            arcpy.analysis.PairwiseBuffer(tmpPS, tmpBuff, buffDist, "", "", "", "")  
+            arcpy.env.extent = tmpBuff
             
             # Get SBBs within the ProtoSite
             printMsg('Selecting SBBs within ProtoSite...')
-            arcpy.SelectLayerByLocation_management("SBB_lyr", "INTERSECT", tmpPS, "", "NEW_SELECTION", "NOT_INVERT")
+            arcpy.management.SelectLayerByLocation("SBB_lyr", "INTERSECT", tmpPS, "", "NEW_SELECTION", "NOT_INVERT")
             
             # Copy the selected SBB features to tmpSBB
             tmpSBB = scratchGDB + os.sep + 'tmpSBB'
@@ -1800,11 +1804,6 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             tmpPF = scratchGDB + os.sep + 'tmpPF'
             arcpy.CopyFeatures_management ("PF_lyr", tmpPF)
             printMsg('Selected PFs copied.')
-            
-            # Buffer around the ProtoSite
-            printMsg('Buffering ProtoSite to get processing area...')
-            tmpBuff = scratchGDB + os.sep + 'tmpBuff'
-            arcpy.Buffer_analysis (tmpPS, tmpBuff, buffDist, "", "", "", "")  
             
             # Clip exclusion features to buffer
             if site_Type == 'TERRESTRIAL':
@@ -1896,15 +1895,16 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
                for mySS in mySplitSites:
                   printMsg('Working on split site %s' % str(counter2))
                   
-                  ssSHP = mySS[0]
-                  tmpSS = scratchGDB + os.sep + "tmpSS" + str(counter2)
-                  arcpy.CopyFeatures_management (ssSHP, tmpSS) 
+                  # ssSHP = mySS[0]
+                  # tmpSS = scratchGDB + os.sep + "tmpSS" + str(counter2)
+                  # arcpy.CopyFeatures_management (ssSHP, tmpSS) 
+                  tmpSS = mySS[0]
                   
-                  # Make Feature Layer from split site
-                  arcpy.MakeFeatureLayer_management (tmpSS, "splitSiteLyr", "", "", "")
+                  # # Make Feature Layer from split site
+                  # arcpy.MakeFeatureLayer_management (tmpSS, "splitSiteLyr", "", "", "")
                            
                   # Get PFs within split site
-                  arcpy.SelectLayerByLocation_management("PF_lyr", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
+                  arcpy.management.SelectLayerByLocation("PF_lyr", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
                   
                   # Select retained SBB fragments corresponding to selected PFs
                   tmpSBB2 = scratchGDB + os.sep + 'tmpSBB2' 
@@ -1918,7 +1918,7 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
                   # Intersect shrinkwrap with original split site
                   # This is necessary to keep it from "spilling over" across features used to split.
                   csInt = scratchGDB + os.sep + 'csInt' + str(counter2)
-                  arcpy.Intersect_analysis ([tmpSS, csShrink], csInt, "ONLY_FID")
+                  arcpy.analysis.PairwiseIntersect([tmpSS, csShrink], csInt, "ONLY_FID")
                   
                   # Process:  Clean Erase (final removal of exclusion features)
                   if site_Type == 'TERRESTRIAL':
@@ -1937,7 +1937,7 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
                   
                   # Append the final geometry to the split sites group feature class.
                   printMsg("Appending feature...")
-                  arcpy.Append_management(ssBnd, tmpSS_grp, "NO_TEST", "", "")
+                  arcpy.management.Append(ssBnd, tmpSS_grp, "NO_TEST", "", "")
                   
                   counter2 +=1
                   del mySS
@@ -1964,15 +1964,17 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             # Eliminate gaps
             printMsg('Eliminating gaps...')
             finBnd = scratchGDB + os.sep + 'finBnd'
-            arcpy.EliminatePolygonPart_management (csCull, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
+            arcpy.management.EliminatePolygonPart(csCull, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
             
             # Generalize
             printMsg('Generalizing boundary...')
-            arcpy.Generalize_edit(finBnd, "0.5 METERS")
+            arcpy.edit.Generalize(finBnd, "0.5 METERS")
 
             # Append the final geometry to the ConSites feature class.
             printMsg("Appending feature...")
-            arcpy.Append_management(finBnd, out_ConSites, "NO_TEST", "", "")
+            arcpy.management.Append(finBnd, out_ConSites, "NO_TEST", "", "")
+            
+            printMsg("Processing complete for ProtoSite %s." %str(counter))
             
          except:
             # Error handling code swiped from "A Python Primer for ArcGIS"
@@ -1986,9 +1988,10 @@ def CreateConSites(in_SBB, ysn_Expand, in_PF, fld_SFID, in_ConSites, out_ConSite
             printMsg(arcpy.GetMessages(1))
          
          finally:
+            arcpy.env.extent = "MAXOF"
             tProtoEnd = datetime.now()
             deltaString = GetElapsedTime(tProtoStart, tProtoEnd)
-            printMsg("Processing complete for ProtoSite %s. Elapsed time: %s" %(str(counter), deltaString))
+            printMsg("Elapsed time: %s" %deltaString)
             counter +=1
             del myPS
             

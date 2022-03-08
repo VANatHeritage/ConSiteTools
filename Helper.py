@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-03
+# Last Edit: 2022-03-07
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -166,21 +166,29 @@ def ExpandSelection(inLyr, SearchDist):
    - inLyr: a feature layer with a selection on it (NOT a feature class)
    - SearchDist: distance within which features should be added to the selection
    '''
-   # Initialize row count variables
-   c0 = 0
-   c1 = 1
    
-   while c0 < c1:
-      # Keep adding to the selection as long as the counts of selected records keep changing
-      # Get count of records in initial selection
-      c0 = countSelectedFeatures(inLyr)
+   c = countSelectedFeatures(inLyr)
+   # printMsg("%s features are selected"%str(c))
+   if c == 0:
+      printErr("You need to have an active selection on the input layer for this function to work.")
+   else:
+      # Initialize row count variables
+      c0 = 0
+      c1 = 1
       
-      # Select features within distance of current selection
-      arcpy.management.SelectLayerByLocation(inLyr, "WITHIN_A_DISTANCE", inLyr, SearchDist, "ADD_TO_SELECTION")
+      while c0 < c1:
+         # Keep adding to the selection as long as the counts of selected records keep changing
+         # Get count of records in initial selection
+         c0 = countSelectedFeatures(inLyr)
+         
+         # Select features within distance of current selection
+         arcpy.management.SelectLayerByLocation(inLyr, "WITHIN_A_DISTANCE", inLyr, SearchDist, "ADD_TO_SELECTION")
+         
+         # Get updated selection count
+         c1 = countSelectedFeatures(inLyr)
+      printMsg("Updated selection: %s features are selected"%str(c1))
+   return inLyr
       
-      # Get updated selection count
-      c1 = countSelectedFeatures(inLyr)
-   
 def unique_values(table, field):
    '''This function was obtained from:
    https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
