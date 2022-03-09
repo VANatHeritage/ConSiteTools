@@ -268,7 +268,7 @@ def tback():
    return msgList
    
 def clearSelection(fc):
-   typeFC= (arcpy.Describe(fc)).dataType
+   typeFC = (arcpy.Describe(fc)).dataType
    if typeFC == 'FeatureLayer':
       arcpy.SelectLayerByAttribute_management (fc, "CLEAR_SELECTION")
       

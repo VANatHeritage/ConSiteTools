@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-07
+# Last Edit: 2022-03-08
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1318,11 +1318,10 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                # Step 2: Create a maximum buffer around the Procedural Feature
                arcpy.analysis.PairwiseBuffer (myShape, "myMaxBuffer", buff2)
                arcpy.env.extent = "myMaxBuffer"
-               # Added the extent steps because it doesn't seem to be grabbing all the NWI features from the feature service, otherwise
                
                # Step 3: Clip the NWI to the maximum buffer
                # First check if there are any NWI features in range to work with
-               arcpy.management.SelectLayerByLocation ("NWI_lyr", "INTERSECT", "myMaxBuffer", "", "NEW_SELECTION")
+               arcpy.management.SelectLayerByLocation ("NWI_lyr", "INTERSECT", "myMaxBuffer")
                c = countSelectedFeatures("NWI_lyr")
                
                if c > 0:
@@ -1696,45 +1695,61 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
    SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
    
-   # Buffer the SBBs; output used for selecting relevant features and setting processing extent
-   procBuff = scratchGDB + os.sep + "procBuff"
-   printMsg("Creating the processing buffer")
-   arcpy.analysis.Buffer(SBB_sub, procBuff, "500 METERS")
-   arcpy.env.extent = procBuff
+   # # Buffer the SBBs; output used for selecting relevant features and setting processing extent
+   # procBuff = scratchGDB + os.sep + "procBuff"
+   # printMsg("Creating the processing buffer")
+   # arcpy.analysis.Buffer(SBB_sub, procBuff, "500 METERS")
+   # arcpy.env.extent = procBuff
    
    # Make Feature Layers
    printMsg("Making feature layers...")
    pf = arcpy.management.MakeFeatureLayer(PF_sub, "PF_lyr") 
    sbb = arcpy.management.MakeFeatureLayer(SBB_sub, "SBB_lyr") 
-   proc = arcpy.management.MakeFeatureLayer(procBuff, "proc_lyr") 
+   # proc = arcpy.management.MakeFeatureLayer(procBuff, "proc_lyr") 
    water = arcpy.management.MakeFeatureLayer(in_Hydro, "Hydro_lyr", hydroQry)
-   water = arcpy.management.SelectLayerByLocation(water, "INTERSECT", proc, "", "SUBSET_SELECTION")
+   # water = arcpy.management.SelectLayerByLocation(water, "INTERSECT", proc)
+   modLyrs = [water]
    
    if site_Type == 'TERRESTRIAL':
       excl = arcpy.management.MakeFeatureLayer(in_Exclude, "Excl_lyr")
-      excl = arcpy.management.SelectLayerByLocation(excl, "INTERSECT", proc, "", "SUBSET_SELECTION")
+      modLyrs.append(excl)
+      # excl = arcpy.management.SelectLayerByLocation(excl, "INTERSECT", proc)
       
-      transLyr = []
-      i = 1
-      for t in Trans:
-         name = "trans%s_lyr"%i
-         arcpy.management.MakeFeatureLayer(t, name)
-         arcpy.management.SelectLayerByLocation(name, "INTERSECT", proc, "", "SUBSET_SELECTION")
-         transLyr.append(name)
-         i += 1
-   
-   # Merge the transportation layers, if applicable
-   if site_Type == 'TERRESTRIAL':
-      # Note: It takes WAY longer to clip and then merge, than to simply merge the whole extent, so I eliminated the clipping step.
+      # i = 1
+      dTrans = dict()
+      for i in range(0, len(Trans)):
+         dTrans[i] = Trans[i]
+      transLyrs = []
+      for key in dTrans.keys():
+         inName = dTrans[key]
+         lyrName = "trans%s_lyr"%str(key)
+         # print("Input: %s"%inName)
+         # inType = (arcpy.Describe(inName)).dataType
+         # print("Data type: %s"%inType)
+         # if inType != "FeatureLayer":
+            # lyrName = "trans%s_lyr"%str(key)
+            # print("Making new feature layer: %s"%lyrName)
+            # arcpy.management.MakeFeatureLayer(inName, lyrName)
+         # else:
+            # lyrName = dTrans[key]
+            # print("Selecting on existing feature layer: %s"%lyrName)
+         # arcpy.management.SelectLayerByLocation(lyrName, "INTERSECT", proc)
+         arcpy.management.MakeFeatureLayer(inName, lyrName)
+         modLyrs.append(lyrName)
+         transLyrs.append(lyrName)
+         
+   # # Merge the transportation layers, if applicable
+   # if site_Type == 'TERRESTRIAL':
+      # # Note: It takes WAY longer to clip and then merge, than to simply merge the whole extent, so I eliminated the clipping step.
 
-      if len(transLyr) == 1:
-         Trans = transLyr[0]
-      else:
-         printMsg("Merging transportation surfaces")
-         mergeTrans = scratchGDB + os.sep + "mergeTrans"
-         arcpy.management.Merge(transLyr, mergeTrans)
-         Trans = arcpy.management.MakeFeatureLayer(mergeTrans, "mergeTrans_lyr")
-         #Trans = mergeTrans
+      # if len(transLyr) == 1:
+         # Trans = transLyr[0]
+      # else:
+         # printMsg("Merging transportation surfaces")
+         # mergeTrans = scratchGDB + os.sep + "mergeTrans"
+         # arcpy.management.Merge(transLyr, mergeTrans)
+         # Trans = arcpy.management.MakeFeatureLayer(mergeTrans, "mergeTrans_lyr")
+         # #Trans = mergeTrans
    
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
@@ -1781,15 +1796,32 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             tmpSS_grp = scratchGDB + os.sep + "tmpSS_grp"
             arcpy.management.CreateFeatureclass(scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites) 
             
-            # Buffer around the ProtoSite
+            # Buffer around the ProtoSite and set extent
             printMsg('Buffering ProtoSite to get processing area...')
             tmpBuff = scratchGDB + os.sep + 'tmpBuff'
             arcpy.analysis.PairwiseBuffer(tmpPS, tmpBuff, buffDist, "", "", "", "")  
             arcpy.env.extent = tmpBuff
             
+            # Select modification layers by location
+            for lyr in modLyrs:
+               try:
+                  arcpy.management.SelectLayerByLocation(lyr, "INTERSECT", tmpBuff)
+               except:
+                  printErr("Crap. Select by location failed for %s"%lyr)
+                  
+            # Merge the transportation layers, if applicable
+            if site_Type == 'TERRESTRIAL':
+               if len(transLyrs) == 1:
+                  Trans = transLyrs[0]
+               else:
+                  printMsg("Merging transportation surfaces")
+                  mergeTrans = scratchGDB + os.sep + "mergeTrans"
+                  arcpy.management.Merge(transLyrs, mergeTrans)
+                  Trans = mergeTrans
+            
             # Get SBBs within the ProtoSite
             printMsg('Selecting SBBs within ProtoSite...')
-            arcpy.management.SelectLayerByLocation("SBB_lyr", "INTERSECT", tmpPS, "", "NEW_SELECTION", "NOT_INVERT")
+            arcpy.management.SelectLayerByLocation("SBB_lyr", "INTERSECT", tmpPS)
             
             # Copy the selected SBB features to tmpSBB
             tmpSBB = scratchGDB + os.sep + 'tmpSBB'
@@ -1798,14 +1830,14 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             # Get PFs within the ProtoSite
             printMsg('Selecting PFs within ProtoSite...')
-            arcpy.SelectLayerByLocation_management("PF_lyr", "INTERSECT", tmpPS, "", "NEW_SELECTION", "NOT_INVERT")
+            arcpy.SelectLayerByLocation_management("PF_lyr", "INTERSECT", tmpPS)
             
             # Copy the selected PF features to tmpPF
             tmpPF = scratchGDB + os.sep + 'tmpPF'
             arcpy.CopyFeatures_management ("PF_lyr", tmpPF)
             printMsg('Selected PFs copied.')
             
-            # Clip exclusion features to buffer
+            # Clip modification features to buffered ProtoSite
             if site_Type == 'TERRESTRIAL':
                printMsg('Clipping transportation features to buffer...')
                tranClp = scratchGDB + os.sep + 'tranClp'
@@ -1823,12 +1855,12 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                # Get Transportation Surface Erase Features
                printMsg('Subsetting transportation features')
                transErase = scratchGDB + os.sep + 'transErase'
-               arcpy.Select_analysis (tranClp, transErase, transQry)
+               arcpy.analysis.Select(tranClp, transErase, transQry)
                
                # Get Exclusion Erase Features
                printMsg('Subsetting exclusion features')
                exclErase = scratchGDB + os.sep + 'exclErase'
-               arcpy.Select_analysis (efClp, exclErase, transQry)
+               arcpy.analysis.Select(efClp, exclErase, transQry)
                efClp = exclErase
             
             # Cull Hydro Erase Features
@@ -1841,7 +1873,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             hydroDiss = scratchGDB + os.sep + 'hydroDiss'
             arcpy.Dissolve_management(hydroRtn, hydroDiss, "Hydro", "", "SINGLE_PART", "")
             
-            # Get Hydro Erase Features
+            # Remove narrow hydro from erase features
             printMsg('Eliminating narrow hydro features from erase features...')
             hydroErase = scratchGDB + os.sep + 'hydroErase'
             GetEraseFeats (hydroDiss, hydroQry, hydroElimDist, hydroErase, tmpPF, scratchParm)
@@ -1865,7 +1897,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             sbbErase = scratchGDB + os.sep + 'sbbErase'
             ChopSBBs(tmpPF, tmpSBB, coalErase, sbbClusters, sbbErase, "5 METERS", scratchParm)
             
-            #### Next two blocks seem to duplicate what I already did??
             # Use erase features to chop out areas of SBBs
             printMsg('Erasing portions of SBBs...')
             sbbFrags = scratchGDB + os.sep + 'sbbFrags'
