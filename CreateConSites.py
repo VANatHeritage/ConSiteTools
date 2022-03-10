@@ -1853,7 +1853,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             Coalesce(tmpErase, "0.5 METERS", coalErase, scratchParm)
 
             # Modify SBBs and Erase Features
-            printMsg('Clustering SBBs...')
+            printMsg('Clustering SBBs and modifying erase features...')
             sbbClusters = scratchGDB + os.sep + 'sbbClusters'
             sbbErase = scratchGDB + os.sep + 'sbbErase'
             ChopSBBs(tmpPF, tmpSBB, coalErase, sbbClusters, sbbErase, "5 METERS", scratchParm)
