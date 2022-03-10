@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-07
+# Last Edit: 2022-03-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -327,9 +327,10 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
       garbagePickup([Buff1, Clean_Buff1, Buff2])
       
    return outFeats
-   
-def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memory"):
+
+def ShrinkWrap_OBSOLETE(inFeats, searchDist, outFeats, smthMulti = 8, scratchGDB = "in_memory"):
    '''Like Coalesce, but with a smoothing routine
+   OBSOLETE! This function was slooooowwww! New version is much improved.
    '''
    # Parse dilation distance, and increase it to get smoothing distance
    smthMulti = float(smthMulti)
@@ -416,6 +417,87 @@ def ShrinkWrap(inFeats, dilDist, outFeats, smthMulti = 8, scratchGDB = "in_memor
          # Process:  Append the final geometry to the ShrinkWrap feature class
          arcpy.AddMessage("Appending feature...")
          arcpy.management.Append(noGapFeats, outFeats, "NO_TEST", "", "")
+         
+         counter +=1
+         del Feat
+
+   # Cleanup
+   if scratchGDB == "in_memory":
+      garbagePickup(trashList)
+      
+   return outFeats
+   
+def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_memory"):
+   '''Groups features first, then coalesces them into smooth shapes
+   Parameters:
+   - inFeats: the features to be shrinkwrapped
+   - searchDist: the distance used to cluster input features into groups to be coalesced
+   - outFeats: output shrinkwrapped features
+   - smthMulti: a smoothing multiplier; determines buffer distance for coalescing
+   - scratchGDB: geodatabase to store intermediate products
+   '''
+   # Parse dilation distance, and increase it to get smoothing distance
+   smthMulti = float(smthMulti)
+   origDist, units, meas = multiMeasure(searchDist, 1)
+   smthDist, units, smthMeas = multiMeasure(searchDist, smthMulti)
+
+   # Parameter check
+   if origDist <= 0:
+      arcpy.AddError("You need to enter a positive, non-zero value for the search distance")
+      raise arcpy.ExecuteError   
+   
+   # Set up empty trashList for later garbage collection
+   trashList = []
+
+   # Declare path/name of output data and workspace
+   drive, path = os.path.splitdrive(outFeats) 
+   path, filename = os.path.split(path)
+   myWorkspace = drive + path
+   Output_fname = filename
+
+   # Process:  Create Feature Class (to store output)
+   arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
+   
+   # Make feature layer
+   inFeats_lyr = arcpy.management.MakeFeatureLayer(inFeats, "inFeats_lyr") 
+
+   # Aggregate features
+   printMsg("Aggegating features...")
+   aggFeats = scratchGDB + os.sep + "aggFeats"
+   arcpy.cartography.AggregatePolygons(inFeats_lyr, aggFeats, searchDist, "0 SquareMeters", "0 SquareMeters", "NON_ORTHOGONAL")
+
+   # Process:  Get Count
+   c = countFeatures(aggFeats)
+   arcpy.AddMessage("There are %s clusters to shrinkwrap..."%c)
+
+   # Loop through the aggregated features
+   counter = 1
+   with arcpy.da.SearchCursor(aggFeats, ["SHAPE@"]) as myFeats:
+      for Feat in myFeats:
+         printMsg("Working on cluster %s..." % str(counter))
+         featSHP = Feat[0]
+
+         # Get input features within aggregate feature
+         arcpy.management.SelectLayerByLocation(inFeats_lyr, "INTERSECT", featSHP)
+         
+         # Coalesce selected features
+         coalFeats = scratchGDB + os.sep + 'coalFeats'
+         Coalesce(inFeats_lyr, smthMeas, coalFeats, scratchGDB)
+         # Increasing the dilation distance improves smoothing and reduces the "dumbbell" effect. However, it can also cause some wonkiness which needs to be corrected in the next steps.
+         trashList.append(coalFeats)
+         
+         # # Merge coalesced feature with original features, and coalesce again.
+         # mergeFeats = scratchGDB + os.sep + 'mergeFeats'
+         # arcpy.management.Merge([coalFeats, "dissFeatsLyr"], mergeFeats, "")
+         # Coalesce(mergeFeats, "5 METERS", coalFeats, scratchGDB)
+         
+         # Eliminate gaps
+         noGapFeats = scratchGDB + os.sep + "noGapFeats"
+         arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
+         
+         # Process:  Append the final geometry to the ShrinkWrap feature class
+         arcpy.AddMessage("Appending feature...")
+         arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
          
          counter +=1
          del Feat
