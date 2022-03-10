@@ -1637,7 +1637,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    
    # Specify a bunch of parameters
    selDist = "1000 METERS" # Distance used to expand the SBB selection, if this option is selected. Also used to add extra buffer to SBBs.
-   dilDist = "250 METERS" # Distance used to coalesce SBBs into ProtoSites (precursors to final automated CS boundaries). Features within twice this distance of each other will be merged into one.
+   clusterDist = "500 METERS" # Distance used to cluster SBBs into ProtoSites (precursors to final automated CS boundaries). Features within this distance of each other will be merged into one.
    hydroPerCov = 100 # The minimum percent of any SBB feature that must be covered by water, for those features to be eliminated from the set of features which are used to erase portions of the site. Set to 101 if you don't want features to ever be purged.
    hydroQry = "Hydro = 1" # Expression used to select appropriate hydro features to create erase features
    hydroElimDist = "10 METERS" # Distance used to eliminate insignificant water features from the set of erasing features. Portions of water bodies less than double this width will not be used to split or erase portions of sites.
@@ -1764,10 +1764,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    tProtoStart = datetime.now()
    printMsg("Creating ProtoSites by shrink-wrapping SBBs...")
    outPS = myWorkspace + os.sep + 'ProtoSites'
-   
-   # Saving ProtoSites to hard drive, just in case...
    printMsg('ProtoSites will be stored here: %s' % outPS)
-   ShrinkWrap("SBB_lyr", dilDist, outPS)
+   ShrinkWrap("SBB_lyr", clusterDist, outPS)
 
    # Generalize Features in hopes of speeding processing and preventing random processing failures 
    arcpy.AddMessage("Simplifying features...")
@@ -1944,7 +1942,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   
                   # ShrinkWrap retained SBB fragments
                   csShrink = scratchGDB + os.sep + 'csShrink' + str(counter2)
-                  ShrinkWrap(tmpSBB2, dilDist, csShrink)
+                  ShrinkWrap(tmpSBB2, clusterDist, csShrink)
                   
                   # Intersect shrinkwrap with original split site
                   # This is necessary to keep it from "spilling over" across features used to split.
