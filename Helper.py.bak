@@ -99,7 +99,7 @@ def CleanBuffer(inFeats, buffDist, outFeats, scratchGDB = "in_memory"):
 
    # Process: Clean Features
    buff_clean = scratchGDB + os.sep + "buff_clean"
-   CleanFeatures(buff, buff_clean)
+   CleanFeatures(buff1, buff1_clean)
 
    # Process:  Generalize Features
    # This should prevent random processing failures on features with many vertices, and also speed processing in general

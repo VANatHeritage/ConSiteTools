@@ -1133,9 +1133,7 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    return out_SBB
 
 def ChopSBBs(in_PF, in_SBB, in_EraseFeats, out_Clusters, out_subErase, dilDist = "5 METERS", scratchGDB = "in_memory"):
-   '''Uses Erase Features to chop out sections of SBBs. Stitches "major" SBB fragments back together only if within twice the dilDist of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
-   TODO: Could I use this function for protosites also?
-   '''
+   '''Uses Erase Features to chop out sections of SBBs. Stitches "major" SBB fragments back together only if within twice the dilDist of each other. Subsequently uses output to erase EraseFeats.'''
 
    # Use in_EraseFeats to chop out sections of SBB
    # Use regular Erase, not Clean Erase; multipart is good output at this point
@@ -1725,14 +1723,13 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    deltaString = GetElapsedTime (tStartPrep, tEndPrep)
    printMsg("Data prep complete. Elapsed time: %s" %deltaString)
    
-   # Process:  Shrinkwrap to create ProtoSites
-   # Note: I tried doing a simple clean buffer instead, to speed processing, but the result sucked.
+   # Process:  Clean buffer to create ProtoSites
    tProtoStart = datetime.now()
-   printMsg("Creating ProtoSites by shrinkwrapping SBBs...")
+   printMsg("Creating ProtoSites by buffering SBBs...")
    outPS = myWorkspace + os.sep + 'ProtoSites'
    printMsg('ProtoSites will be stored here: %s' % outPS)
-   ShrinkWrap("SBB_lyr", dilDist, outPS)
-   # CleanBuffer("SBB_lyr", dilDist, outPS)
+   # ShrinkWrap("SBB_lyr", dilDist, outPS)
+   CleanBuffer("SBB_lyr", dilDist, outPS)
 
    # # Generalize Features in hopes of speeding processing and preventing random processing failures 
    # arcpy.AddMessage("Simplifying features...")
