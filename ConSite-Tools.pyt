@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-03-07
+# Last Edit: 2022-03-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -123,9 +123,9 @@ class shrinkwrapFeats(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_Feats", "Input features", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam("dil_Dist", "Dilation distance", "GPLinearUnit", "Required", "Input")
+      parm1 = defineParam("searchDist", "Search distance", "GPLinearUnit", "Required", "Input")
       parm2 = defineParam("out_Feats", "Output features", "DEFeatureClass", "Required", "Output")
-      parm3 = defineParam("smthMulti", "Smoothing multiplier", "GPDouble", "Optional", "Input", 8)
+      parm3 = defineParam("smthMulti", "Smoothing multiplier", "GPDouble", "Optional", "Input", 4)
       parm4 = defineParam("scratch_GDB", "Scratch geodatabase", "DEWorkspace", "Optional", "Input")
       
       parm4.filter.list = ["Local Database"]
@@ -160,9 +160,9 @@ class shrinkwrapFeats(object):
       if smthMulti != 'None':
          multiParm = smthMulti
       else:
-         multiParm = 8
+         multiParm = 4
       
-      ShrinkWrap(in_Feats, dil_Dist, out_Feats, multiParm, scratchParm)
+      ShrinkWrap(in_Feats, searchDist, out_Feats, multiParm, scratchParm)
 
       return out_Feats
 
