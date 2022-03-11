@@ -482,8 +482,12 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    # Process:  Create Feature Class (to store output)
    arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
    
+   # Prep features
+   cleanFeats = scratchGDB + os.sep + "cleanFeats"
+   CleanFeatures(inFeats, cleanFeats)
+   
    # Make feature layer
-   inFeats_lyr = arcpy.management.MakeFeatureLayer(inFeats, "inFeats_lyr") 
+   inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr") 
 
    # Aggregate features
    printMsg("Aggegating features...")

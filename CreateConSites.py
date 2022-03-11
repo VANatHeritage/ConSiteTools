@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-09
+# Last Edit: 2022-03-11
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1132,32 +1132,39 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    printMsg('Done.')
    return out_SBB
 
-def ChopSBBs(in_PF, in_SBB, in_EraseFeats, out_Clusters, out_subErase, dilDist = "5 METERS", scratchGDB = "in_memory"):
-   '''Uses Erase Features to chop out sections of SBBs. Stitches "major" SBB fragments back together only if within twice the dilDist of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
-   TODO: Could I use this function for protosites also?
+def ChopMod(in_PF, in_Feats, in_EraseFeats, out_Clusters, out_subErase, searchDist, scratchGDB = "in_memory"):
+   '''Uses Erase Features to chop out sections of input features. Stitches non-trivial fragments back together only if within search distance of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
+   
+   Parameters:
+   - in_PF: input Procedural Features
+   - in_Feats: input features to be chopped
+   - in_EraseFeats: input features used to erase portions of input features
+   - out_Clusters: output clusters
+   - out_subErase: output modified erase features
+   - searchDist: search distance used to cluster fragments back together
    '''
 
-   # Use in_EraseFeats to chop out sections of SBB
+   # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
-   printMsg('Chopping SBBs...')
+   printMsg('Chopping polygons...')
    firstChop = scratchGDB + os.sep + 'firstChop'
-   arcpy.Erase_analysis (in_SBB, in_EraseFeats, firstChop)
+   arcpy.analysis.Erase(in_Feats, in_EraseFeats, firstChop)
 
-   # Eliminate parts comprising less than 5% of total SBB size
-   printMsg('Eliminating insignificant parts of SBBs...')
+   # Eliminate parts comprising less than 5% of total original feature size
+   printMsg('Eliminating insignificant fragments...')
    rtnParts = scratchGDB + os.sep + 'rtnParts'
-   arcpy.EliminatePolygonPart_management (firstChop, rtnParts, 'PERCENT', '', 5, 'ANY')
+   arcpy.management.EliminatePolygonPart(firstChop, rtnParts, 'PERCENT', '', 5, 'ANY')
    
-   # Shrinkwrap to fill in gaps
-   printMsg('Clustering SBB fragments...')
+   # Shrinkwrap to fill in gaps narrower than search distance
+   printMsg('Clustering fragments...')
    initClusters = scratchGDB + os.sep + 'initClusters'
-   ShrinkWrap(rtnParts, dilDist, initClusters, smthMulti = 2)
+   ShrinkWrap(rtnParts, searchDist, initClusters, smthMulti = 1)
    
    # Remove any fragments without procedural features
-   printMsg('Culling SBB fragments...')
+   printMsg('Culling fragments...')
    CullFrags(initClusters, in_PF, 0, out_Clusters)
    
-   # Use SBB clusters to chop out sections of Erase Features
+   # Use fragment clusters to chop out sections of Erase Features
    printMsg('Eliminating irrelevant Erase Features')
    CleanErase(in_EraseFeats, out_Clusters, out_subErase)
    
@@ -1647,7 +1654,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    transQry = "NH_IGNORE = 0 OR NH_IGNORE IS NULL" ### Substituted old query with new query, allowing user to specify segments to ignore. Old query was: "DCR_ROW_TYPE = 'IS' OR DCR_ROW_TYPE = 'PR'" # Expression used to select appropriate transportation surface features to create erase features
    buffDist = "50 METERS" # Distance used to buffer ProtoSites to establish the area for further processing. Essential to add a little extra!
    searchDist = "0 METERS" # Distance from PFs used to determine whether to cull SBB and ConSite fragments after ProtoSites have been split.
-   coalDist = "25 METERS" # Distance for coalescing split sites back together. Sites with less than double this width between each other will merge.
+   coalDist = "50 METERS" # Distance for stitching split sites back together. Sites with less than this width between each other will merge.
    
    if not scratchGDB:
       scratchGDB = "in_memory"
@@ -1734,9 +1741,9 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    printMsg('ProtoSites will be stored here: %s' % outPS)
    ShrinkWrap("SBB_lyr", clusterDist, outPS)
 
-   # # Generalize Features in hopes of speeding processing and preventing random processing failures 
-   # arcpy.AddMessage("Simplifying features...")
-   # arcpy.Generalize_edit(outPS, "0.1 Meters")
+   # Generalize Features in hopes of speeding processing and preventing random processing failures 
+   arcpy.AddMessage("Simplifying features...")
+   arcpy.Generalize_edit(outPS, "0.1 Meters")
    
    # Get info on ProtoSite generation
    numPS = countFeatures(outPS)
@@ -1801,13 +1808,13 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             # Clip modification features to ProtoSite
             if site_Type == 'TERRESTRIAL':
-               printMsg('Clipping transportation features to ProtoSite...')
+               printMsg('Clipping transportation features to ProtoSite buffer...')
                tranClp = scratchGDB + os.sep + 'tranClp'
                CleanClip(Trans, tmpBuff, tranClp, scratchParm)
-               printMsg('Clipping exclusion features to ProtoSite...')
+               printMsg('Clipping exclusion features to ProtoSite buffer...')
                efClp = scratchGDB + os.sep + 'efClp'
                CleanClip(excl, tmpBuff, efClp, scratchParm)
-            printMsg('Clipping hydro features to ProtoSite...')
+            printMsg('Clipping hydro features to ProtoSite buffer...')
             hydroClp = scratchGDB + os.sep + 'hydroClp'
             CleanClip(water, tmpBuff, hydroClp, scratchParm)
                         
@@ -1824,26 +1831,26 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                arcpy.analysis.Select(efClp, exclErase, transQry)
                efClp = exclErase
             
-            # Cull Hydro Erase Features
-            printMsg('Culling hydro erase features based on prevalence in SBBs...')
-            hydroRtn = scratchGDB + os.sep + 'hydroRtn'
-            CullEraseFeats (hydroClp, tmpSBB, fld_SFID, hydroPerCov, hydroRtn, scratchParm)
-            
             # Dissolve Hydro Erase Features
             printMsg('Dissolving hydro erase features...')
             hydroDiss = scratchGDB + os.sep + 'hydroDiss'
-            arcpy.Dissolve_management(hydroRtn, hydroDiss, "Hydro", "", "SINGLE_PART", "")
+            arcpy.Dissolve_management(hydroClp, hydroDiss, "Hydro", "", "SINGLE_PART", "")
+            
+            # Cull Hydro Erase Features
+            printMsg('Culling hydro erase features based on prevalence in SBBs...')
+            hydroRtn = scratchGDB + os.sep + 'hydroRtn'
+            CullEraseFeats (hydroDiss, tmpSBB, fld_SFID, hydroPerCov, hydroRtn, scratchParm)
             
             # Remove narrow hydro from erase features
             printMsg('Eliminating narrow hydro features from erase features...')
             hydroErase = scratchGDB + os.sep + 'hydroErase'
-            GetEraseFeats (hydroDiss, hydroQry, hydroElimDist, hydroErase, tmpPF, scratchParm)
+            GetEraseFeats (hydroRtn, hydroQry, hydroElimDist, hydroErase, tmpPF, scratchParm)
             
             # Merge Erase Features (Exclusions, hydro, and transportation)
             if site_Type == 'TERRESTRIAL':
                printMsg('Merging erase features...')
                tmpErase = scratchGDB + os.sep + 'tmpErase'
-               arcpy.Merge_management ([efClp, transErase, hydroErase], tmpErase)
+               arcpy.management.Merge([efClp, transErase, hydroErase], tmpErase)
             else:
                tmpErase = hydroErase
             
@@ -1853,28 +1860,46 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             Coalesce(tmpErase, "0.5 METERS", coalErase, scratchParm)
 
             # Modify SBBs and Erase Features
-            printMsg('Clustering SBBs and modifying erase features...')
+            printMsg('Chopping SBBs and modifying erase features...')
             sbbClusters = scratchGDB + os.sep + 'sbbClusters'
             sbbErase = scratchGDB + os.sep + 'sbbErase'
-            ChopSBBs(tmpPF, tmpSBB, coalErase, sbbClusters, sbbErase, "5 METERS", scratchParm)
+            ChopMod(tmpPF, tmpSBB, coalErase, sbbClusters, sbbErase, "20 METERS", scratchParm)
+            
+            # For non-AHZ sites, force the manual exclusion features back into erase features
+            if site_Type == 'TERRESTRIAL':
+               finErase = scratchGDB + os.sep + "finErase"
+               arcpy.management.Merge([sbbErase, efClp], finErase)
+            else:
+               finErase = sbbErase
             
             # Use erase features to chop out areas of SBBs
             printMsg('Erasing portions of SBBs...')
             sbbFrags = scratchGDB + os.sep + 'sbbFrags'
-            CleanErase (tmpSBB, sbbErase, sbbFrags, scratchParm) 
+            CleanErase (tmpSBB, finErase, sbbFrags, scratchParm) 
             
             # Remove any SBB fragments too far from a PF
             printMsg('Culling SBB fragments...')
             sbbRtn = scratchGDB + os.sep + 'sbbRtn'
             CullFrags(sbbFrags, tmpPF, searchDist, sbbRtn)
-            arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
+            # arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
             
-            ### TODO: Could I apply the ChopSBB function to ProtoSites as well??
+            # # Modify ProtoSites and Erase Features
+            # printMsg('Chopping ProtoSites and modifying erase features...')
+            # psClusters = scratchGDB + os.sep + 'psClusters'
+            # psErase = scratchGDB + os.sep + 'psErase'
+            # ChopMod(tmpPF, tmpPS, finErase, psClusters, psErase, "10 METERS", scratchParm)
+            
+            # # For non-AHZ sites, force the manual exclusion features back into erase features
+            # if site_Type == 'TERRESTRIAL':
+               # finErase2 = scratchGDB + os.sep + "finErase2"
+               # arcpy.management.Merge([psErase, efClp], finErase2)
+            # else:
+               # finErase2 = psErase
             
             # Use erase features to chop out areas of ProtoSites
             printMsg('Erasing portions of ProtoSites...')
             psFrags = scratchGDB + os.sep + 'psFrags'
-            CleanErase (tmpPS, sbbErase, psFrags, scratchParm) 
+            CleanErase (tmpPS, finErase, psFrags, scratchParm) 
             
             # Remove any ProtoSite fragments too far from a PF
             printMsg('Culling ProtoSite fragments...')
@@ -1901,58 +1926,49 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   csShrink = scratchGDB + os.sep + 'csShrink' + str(counter2)
                   ShrinkWrap(tmpSBB2, clusterDist, csShrink)
                   
-                  # Intersect shrinkwrap with original split site
-                  # This is necessary to keep it from "spilling over" across features used to split.
-                  copySS = scratchGDB + os.sep + "tmpSS"
-                  csInt = scratchGDB + os.sep + 'csInt' + str(counter2)
-                  arcpy.management.CopyFeatures(tmpSS, copySS)
-                  arcpy.analysis.PairwiseIntersect([copySS, csShrink], csInt, "ONLY_FID")
+                  # Use erase features to chop out areas of sites
+                  printMsg('Erasing portions of sites...')
+                  siteFrags = scratchGDB + os.sep + 'siteFrags'
+                  CleanErase (csShrink, finErase, siteFrags, scratchParm) 
                   
-                  # Process:  Clean Erase (final removal of exclusion features)
-                  if site_Type == 'TERRESTRIAL':
-                     printMsg('Excising manually delineated exclusion features...')
-                     ssErased = scratchGDB + os.sep + 'ssBnd' + str(counter2)
-                     CleanErase (csInt, efClp, ssErased, scratchParm) 
-                     ### TODO: Should I actually be using the protosite equivalent of sbbErase as erase features here?
-                  else:
-                     ssErased = csInt
-                  
-                  # Remove any fragments too far from a PF
-                  # Verified this step is indeed necessary, 2018-01-23
+                  # Cull site fragments
                   printMsg('Culling site fragments...')
                   ssBnd = scratchGDB + os.sep + 'ssBnd'
-                  CullFrags(ssErased, tmpPF2, searchDist, ssBnd)
-                  
+                  CullFrags(siteFrags, tmpPF2, searchDist, ssBnd)
+
                   # Append the final geometry to the split sites group feature class.
                   printMsg("Appending feature...")
                   arcpy.management.Append(ssBnd, tmpSS_grp, "NO_TEST", "", "")
                   
                   counter2 +=1
                   del mySS
+            
+            # Final smoothing operation. Yes this is necessary!
+            printMsg('Smoothing boundaries...')
+            smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter)
+            Coalesce(tmpSS_grp, "10 METERS", smoothBnd, scratchParm)
 
-            # Re-merge split sites, if applicable
-            printMsg("Reconnecting site fragments, where warranted...")
-            shrinkFrags = scratchGDB + os.sep + 'shrinkFrags'
-            ShrinkWrap(tmpSS_grp, coalDist, shrinkFrags, 8)
+            # finBuff = scratchGDB + os.sep + "finBuff"
+            # overlaps = scratchGDB + os.sep + "overlaps"
+            # mergeSites = scratchGDB + os.sep + "mergeSites"
+            # dissSites = scratchGDB + os.sep + "dissSites"
+            # arcpy.analysis.PairwiseBuffer(tmpSS_grp, finBuff, "50 METERS", "NONE")
+            # arcpy.analysis.CountOverlappingFeatures(finBuff, overlaps, 2)
+            # arcpy.management.Merge([overlaps, tmpSS_grp], mergeSites)
+            # arcpy.analysis.PairwiseDissolve(mergeSites, dissSites, "", "", "SINGLE_PART")
             
-            # Process:  Clean Erase (final removal of exclusion features)
-            if site_Type == 'TERRESTRIAL':
-               printMsg('Excising manually delineated exclusion features...')
-               csErased = scratchGDB + os.sep + 'csErased'
-               CleanErase (shrinkFrags, efClp, csErased, scratchParm) 
-            else:
-               csErased = shrinkFrags
+            # # Final removal of manual exclusions
+            # if site_Type == 'TERRESTRIAL':
+               # printMsg("Final removal of manual exclusion features...")
+               # finBnd = scratchGDB + os.sep + "finBnd"
+               # CleanErase (smoothBnd, efClp, finBnd, scratchParm) 
+            # else:
+               # finBnd = smoothBnd
             
-            # Remove any fragments too far from a PF
-            # Verified this step is indeed necessary, 2018-01-23
-            printMsg('Culling site fragments...')
-            csCull = scratchGDB + os.sep + 'csCull'
-            CullFrags(csErased, tmpPF, searchDist, csCull)
-            
-            # Eliminate gaps
-            printMsg('Eliminating gaps...')
-            finBnd = scratchGDB + os.sep + 'finBnd'
-            arcpy.management.EliminatePolygonPart(csCull, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
+            # Eliminate holes
+            printMsg("Eliminating holes...")
+            finBnd = scratchGDB + os.sep + "finBnd"
+            arcpy.management.EliminatePolygonPart(smoothBnd, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
             
             # Generalize
             printMsg('Generalizing boundary...')

@@ -765,13 +765,13 @@ class create_consite(object):
             parameters[6].parameterType = "Required"
             parameters[7].enabled = 1
             parameters[7].parameterType = "Required"
-            parameters[8].value = "consites_tcs"
+            # parameters[8].value = "consites_tcs"
          else:
             parameters[6].enabled = 0
             parameters[6].parameterType = "Optional"
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
-            parameters[8].value = "consites_ahz"
+            # parameters[8].value = "consites_ahz"
             
       return
 
