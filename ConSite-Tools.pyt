@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-03-10
+# Last Edit: 2022-03-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -53,7 +53,7 @@ class Toolbox(object):
       # List of tool classes associated with this toolbox
       Subroutine_Tools = [coalesceFeats, shrinkwrapFeats]
       Biotics_Tools = [extract_biotics, parse_siteTypes]
-      PrepReview_Tools = [rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands]
+      PrepReview_Tools = [copy_layers, rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands]
       TCS_AHZ_Tools = [expand_selection, create_sbb, expand_sbb, create_consite]
       SCS_Tools = [servLyrs_scs, ntwrkPts_scs, lines_scs, sites_scs] 
       Portfolio_Tools = [tabulate_exclusions, attribute_eo, score_eo, build_portfolio, build_element_lists]
@@ -173,20 +173,25 @@ class extract_biotics(object):
       self.label = "1: Extract Biotics data"
       self.description = ""
       self.canRunInBackground = True
-      # For some reason, this tool fails if run in the background.
       self.category = "Biotics Tools"
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam('BioticsPF', "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "BIOTICS_DLINK.ProcFeats" in lnames:
          parm0.value = "BIOTICS_DLINK.ProcFeats"
-      except:
+      else:
          pass
+         
       parm1 = defineParam('BioticsCS', "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "BIOTICS_DLINK.ConSites" in lnames:
          parm1.value = "BIOTICS_DLINK.ConSites"
-      except:
+      else:
          pass
       parm2 = defineParam('outGDB', "Output Geodatabase", "DEWorkspace", "Required", "Input")
 
@@ -236,16 +241,23 @@ class parse_siteTypes(object):
 
    def getParameterInfo(self):
       """Define parameters"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "Biotics ProcFeats" in lnames:
          parm0.value = "Biotics ProcFeats"
-      except:
+      else:
          pass
+      
       parm1 = defineParam("in_CS", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "Biotics ConSites" in lnames:
          parm1.value = "Biotics ConSites"
-      except:
+      else:
          pass
+      
       parm2 = defineParam("out_GDB", "Geodatabase to store outputs", "DEWorkspace", "Required", "Input")
 
       parms = [parm0, parm1, parm2]
@@ -300,6 +312,65 @@ class parse_siteTypes(object):
  
       
 # Preparation and Review Tools
+class copy_layers(object):
+   def __init__(self):
+      """Define the tool (tool name is the name of the class)."""
+      self.label = "Copy layers to geodatabase"
+      self.description = ""
+      self.canRunInBackground = True
+      self.category = "Preparation and Review Tools"
+
+   def getParameterInfo(self):
+      """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
+      parm0 = defineParam("in_Layers", "Layers to Copy", "GPValueTable", "Required", "Input")
+      parm0.columns = [["GPFeatureLayer","Layers"]]
+      mstrList = ["HydrographicFeatures", "ExclusionFeatures", "VirginiaRailSurfaces", "VirginiaRoadSurfaces", "Cores123", "VA_Wetlands"]
+      lyrList = []
+      for l in mstrList:
+         if l in lnames: 
+            lyrList.append([l])
+         else:
+            pass
+      parm0.values = lyrList
+      
+      parm1 = defineParam("out_GDB", "Output Geodatabase", "DEWorkspace", "Required", "Input")
+      
+      parms = [parm0, parm1]
+      return parms
+
+   def isLicensed(self):
+      """Set whether tool is licensed to execute."""
+      return True
+
+   def updateParameters(self, parameters):
+      """Modify the values and properties of parameters before internal
+      validation is performed.  This method is called whenever a parameter
+      has been changed."""
+      return
+
+   def updateMessages(self, parameters):
+      """Modify the messages created by internal validation for each tool
+      parameter.  This method is called after internal validation."""
+      return
+
+   def execute(self, parameters, messages):
+      """The source code of the tool."""
+      # Set up parameter names and values
+      declareParams(parameters)
+      
+      # Parse out layers
+      Lyrs = in_Layers.split(';')
+      for i in range(len(Lyrs)):
+         Lyrs[i] = Lyrs[i].replace("'","")
+      
+      copyLayersToGDB(Lyrs, out_GDB)
+
+      return 
 
 class review_consite(object):
    def __init__(self):
@@ -540,7 +611,7 @@ class expand_selection(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm0 = defineParam("inLyr", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam("SearchDist", "Search distance", "GPLinearUnit", "Required", "Input", "3000 METERS")
+      parm1 = defineParam("SearchDist", "Search distance", "GPLinearUnit", "Required", "Input", "1500 METERS")
 
       parms = [parm0, parm1]
       return parms
@@ -579,29 +650,46 @@ class create_sbb(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam('in_PF', "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam('fld_SFID', "Source Feature ID field", "String", "Required", "Input", 'SFID')
-      parm2 = defineParam('fld_Rule', "SBB Rule field", "String", "Required", "Input", 'RULE')
-      parm3 = defineParam('fld_Buff', "SBB Buffer field", "String", "Required", "Input", 'BUFFER')
-      parm4 = defineParam('in_nwi5', "Input Rule 5 NWI Features", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm4.value = "Wetlands/Rule 5 Wetlands"
-      except:
+      if map.name == "TCS" and "pfTerrestrial" in lnames:
+         parm0.value = "pfTerrestrial"
+      elif map.name == "AHZ" and "pfAnthro" in lnames:
+         parm0.value = "pfAnthro"
+      else:
          pass
-      parm5 = defineParam('in_nwi67', "Input Rule 67 NWI Features", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm5.value = "Wetlands/Rule 6-7 Wetlands"
-      except:
-         pass
-      parm6 = defineParam('in_nwi9', "Input Rule 9 NWI Features", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm6.value = "Wetlands/Rule 9 Wetlands"
-      except:
-         pass
-      parm7 = defineParam('out_SBB', "Output Site Building Blocks (SBBs)", "DEFeatureClass", "Required", "Output", "sbb")
-      parm8 = defineParam('scratch_GDB', "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
-      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8]
+      parm1 = defineParam('fld_SFID', "Source Feature ID field", "String", "Required", "Input", 'SFID')
+      
+      parm2 = defineParam('fld_Rule', "SBB Rule field", "String", "Required", "Input", 'RULE')
+      
+      parm3 = defineParam('fld_Buff', "SBB Buffer field", "String", "Required", "Input", 'BUFFER')
+      
+      parm4 = defineParam('in_nwi', "Input Wetlands", "GPFeatureLayer", "Optional", "Input")
+      if map.name == "TCS": 
+         parm4.enabled = True
+         if "VA_Wetlands" in lnames:
+            parm4.value = "VA_Wetlands"
+         else:
+            pass
+      else:
+         parm4.enabled = False
+      
+      parm5 = defineParam('out_SBB', "Output Site Building Blocks (SBBs)", "DEFeatureClass", "Required", "Output", "sbb")
+      if map.name == "TCS":
+         parm5.value = "sbb_tcs"
+      elif map.name == "AHZ":
+         parm5.value = "sbb_ahz"
+      else:
+         pass
+      
+      parm6 = defineParam('scratch_GDB', "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+
+      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6]
       return parms
 
    def isLicensed(self):
@@ -634,7 +722,7 @@ class create_sbb(object):
       else:
          scratchParm = "in_memory" 
 
-      CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, out_SBB, scratchParm)
+      CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
 
       return out_SBB
@@ -649,23 +737,33 @@ class expand_sbb(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam('in_Cores', "Input Cores", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm0.value = "Habitat Cores"
-      except:
+      if "Cores123" in lnames:
+         parm0.value = "Cores123"
+      else:
          pass
+      
       parm1 = defineParam('in_SBB', "Input Site Building Blocks (SBBs)", "GPFeatureLayer", "Required", "Input")
-      try: 
-         parm1.value = "sbb"
-      except:
+      if "sbb_tcs" in lnames:
+         parm1.value = "sbb_tcs"
+      else:
          pass
+      
       parm2 = defineParam('in_PF', "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "pfTerrestrial" in lnames:
          parm2.value = "pfTerrestrial"
-      except:
+      else:
          pass
+      
       parm3 = defineParam('joinFld', "Source Feature ID field", "String", "Required", "Input", 'SFID')
-      parm4 = defineParam('out_SBB', "Output Expanded Site Building Blocks", "DEFeatureClass", "Required", "Output", "expanded_sbb")
+      
+      parm4 = defineParam('out_SBB', "Output Expanded Site Building Blocks", "DEFeatureClass", "Required", "Output", "expanded_sbb_tcs")
+      
       parm5 = defineParam('scratch_GDB', "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
       parms = [parm0, parm1, parm2, parm3, parm4, parm5]
@@ -715,31 +813,81 @@ class create_consite(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm00 = defineParam("in_SBB", "Input Site Building Blocks (SBBs)", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "expanded_sbb_tcs" in lnames:
+         parm00.value = "expanded_sbb_tcs"
+      elif map.name == "AHZ" and "sbb_ahz" in lnames:
+         parm00.value = "sbb_ahz"
+      else:
+         pass
+      
       parm01 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "pfTerrestrial" in lnames:
+         parm01.value = "pfTerrestrial"
+      elif map.name == "AHZ" and "pfAnthro" in lnames:
+         parm01.value = "pfAnthro"
+      else:
+         pass
+      
       parm02 = defineParam("joinFld", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      
       parm03 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "csTerrestrial" in lnames:
+         parm03.value = "csTerrestrial"
+      elif map.name == "AHZ" and "csAnthro" in lnames:
+         parm03.value = "csAnthro"
+      else:
+         pass
+      
       parm04 = defineParam("site_Type", "Site Type", "String", "Required", "Input")
       parm04.filter.list = ["TERRESTRIAL", "AHZ"]
-      parm05 = defineParam("in_Hydro", "Input Hydro Features", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm05.value = "Open Water"
-      except:
+      if map.name == "TCS":
+         parm04.value = "TERRESTRIAL"
+      elif map.name == "AHZ":
+         parm04.value = "AHZ"
+      else:
          pass
+      
+      parm05 = defineParam("in_Hydro", "Input Hydro Features", "GPFeatureLayer", "Required", "Input")
+      if "HydrographicFeatures" in lnames:
+         parm05.value = "HydrographicFeatures"
+      else:
+         pass
+      
       parm06 = defineParam("in_TranSurf", "Input Transportation Surfaces", "GPValueTable", "Optional", "Input")
       parm06.columns = [["GPFeatureLayer","Transportation Layers"]]
-      try:
-         parm06.values = [["Road Surfaces"], ["Rail Surfaces"]]
-      except:
-         pass
-      parm06.enabled = False
+      if map.name == "TCS":
+         parm06.enabled = True
+         if "VirginiaRoadSurfaces" in lnames and "VirginiaRailSurfaces" in lnames: 
+            parm06.values = [["VirginiaRoadSurfaces"], ["VirginiaRailSurfaces"]]
+         else:
+            pass
+      else:
+         parm06.enabled = False
+
       parm07 = defineParam("in_Exclude", "Input Exclusion Features", "GPFeatureLayer", "Optional", "Input")
-      try:
-         parm07.value = "Exclusion Features"
-      except:
-         pass
-      parm07.enabled = False
+      if map.name == "TCS":
+         parm07.enabled = True
+         if "ExclusionFeatures" in lnames:
+            parm07.value = "ExclusionFeatures"
+         else:
+            pass
+      else:
+         parm07.enabled = False
+
       parm08 = defineParam("out_ConSites", "Output Updated Conservation Sites", "DEFeatureClass", "Required", "Output", "consites")
+      if map.name == "TCS":
+         parm08.value = "consites_tcs"
+      elif map.name == "AHZ":
+         parm08.value = "consites_ahz"
+      else:
+         pass
+      
       parm09 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09]
@@ -789,12 +937,18 @@ class create_consite(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-
+      
+      # Parse out transportation datasets
+      if site_Type == 'TERRESTRIAL':
+         Trans = in_TranSurf.split(';')
+         for i in range(len(Trans)):
+            Trans[i] = Trans[i].replace("'","")
+      
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
       else:
          scratchParm = "in_memory" 
-      CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, in_TranSurf, in_Exclude, scratchParm)
+      CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, Trans, in_Exclude, scratchParm)
 
       return out_ConSites
 

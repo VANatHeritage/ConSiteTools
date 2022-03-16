@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-11
+# Last Edit: 2022-03-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1421,7 +1421,8 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
       msg = None
    return msg
 
-def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, out_SBB, scratchGDB = "in_memory"):
+# def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, out_SBB, scratchGDB = "in_memory"):
+def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi = "NA", out_SBB = "sbb", scratchGDB = "in_memory"):
    '''Creates SBBs for all input PFs, subsetting and applying rules as needed.
    Usage Notes:  
    - This function does not test to determine if all of the input Procedural Features should be subject to a particular rule. The user must ensure that this is so.
@@ -1494,39 +1495,32 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi5, in_nwi67, in_nwi9, 
    else:
       printMsg('There are no PFs using the no-buffer rules. Passing...')
 
-   # Create wetland SBBs
-   # Set up rule dictionary and keys
-   d = dict()
-   d["5"] = in_nwi5
-   d["6"] = in_nwi67
-   d["7"] = in_nwi67
-   d["9"] = in_nwi9
-   keys = d.keys()
-   
-   # Loop through the rule sets
-   for k in keys:
-      selQry = "intRule = %s"%k
-      in_NWI = d[k]
+   #Create wetland SBBs
+   rules = [5, 6, 7, 9]
+   for r in rules:
+      selQry = "intRule = %s"%r
       arcpy.management.MakeFeatureLayer(tmp_PF, "tmpLyr", selQry)
       c = countFeatures("tmpLyr")
       if c > 0:
-         printMsg("Processing the Rule %s features"%k)
+         printMsg("Processing the Rule %s features"%r)
          try:
-            msg = CreateWetlandSBB("tmpLyr", fld_SFID, in_NWI, out_SBB, scratchGDB)
+            nwiQry = "Rule%s = 1"%r
+            nwi = arcpy.management.MakeFeatureLayer(in_nwi, "tmpNWI", nwiQry)
+            msg = CreateWetlandSBB("tmpLyr", fld_SFID, nwi, out_SBB, scratchGDB)
             warnMsgs = arcpy.GetMessages(1)
             if warnMsgs:
-               printWrng("Finished processing Rule %s, but there were some problems."%k)
+               printWrng("Finished processing Rule %s, but there were some problems."%r)
                printWrng(warnMsgs)
                sbbWarnings.append(msg)
             else:
-               printMsg("Rule %s SBBs completed"%k)
+               printMsg("Rule %s SBBs completed"%r)
          except:
-            printWrng("Unable to process Rule %s features"%k)
+            printWrng("Unable to process Rule %s features"%r)
             tback()
-            msg = "WARNING: There was a problem creating the Rule %s features"%k
+            msg = "WARNING: There was a problem creating the Rule %s features"%r
             sbbWarnings.append(msg)
       else:
-         printMsg("There are no PFs with Rule %s. Passing..."%k)
+         printMsg("There are no PFs with Rule %s. Passing..."%r)
 
    printMsg("SBB processing complete")
    if len(sbbWarnings) > 0:
@@ -1635,7 +1629,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    - out_ConSites: the output feature class representing updated Conservation Sites
    - site_Type: type of conservation site (TERRESTRIAL|AHZ)
    - in_Hydro: feature class representing water bodies
-   - in_TranSurf: feature class(es) representing transportation surfaces (i.e., road and rail) [If multiple, this is a string with items separated by ';']
+   - in_TranSurf: feature class(es) representing transportation surfaces (i.e., road and rail). 
    - in_Exclude: feature class representing areas to definitely exclude from sites
    - scratchGDB: geodatabase to contain intermediate/scratch products. Setting
    this to "in_memory" can result in HUGE savings in processing time, but there's a chance you might run out of memory and cause a crash.
@@ -1676,11 +1670,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    myWorkspace = drive + path
    Output_CS_fname = filename
    
-   # Parse out transportation datasets
-   if site_Type == 'TERRESTRIAL':
-      Trans = in_TranSurf.split(';')
-      for i in range(len(Trans)):
-         Trans[i] = Trans[i].replace("'","")
+   # # Parse out transportation datasets
+   # if site_Type == 'TERRESTRIAL':
+      # Trans = in_TranSurf.split(';')
+      # for i in range(len(Trans)):
+         # Trans[i] = Trans[i].replace("'","")
    
    # If applicable, clear any selections on non-SBB inputs
    for fc in [in_PF, in_Hydro]:
@@ -1689,7 +1683,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    if site_Type == 'TERRESTRIAL':
       printMsg("Site type is %s" % site_Type)
       clearSelection(in_Exclude)
-      for fc in Trans:
+      for fc in in_TranSurf:
          clearSelection(fc)
    
    ### Start data prep
@@ -1714,8 +1708,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
       excl = arcpy.management.MakeFeatureLayer(in_Exclude, "Excl_lyr")
       modLyrs.append(excl)
       dTrans = dict()
-      for i in range(0, len(Trans)):
-         dTrans[i] = Trans[i]
+      for i in range(0, len(in_TranSurf)):
+         dTrans[i] = in_TranSurf[i]
       transLyrs = []
       for key in dTrans.keys():
          inName = dTrans[key]
@@ -1781,12 +1775,12 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Merge the transportation layers, if applicable
             if site_Type == 'TERRESTRIAL':
                if len(transLyrs) == 1:
-                  Trans = transLyrs[0]
+                  in_TranSurf = transLyrs[0]
                else:
                   printMsg("Merging transportation surfaces")
                   mergeTrans = scratchGDB + os.sep + "mergeTrans"
                   arcpy.management.Merge(transLyrs, mergeTrans)
-                  Trans = mergeTrans
+                  in_TranSurf = mergeTrans
             
             # Get SBBs within the ProtoSite
             printMsg('Selecting SBBs within ProtoSite...')
@@ -1810,7 +1804,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             if site_Type == 'TERRESTRIAL':
                printMsg('Clipping transportation features to ProtoSite buffer...')
                tranClp = scratchGDB + os.sep + 'tranClp'
-               CleanClip(Trans, tmpBuff, tranClp, scratchParm)
+               CleanClip(in_TranSurf, tmpBuff, tranClp, scratchParm)
                printMsg('Clipping exclusion features to ProtoSite buffer...')
                efClp = scratchGDB + os.sep + 'efClp'
                CleanClip(excl, tmpBuff, efClp, scratchParm)
@@ -1924,7 +1918,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   
                   # ShrinkWrap retained SBB fragments
                   csShrink = scratchGDB + os.sep + 'csShrink' + str(counter2)
-                  ShrinkWrap(tmpSBB2, clusterDist, csShrink)
+                  ShrinkWrap(tmpSBB2, clusterDist, csShrink, 4, scratchGDB)
                   
                   # Use erase features to chop out areas of sites
                   printMsg('Erasing portions of sites...')

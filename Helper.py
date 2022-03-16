@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-10
+# Last Edit: 2022-03-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -54,15 +54,38 @@ def garbagePickup(trashList):
       except:
          pass
    return
+
+def copyLayersToGDB(inLayers, outGDB):
+   '''A function to quickly copy a set of layers to a local geodatabase.
+   Parameters:
+   - layerList: a list of layers (in a map) to copy
+   - local geodatabase in which copied data should be stored
+   - name of the map containing layers to be updated with new local sources
+   NOTE: Any features selections will be removed before copying.
+   NOTE: Any data of the same name in the geodatabase will be overwritten.
+   '''
+         
+   for l in inLayers:
+      try:
+         printMsg("Working on %s..."%l)
+         clearSelection(l)
+         l.replace(" ","_")
+         outFC = outGDB + os.sep + l
+         arcpy.management.CopyFeatures(l, outFC)
+         printMsg("%s successfully copied."%l)
+      except:
+         printMsg("Unable to copy %s."%l)
    
 def CleanFeatures(inFeats, outFeats):
    '''Repairs geometry, then explodes multipart polygons to prepare features for geoprocessing.'''
    
    # Process: Repair Geometry
+   printMsg("Repairing geometry...")
    arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
 
    # Have to add the while/try/except below b/c polygon explosion sometimes fails inexplicably.
    # This gives it 10 tries to overcome the problem with repeated geometry repairs, then gives up.
+   printMsg("Exploding multiparts...")
    counter = 1
    while counter <= 10:
       try:
@@ -483,16 +506,23 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
    
    # Prep features
+   printMsg("Dissolving and cleaning features...")
+   dissFeats = scratchGDB + os.sep + "dissFeats"
+   arcpy.analysis.PairwiseDissolve(inFeats, dissFeats, "", "", "SINGLE_PART")
+   trashList.append(dissFeats)
+   
    cleanFeats = scratchGDB + os.sep + "cleanFeats"
-   CleanFeatures(inFeats, cleanFeats)
+   CleanFeatures(dissFeats, cleanFeats)
+   trashList.append(cleanFeats)
    
    # Make feature layer
    inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr") 
 
    # Aggregate features
-   printMsg("Aggegating features...")
+   printMsg("Aggregating features...")
    aggFeats = scratchGDB + os.sep + "aggFeats"
    arcpy.cartography.AggregatePolygons(inFeats_lyr, aggFeats, searchDist, "0 SquareMeters", "0 SquareMeters", "NON_ORTHOGONAL")
+   trashList.append(aggFeats)
 
    # Process:  Get Count
    c = countFeatures(aggFeats)
@@ -522,6 +552,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
          # Eliminate gaps
          noGapFeats = scratchGDB + os.sep + "noGapFeats"
          arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
+         trashList.append(noGapFeats)
          
          # Process:  Append the final geometry to the ShrinkWrap feature class
          arcpy.AddMessage("Appending feature...")
