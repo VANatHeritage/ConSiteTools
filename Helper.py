@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-15
+# Last Edit: 2022-03-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -69,8 +69,7 @@ def copyLayersToGDB(inLayers, outGDB):
       try:
          printMsg("Working on %s..."%l)
          clearSelection(l)
-         l.replace(" ","_")
-         outFC = outGDB + os.sep + l
+         outFC = outGDB + os.sep + l.replace(" ","_") + "_local"
          arcpy.management.CopyFeatures(l, outFC)
          printMsg("%s successfully copied."%l)
       except:

@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-03-15
+# Last Edit: 2022-03-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -329,7 +329,7 @@ class copy_layers(object):
       
       parm0 = defineParam("in_Layers", "Layers to Copy", "GPValueTable", "Required", "Input")
       parm0.columns = [["GPFeatureLayer","Layers"]]
-      mstrList = ["HydrographicFeatures", "ExclusionFeatures", "VirginiaRailSurfaces", "VirginiaRoadSurfaces", "Cores123", "VA_Wetlands"]
+      mstrList = ["HydrographicFeatures", "ExclusionFeatures", "VirginiaRailSurfaces", "VirginiaRoadSurfaces", "Cores123", "VA_Wetlands", "NID_damsVA", "FlowBuff150"]
       lyrList = []
       for l in mstrList:
          if l in lnames: 
@@ -438,6 +438,7 @@ class assign_brank(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_PF", "Input site-worthy Procedural Features", "GPFeatureLayer", "Required", "Input")
+      
       parm1 = defineParam("in_CS", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
 
       parms = [parm0, parm1]
@@ -943,6 +944,8 @@ class create_consite(object):
          Trans = in_TranSurf.split(';')
          for i in range(len(Trans)):
             Trans[i] = Trans[i].replace("'","")
+      else:
+         Trans = None
       
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
@@ -964,21 +967,31 @@ class servLyrs_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
-      try:
+      if "HydroNet_ND" in lnames:
          parm0.value = "HydroNet_ND"
-      except:
+      else:
          pass
+         
       parm1 = defineParam("in_dams", "Input Dams", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm1.value = "Dams"
-      except:
+      if "NID_damsVA" in lnames:
+         parm1.value = "NID_damsVA"
+      else:
          pass
+         
       parm2 = defineParam("out_lyrDown", "Output Downstream Layer", "DELayer", "Derived", "Output")
+      
       parm3 = defineParam("out_lyrUp", "Output Upstream Layer", "DELayer", "Derived", "Output")
+      
       parm4 = defineParam("out_lyrTidal", "Output Tidal Layer", "DELayer", "Derived", "Output")
       
       parms = [parm0, parm1, parm2, parm3, parm4]
+      
       return parms
 
    def isLicensed(self):
@@ -1022,31 +1035,45 @@ class ntwrkPts_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "pfStream" in lnames:
          parm0.value = "pfStream"
-      except:
+      else:
          pass
+
       parm1 = defineParam("out_Points", "Output Network Points", "DEFeatureClass", "Required", "Output", "scsPoints")
+      
       parm2 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
-      try:
+      if "HydroNet_ND" in lnames:
          parm2.value = "HydroNet_ND"
-      except:
+      else:
          pass
+      
       parm3 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "NHDPlusCatchment" in lnames:
          parm3.value = "NHDPlusCatchment"
-      except:
+      else:
          pass
+      
       parm4 = defineParam("in_NWI", "Input NWI Wetlands", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm4.value = "Tidal Waters and Wetlands"
-      except:
+      if "VA_Wetlands" in lnames:
+         parm4.value = "VA_Wetlands"
+      else:
          pass
+      
       parm5 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      
       parm6 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      
       parm7 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+      
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7]
+      
       return parms
 
    def isLicensed(self):
@@ -1093,28 +1120,39 @@ class lines_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("in_Points", "Input Network Points", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "scsPoints" in lnames:
          parm0.value = "scsPoints"
-      except:
+      else:
          pass
+      
       parm1 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
+      
       parm2 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
-      try:
+      if "naDownTrace" in lnames:
          parm2.value = "naDownTrace"
-      except:
+      else:
          pass
+         
       parm3 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
-      try:
+      if "naUpTrace" in lnames:
          parm3.value = "naUpTrace"
-      except:
+      else:
          pass
+      
       parm4 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
-      try:
+      if "naTidalTrace" in lnames:
          parm4.value = "naTidalTrace"
-      except:
+      else:
          pass
+      
       parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      
       parm6 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6]
@@ -1170,44 +1208,59 @@ class sites_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "pfStream" in lnames:
          parm0.value = "pfStream"
-      except:
+      else:
          pass
+      
       parm1 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "csStream" in lnames:
          parm1.value = "csStream"
-      except:
+      else:
          pass
+         
       parm2 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
+      
       parm3 = defineParam("in_Lines", "Input SCU lines", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "scsLines" in lnames:
          parm3.value = "scsLines"
-      except: 
+      else: 
          pass
+         
       parm4 = defineParam("in_Catch", "Input Catchments", "GPFeatureLayer", "Required", "Input")
-      try:
+      if "NHDPlusCatchment" in lnames:
          parm4.value = "NHDPlusCatchment"
-      except: 
+      else: 
          pass
+         
       parm5 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
-      try:
+      if "HydroNet_ND" in lnames:
          parm5.value = "HydroNet_ND"
-      except:
+      else:
          pass
+         
       parm6 = defineParam("in_FlowBuff", "Input Flow Buffer", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm6.value = "Flow Buffers"
-      except: 
+      if "FlowBuff150" in lnames:
+         parm6.value = "FlowBuff150"
+      else: 
          pass
+         
       parm7 = defineParam("fld_Rule", "Site rule field", "String", "Required", "Input", "RULE")
+      
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+      
       parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCU")
       parm9.filter.type = "ValueList"
       parm9.filter.list = ["SCU", "SCS"]
       
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9]
+      
       return parms
 
    def isLicensed(self):

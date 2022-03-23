@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-02-16
+# Last Edit: 2022-03-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -420,8 +420,9 @@ def getBRANK(in_PF, in_ConSites):
    # Calculate B-rank scores 
    printMsg('Calculating B-rank sums and maximums in loop...')
    arcpy.MakeFeatureLayer_management (in_EOs, "eo_lyr")
+   arcpy.MakeFeatureLayer_management (in_ConSites, "cs_lyr")
    failList = []
-   with arcpy.da.UpdateCursor (in_ConSites, ["SHAPE@", "SITEID", "IBR_SUM", "IBR_MAX"]) as cursor:
+   with arcpy.da.UpdateCursor ("cs_lyr", ["SHAPE@", "SITEID", "IBR_SUM", "IBR_MAX"]) as cursor:
       for row in cursor:
          myShp = row[0]
          siteID = row[1]
@@ -478,7 +479,7 @@ def getBRANK(in_PF, in_ConSites):
    printMsg('Calculating flag status...')
    codeblock = '''def flag(brank, auto_brank):
       if auto_brank == None:
-         return None
+         return 1
       elif brank == auto_brank:
          return 0
       else:
