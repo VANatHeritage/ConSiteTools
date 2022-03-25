@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-03-23
+# Last Edit: 2022-03-25
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -402,27 +402,28 @@ def getBRANK(in_PF, in_ConSites):
          return 0
    '''
    expression = "score(!IBR!)"
-   arcpy.CalculateField_management(in_EOs, "IBR_SCORE", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(in_EOs, "IBR_SCORE", expression, "PYTHON3", codeblock)
    
    ### For the ConSites, calculate the B-rank and flag if it conflicts with previous B-rank
-   printMsg('Adding several fields to ConSites...')
+   # printMsg('Adding several fields to ConSites...')
    oldFlds = [f.name for f in arcpy.ListFields(in_ConSites)]
-   for fld in ["IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK"]:
+   for fld in ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK"]:
       if fld in oldFlds:
          arcpy.management.DeleteField(in_ConSites, fld)
       else:
          pass
-   arcpy.AddField_management(in_ConSites, "IBR_SUM", "LONG")
-   arcpy.AddField_management(in_ConSites, "IBR_MAX", "LONG")
-   # arcpy.AddField_management(in_ConSites, "AUTO_BRANK", "TEXT", 2)
-   # arcpy.AddField_management(in_ConSites, "FLAG_BRANK", "LONG")
 
    # Calculate B-rank scores 
-   printMsg('Calculating B-rank sums and maximums in loop...')
+   printMsg('Calculating biodiversity rank sums and maximums in loop...')
    arcpy.MakeFeatureLayer_management (in_EOs, "eo_lyr")
-   arcpy.MakeFeatureLayer_management (in_ConSites, "cs_lyr")
+   # arcpy.MakeFeatureLayer_management (in_ConSites, "cs_lyr")
+   arcpy.management.CalculateField(in_ConSites, "tmpID", "!OBJECTID!", "PYTHON3")
+   tmpSites = "in_memory" + os.sep + "tmpSites"
+   arcpy.management.CopyFeatures(in_ConSites, tmpSites)
+   arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
+   arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
    failList = []
-   with arcpy.da.UpdateCursor ("cs_lyr", ["SHAPE@", "SITEID", "IBR_SUM", "IBR_MAX"]) as cursor:
+   with arcpy.da.UpdateCursor (tmpSites, ["SHAPE@", "SITEID", "IBR_SUM", "IBR_MAX"]) as cursor:
       for row in cursor:
          myShp = row[0]
          siteID = row[1]
@@ -441,7 +442,7 @@ def getBRANK(in_PF, in_ConSites):
             failList.append(siteID)
          
    # Determine B-rank based on the sum of IBRs
-   printMsg('Calculating site B-ranks from sums and maximums of individual B-ranks...')
+   printMsg('Calculating site biodiversity ranks from sums and maximums of individual ranks...')
    codeblock = '''def brank(sum, max):
       if sum == None:
          sumRank = None
@@ -474,7 +475,10 @@ def getBRANK(in_PF, in_ConSites):
       '''
    
    expression= "brank(!IBR_SUM!,!IBR_MAX!)"
-   arcpy.management.CalculateField(in_ConSites, "AUTO_BRANK", expression, "PYTHON3", codeblock, "TEXT")
+   arcpy.management.CalculateField(tmpSites, "AUTO_BRANK", expression, "PYTHON3", codeblock, "TEXT")
+      
+   arcpy.management.JoinField(in_ConSites, "tmpID", tmpSites, "tmpID", ["IBR_SUM", "IBR_MAX", "AUTO_BRANK"])
+   arcpy.management.DeleteField(in_ConSites, "tmpID")
    
    printMsg('Calculating flag status...')
    codeblock = '''def flag(brank, auto_brank):
