@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-03-15
+# Last Edit: 2022-04-05
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -64,13 +64,14 @@ def ParseSiteTypes(in_ProcFeats, in_ConSites, out_GDB):
    '''
    
    # Define some queries
-   qry_pfTCS = "RULE NOT IN ('SCU','MACS','KCS','AHZ')"
+   # Note that flexibility has been added to aid transition from SCU to SCS
+   qry_pfTCS = "RULE NOT IN ('SCU', 'SCS1', 'SCS2', 'MACS','KCS','AHZ')"
    qry_pfKCS = "RULE = 'KCS'"
-   qry_pfSCU = "RULE = 'SCU'"
+   qry_pfSCU = "RULE IN ('SCU', 'SCS1', 'SCS2')"
    qry_pfAHZ = "RULE = 'AHZ'"
    qry_csTCS = "SITE_TYPE = 'Conservation Site'"
    qry_csKCS = "SITE_TYPE = 'Cave Site'"
-   qry_csSCU = "SITE_TYPE = 'SCU'"
+   qry_csSCU = "SITE_TYPE IN ('SCU', 'SCS')"
    qry_csAHZ = "SITE_TYPE = 'Anthropogenic Habitat Zone'"
    
    
@@ -2344,7 +2345,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    - in_ConSites: feature class representing current Stream Conservation Sites (or, a template feature class)
    - out_ConSites: the output feature class representing updated Stream Conservation Sites
    - in_FlowBuff: Input polygons derived from raster where the flow distances shorter than a specified truncation distance are coded 1; output from the prepFlowBuff function. The flow buffers have been further split by catchments. Ignored if trim = "false", in which case "None" can be entered.
-   - fld_Rule = field containing assigned processing rule (should be "SCU1" for features getting standard process or "SCU2" for alternate process)
+   - fld_Rule = field containing assigned processing rule (should be "SCS1" for features getting standard process or "SCS2" for alternate process)
    - trim: Indicates whether sites should be restricted to buffers ("true"; default) or encompass entire catchments ("false")
    - buffDist: Buffer distance used to make clipping buffers
    - out_Scratch: Geodatabase to contain output products 
@@ -2454,7 +2455,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       
       arcpy.env.extent = "MAXOF"
       # Burn in full catchments for alternate-process PFs
-      qry = "%s = 'SCU2'"%fld_Rule
+      qry = "%s = 'SCS2'"%fld_Rule
       altPF = arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
       count = countFeatures(altPF)
       print(count)
