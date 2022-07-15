@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-06-06
+# Last Edit: 2022-07-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -48,7 +48,7 @@ class Toolbox(object):
    def __init__(self):
       """Define the toolbox (the name of the toolbox is the name of the .pyt file)."""
       self.label = "ConSite Toolbox"
-      self.alias = "ConSite-Toolbox"
+      self.alias = "ConSiteToolbox"
 
       # List of tool classes associated with this toolbox
       Subroutine_Tools = [coalesceFeats, shrinkwrapFeats]
@@ -221,10 +221,18 @@ class extract_biotics(object):
       # Run the function
       (outPF, outCS) = ExtractBiotics(BioticsPF, BioticsCS, outGDB)
       
-      # Display the output in the current map
+      # Delete pre-existing layers, and display the output in the current map
       try:
          aprx = arcpy.mp.ArcGISProject("CURRENT")
          map = aprx.activeMap
+         l = map.listLayers()
+         ldict = dict()
+         for item in l:
+            ldict[item.name] = item
+         lnames = [i.name for i in l]
+         for n in ["Biotics ProcFeats", "Biotics ConSites", "pfTerrestrial", "pfKarst", "pfStream", "pfAnthro", "csTerrestrial", "csKarst", "csStream", "csAnthro"]:
+            if n in lnames:
+               map.removeLayer(ldict[n])
          map.addDataFromPath(outPF).name = "Biotics ProcFeats"
          map.addDataFromPath(outCS).name = "Biotics ConSites"
       except:
@@ -611,7 +619,18 @@ class expand_selection(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm0 = defineParam("inLyr", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "pfTerrestrial" in lnames:
+         parm0.value = "pfTerrestrial"
+      elif map.name == "AHZ" and "pfAnthro" in lnames:
+         parm0.value = "pfAnthro"
+      else:
+         pass
       parm1 = defineParam("SearchDist", "Search distance", "GPLinearUnit", "Required", "Input", "1500 METERS")
 
       parms = [parm0, parm1]
