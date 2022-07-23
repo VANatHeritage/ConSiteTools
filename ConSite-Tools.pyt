@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-07-15
+# Last Edit: 2022-07-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -43,6 +43,16 @@ def declareParams(params):
       globals()[p] = d[p]
    return 
 
+def getViewExtent():
+   '''Gets the extent of the active view.
+   I'm using this to set the processing extent for every tool function that is using feature services as inputs. This way, processing is limited to only the features in the active view. This can save TONS of processing time!!! But the user needs to be careful that the view is big enough to encompass everything needed.
+   '''
+   aprx = arcpy.mp.ArcGISProject("CURRENT")
+   mv = aprx.activeView
+   ext = mv.camera.getExtent()
+   viewExtent = "{}, {}, {}, {}".format(ext.XMin, ext.YMin, ext.XMax, ext.YMax)
+   return viewExtent
+   
 # Define the toolbox
 class Toolbox(object):
    def __init__(self):
@@ -1125,14 +1135,16 @@ class ntwrkPts_scs(object):
          scratchParm = "in_memory" 
       
       # Run the function
+      arcpy.env.extent = getViewExtent()
       scsPoints = MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID, fld_Tidal, scratchParm)
+      arcpy.env.extent = "MAXOF"
       
       return scsPoints
       
 class lines_scs(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
-      self.label = "2: Generate Linear Stream Conservation Units"
+      self.label = "2: Generate SCS Lines"
       self.description = 'Solves the upstream and downstream service layers, and combines segments to create linear SCUs'
       self.canRunInBackground = True
       self.category = "Site Delineation Tools: SCS"
@@ -1277,7 +1289,7 @@ class sites_scs(object):
       parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCU")
       parm9.filter.type = "ValueList"
       parm9.filter.list = ["SCU", "SCS"]
-      
+
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9]
       
       return parms
@@ -1295,6 +1307,14 @@ class sites_scs(object):
          field_names = [f.name for f in arcpy.ListFields(fc)]
          parameters[7].filter.list = field_names
       return
+      
+      # Why isn't this updating the parameter???
+      if parameters[9].altered and not parameters[9].hasBeenValidated:
+         if parameters[9].value == "SCU":
+            parameters[2].value = "scuPolys"
+         else:
+            parameters[2].value = "scsPolys"
+      return parameters[2].value
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
@@ -1312,12 +1332,14 @@ class sites_scs(object):
          scratchParm = "in_memory"
 
       # Run the function
+      arcpy.env.extent = getViewExtent()
       if siteType == "SCU":
          buffDist = 5
       else:
          buffDist = 150
       trim = "true"
       scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, trim, buffDist, scratchParm)
+      arcpy.env.extent = "MAXOF"
 
       return scsPolys
       

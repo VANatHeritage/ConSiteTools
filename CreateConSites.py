@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-04-05
+# Last Edit: 2022-07-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -10,10 +10,10 @@
 # Includes functionality to produce:
 # - Terrestrial Conservation Sites (TCS)
 # - Anthopogenic Habitat Zones (AHZ)
-# - Stream Conservation Sites (SCS)
+# - Stream Conservation Sites (SCS) or Stream Conservation Units (SCU)
 
 # Dependencies:
-# Functions for creating SCS will not work if the hydro network is not set up properly! The network geodatabase VA_HydroNet.gdb has been set up manually, not programmatically. The Network Analyst extension is required for some SCS functions, which will fail if the license is unavailable.
+# Functions for creating SCS/SCU will not work if the hydro network is not set up properly! The network geodatabase VA_HydroNet.gdb has been set up manually, not programmatically. The Network Analyst extension is required for some SCS functions, which will fail if the license is unavailable.
 # ----------------------------------------------------------------------------------------
 
 # Import function libraries and settings
@@ -2125,8 +2125,11 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    nhdWaterbody = catPath + os.sep + "NHDWaterbody"
    
    # Shift PFs to align with primary flowline
+   printMsg("Starting shiftAlign function...")
    shift_PF = out_Scratch + os.sep + "shift_PF"
-   (shiftFeats, clipWideWater, nhdFlowline) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
+   #(shiftFeats, clipWideWater, nhdFlowline) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
+   (shiftFeats, clipWideWater, mergeLines) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
+   printMsg("PF alignment complete")
    
    # # Select catchments intersecting shifted PFs
    # printMsg("Selecting catchments intersecting shifted PFs...")
@@ -2139,29 +2142,54 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    # arcpy.Clip_analysis (wideWater, "lyr_Catchments", clipWideWater)
    
    # Merge shifted PFs and widewater polygons into single feature class
-   printMsg("Merging shifted PFs with clipped widewaters...")
-   mergeFeats = out_Scratch + os.sep + "mergeFeats"
-   arcpy.Merge_management ([shift_PF, clipWideWater], mergeFeats)
+   ###WHY???
+   # printMsg("Merging shifted PFs with clipped widewaters...")
+   # mergeFeats = out_Scratch + os.sep + "mergeFeats"
+   # arcpy.Merge_management ([shift_PF, clipWideWater], mergeFeats)
    
-   # Clip flowlines to merged features
+   # Clip flowlines to shifted PF
    printMsg("Clipping flowlines...")
    clipLines = out_Scratch + os.sep + "clipLines"
-   arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
+   # #arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
+   # #arcpy.Clip_analysis (mergeLines, shift_PF, clipLines)
+   arcpy.analysis.PairwiseClip (mergeLines, shift_PF, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
    # tmpPts = out_Scratch + os.sep + "tmpPts"
-   arcpy.FeatureVerticesToPoints_management (clipLines, out_Points, "BOTH_ENDS")
+   tmpPts = out_Points
+   printMsg("Generating points along network...")
+   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
+   # arcpy.analysis.PairwiseIntersect([mergeLines, shift_PF], out_Points, "", "", "POINT")
+   
+   # Clip wetlands to shifted PF
+   printMsg("Clipping wetlands...")
+   clipNWI = out_Scratch + os.sep + "clipWtlnd"
+   arcpy.analysis.PairwiseClip (in_NWI, shift_PF, clipNWI)
    
    # Attribute points designating them tidal or not
-   # # Spatial join allows for a 3-meter spatial error
-   # arcpy.SpatialJoin_analysis(tmpPts, in_NWI, out_Points, "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "WITHIN_A_DISTANCE", "3 Meters")
-   arcpy.ca.JoinAttributesFromPolygon(out_Points, in_NWI, fld_Tidal)
+   # # First make a layer and select by location to speed up the join
+   # printMsg("Selecting nearby wetlands...")
+   # arcpy.management.MakeFeatureLayer(in_NWI, "lyrNWI")
+   # arcpy.management.SelectLayerByLocation("lyrNWI", "WITHIN_A_DISTANCE", tmpPts, "3 Meters")
+   # c = countSelectedFeatures("lyrNWI")
+   c = countFeatures(clipNWI)
+   
+   if c > 0:
+      # # Spatial join allows for a 3-meter spatial error
+      printMsg("Joining tidal attribute...")
+      # arcpy.analysis.SpatialJoin(tmpPts, in_NWI, out_Points, "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "CLOSEST", "3 Meters", "")
+      arcpy.ca.JoinAttributesFromPolygon(out_Points, clipNWI, fld_Tidal)
+   else:
+      printMsg("No wetlands intersecting PFs...")
+      # arcpy.management.CopyFeatures(tmpPts, out_Points)
+      
    codeblock = """def fillNulls(tidal):
       if not tidal:
          return 0
       else:
          return tidal"""
    expression = "fillNulls(!%s!)"%fld_Tidal
+   printMsg("Replacing nulls with zeros for tidal attribute...")
    arcpy.management.CalculateField(out_Points, fld_Tidal, expression, "PYTHON", codeblock)
    
    # timestamp
@@ -2169,6 +2197,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    ds = GetElapsedTime (t0, t1)
    printMsg("Completed MakeNetworkPts_scs function. Time elapsed: %s" % ds)
    
+   printMsg("Network point generation complete.")
    return out_Points
    
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): #arcpy.env.scratchGDB):

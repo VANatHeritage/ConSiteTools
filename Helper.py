@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-03-23
+# Last Edit: 2022-07-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -882,8 +882,10 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    
    # Merge output to a single feature class
    arcpy.Merge_management ([streamFeats, riverFeats], outFeats)
+   mergeLines = scratchGDB + os.sep + "mergeLines"
+   arcpy.Merge_management ([streamLines, riverLines], mergeLines)
    
-   return (outFeats, clipWideWater, nhdFlowline)
+   return (outFeats, clipWideWater, mergeLines)
    
 def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
    '''Does what it seems the arcpy.UnsplitLine_management function SHOULD do, but doesn't.
