@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-03-25
+# Last Edit: 2022-07-26
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -507,24 +507,17 @@ def MakeExclusionList(in_Tabs, out_Tab):
    printMsg('Creating Element Exclusion table...')
    out_path = os.path.dirname(out_Tab)
    out_name = os.path.basename(out_Tab)
-   arcpy.CreateTable_management (out_path, out_name)
+   arcpy.management.CreateTable (out_path, out_name)
    
    # Add the standard fields
    printMsg('Adding standard fields to table...')
    fldList = [['ELCODE', 'TEXT', 10],
-               ['EXCLUDE', 'SHORT', ''],
-               ['DATADEF', 'SHORT', ''],
-               ['TAXRES', 'SHORT', ''],
-               ['WATCH', 'SHORT', ''],
-               ['EXTIRP', 'SHORT', ''],
-               ['ECOSYST', 'SHORT', ''],
-               ['OTHER', 'TEXT', 50],
-               ['NOTES', 'TEXT', 50]]
+               ['EXCLUDE', 'SHORT', '']]
    for fld in fldList:
       field_name = fld[0]
       field_type = fld[1]
       field_length = fld[2]
-      arcpy.AddField_management (out_Tab, field_name, field_type, '', '', field_length)
+      arcpy.management.AddField(out_Tab, field_name, field_type, '', '', field_length)
          
    # Append each of the input tables
    printMsg('Appending lists to master table...')
@@ -532,7 +525,8 @@ def MakeExclusionList(in_Tabs, out_Tab):
    if type(in_Tabs) == str:
       in_Tabs = in_Tabs.split(';')
    for tab in in_Tabs:
-      arcpy.Append_management (tab, out_Tab, 'NO_TEST')
+      arcpy.management.MakeTableView(tab, "tabView", "EXCLUDE = '1'")
+      arcpy.management.Append ("tabView", out_Tab, 'NO_TEST')
       
    printMsg('Finished creating Element Exclusion table.')
   
@@ -630,11 +624,13 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
       else:
          return granks'''
    expression = "reclass(!RNDGRNK!)"
-   arcpy.CalculateField_management(out_procEOs, "NEW_GRANK", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(out_procEOs, "NEW_GRANK", expression, "PYTHON3", codeblock)
+   #arcpy.CalculateField_management(out_procEOs, "NEW_GRANK", expression, "PYTHON_9.3", codeblock)
    
    # Field: EXCLUSION
    printMsg("Calculating EXCLUSION field...")
-   arcpy.AddField_management(out_procEOs, "EXCLUSION", "TEXT", "", "", 20) # This will be calculated below by groups
+   arcpy.management.AddField(out_procEOs, "EXCLUSION", "TEXT", "", "", 20) # This will be calculated below by groups
+   #arcpy.AddField_management(out_procEOs, "EXCLUSION", "TEXT", "", "", 20) # This will be calculated below by groups
    
    # Set EXCLUSION value for low EO ranks
    printMsg("Excluding low EO ranks...")
@@ -646,20 +642,21 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
       else:
          return "Keep"'''
    expression = "reclass(!EORANK_NUM!)"
-   arcpy.CalculateField_management(out_procEOs, "EXCLUSION", expression, "PYTHON_9.3", codeblock)
+   arcpy.management.CalculateField(out_procEOs, "EXCLUSION", expression, "PYTHON3", codeblock)
    
    # Set EXCLUSION value for old observations
    printMsg("Excluding old observations...")
    where_clause = '"RECENT" = 0'
    arcpy.MakeFeatureLayer_management (out_procEOs, "lyr_EO", where_clause)
    expression = "'Old Observation'"
-   arcpy.CalculateField_management("lyr_EO", "EXCLUSION", expression, "PYTHON_9.3")
+   arcpy.management.CalculateField("lyr_EO", "EXCLUSION", expression, "PYTHON3")
 
    # Set EXCLUSION value for elements exclusions
    printMsg("Excluding certain elements...")
-   arcpy.MakeFeatureLayer_management (out_procEOs, "lyr_EO")
-   arcpy.AddJoin_management ("lyr_EO", "ELCODE", in_elExclude, "ELCODE", "KEEP_COMMON")
-   arcpy.CalculateField_management("lyr_EO", "EXCLUSION", "'Excluded Element'", "PYTHON")
+   arcpy.management.MakeFeatureLayer(out_procEOs, "lyr_EO")
+   arcpy.management.MakeTableView(in_elExclude, "tbl_Exclusions", "EXCLUDE = 1")
+   arcpy.management.AddJoin ("lyr_EO", "ELCODE", "tbl_Exclusions", "ELCODE", "KEEP_COMMON")
+   arcpy.management.CalculateField("lyr_EO", "EXCLUSION", "'Excluded Element'", "PYTHON3")
 
    # Tabulate intersection of EOs with military land
    printMsg("Tabulating intersection of EOs with military lands...")
