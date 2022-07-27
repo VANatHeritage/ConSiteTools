@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-07-26
+# Last Edit: 2022-07-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -525,7 +525,7 @@ def MakeExclusionList(in_Tabs, out_Tab):
    if type(in_Tabs) == str:
       in_Tabs = in_Tabs.split(';')
    for tab in in_Tabs:
-      arcpy.management.MakeTableView(tab, "tabView", "EXCLUDE = '1'")
+      arcpy.management.MakeTableView(tab, "tabView", "EXCLUDE = 1")
       arcpy.management.Append ("tabView", out_Tab, 'NO_TEST')
       
    printMsg('Finished creating Element Exclusion table.')
