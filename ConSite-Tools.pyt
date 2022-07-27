@@ -1306,15 +1306,13 @@ class sites_scs(object):
          fc = parameters[0].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc)]
          parameters[7].filter.list = field_names
-      return
       
-      # Why isn't this updating the parameter???
       if parameters[9].altered and not parameters[9].hasBeenValidated:
          if parameters[9].value == "SCU":
             parameters[2].value = "scuPolys"
          else:
             parameters[2].value = "scsPolys"
-      return parameters[2].value
+      return
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
