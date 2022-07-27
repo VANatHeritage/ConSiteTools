@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-07-22
+# Last Edit: 2022-07-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -400,11 +400,43 @@ class review_consite(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      lyrs = map.listLayers()
+      lnames = [l.name for l in lyrs]
+      
       parm00 = defineParam("auto_CS", "Input NEW Conservation Sites", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "consites_tcs" in lnames:
+         parm00.value = "consites_tcs"
+      elif map.name == "AHZ" and "consites_ahz" in lnames:
+         parm00.value = "consites_ahz"
+      elif map.name == "SCS" and "consites_scs" in lnames:
+         parm00.value = "consites_scs"
+      elif map.name == "SCS" and "consites_scu" in lnames:
+         parm00.value = "consites_scu"
+      else:
+         pass
+         
       parm01 = defineParam("orig_CS", "Input OLD Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      parm02 = defineParam("cutVal", "Cutoff value (percent)", "GPDouble", "Required", "Input")
-      parm03 = defineParam("out_Sites", "Output new Conservation Sites feature class with QC fields", "GPFeatureLayer", "Required", "Output", "ConSites_QC")
+      if map.name == "TCS" and "csTerrestrial" in lnames:
+         parm01.value = "csTerrestrial"
+      elif map.name == "AHZ" and "csAnthro" in lnames:
+         parm01.value = "csAnthro"
+      elif map.name == "SCS" and "csStream" in lnames:
+         parm01.value = "csStream"
+      else:
+         pass
+      
+      parm02 = defineParam("cutVal", "Cutoff value (percent)", "GPDouble", "Required", "Input", 5)
+      
+      parm03 = defineParam("out_Sites", "Output new Conservation Sites feature class with QC fields", "GPFeatureLayer", "Required", "Output")
+      if parm00.value == None:
+         parm03.value = "consites_QC"
+      else:
+         parm03.value = "%s_QC"%parm00.value
+      
       parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "String", "Required", "Input", "SITEID")
+      
       parm05 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05]
@@ -418,6 +450,9 @@ class review_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         parameters[3].value = "%s_QC"%parameters[0].valueAsText
+      
       if parameters[1].altered:
          fc = parameters[1].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc)]
