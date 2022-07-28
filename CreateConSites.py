@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-07-22
+# Last Edit: 2022-07-28
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -686,7 +686,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # arcpy.analysis.Select(Join1, NewSites, "Join_Count = 0")
    qry = "Join_Count = 0"
    arcpy.management.MakeFeatureLayer(out_Sites, "newLyr", qry)
-   arcpy.management.CalculateField("newLyr", "ModType", "N")
+   arcpy.management.CalculateField("newLyr", "ModType", '"N"')
 
    # Get the single and split sites.
    # These are sites that overlap exactly one old site each. This may be a one-to-one correspondence or a split.
