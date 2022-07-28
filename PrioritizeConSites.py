@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS 10.3 / Python 2.7
 # Creation Date: 2018-02-21
-# Last Edit: 2022-07-27
+# Last Edit: 2022-07-28
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -313,8 +313,8 @@ def getBRANK(in_PF, in_ConSites):
    NOTE: Should only be run on one site type at a time, with type-specific inputs. Needs to run in foreground so tables update attributes. Best to close attribute tables prior to running.
    
    Parameters:
-   in_PF = Input site-worthy procedural features for a specific site type
-   in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
+   - in_PF = Input site-worthy procedural features for a specific site type
+   - in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
    '''
    
    # Dissolve procedural features on SF_EOID
@@ -418,12 +418,17 @@ def getBRANK(in_PF, in_ConSites):
    arcpy.MakeFeatureLayer_management (in_EOs, "eo_lyr")
    # arcpy.MakeFeatureLayer_management (in_ConSites, "cs_lyr")
    arcpy.management.CalculateField(in_ConSites, "tmpID", "!OBJECTID!", "PYTHON3")
+   if "SITEID" in oldFlds:
+      fld_ID = "SITEID"
+   else:
+      fld_ID = "tmpID"
+      printMsg("No SITEID field found. Using OID as unique identifier instead.")
    tmpSites = "in_memory" + os.sep + "tmpSites"
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
    failList = []
-   with arcpy.da.UpdateCursor (tmpSites, ["SHAPE@", "SITEID", "IBR_SUM", "IBR_MAX"]) as cursor:
+   with arcpy.da.UpdateCursor (tmpSites, ["SHAPE@", fld_ID, "IBR_SUM", "IBR_MAX"]) as cursor:
       for row in cursor:
          myShp = row[0]
          siteID = row[1]
@@ -489,8 +494,11 @@ def getBRANK(in_PF, in_ConSites):
       else:
          return 1
    '''
-   expression = "flag(!BRANK!, !AUTO_BRANK!)"
-   arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "LONG")
+   if "BRANK" in oldFlds:
+      expression = "flag(!BRANK!, !AUTO_BRANK!)"
+      arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "LONG")
+   else:
+      printMsg("No existing B-ranks available for comparison.")
 
    if len(failList) > 0:
       printMsg("Processing incomplete for some sites %s"%failList)
