@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-07-28
+# Last Edit: 2022-08-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1867,16 +1867,16 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             else:
                finErase = sbbErase
             
-            # Use erase features to chop out areas of SBBs
-            printMsg('Erasing portions of SBBs...')
-            sbbFrags = scratchGDB + os.sep + 'sbbFrags'
-            CleanErase (tmpSBB, finErase, sbbFrags, scratchParm) 
+            # # Use erase features to chop out areas of SBBs
+            # printMsg('Erasing portions of SBBs...')
+            # sbbFrags = scratchGDB + os.sep + 'sbbFrags'
+            # CleanErase (tmpSBB, finErase, sbbFrags, scratchParm) 
             
-            # Remove any SBB fragments too far from a PF
-            printMsg('Culling SBB fragments...')
-            sbbRtn = scratchGDB + os.sep + 'sbbRtn'
-            CullFrags(sbbFrags, tmpPF, searchDist, sbbRtn)
-            # arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
+            # # Remove any SBB fragments too far from a PF
+            # printMsg('Culling SBB fragments...')
+            # sbbRtn = scratchGDB + os.sep + 'sbbRtn'
+            # CullFrags(sbbFrags, tmpPF, searchDist, sbbRtn)
+            # # arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
             
             # # Modify ProtoSites and Erase Features
             # printMsg('Chopping ProtoSites and modifying erase features...')
@@ -1890,6 +1890,17 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                # arcpy.management.Merge([psErase, efClp], finErase2)
             # else:
                # finErase2 = psErase
+               
+            # Clip SBBs and PFs to the SBB clusters created with the ChopMod function
+            printMsg('Clipping SBBs to clusters...')
+            sbbRtn = scratchGDB + os.sep + 'sbbRtn'
+            arcpy.analysis.PairwiseClip(tmpSBB, sbbClusters, sbbRtn)
+            
+            printMsg('Clipping PFs to clusters... yeah this is kinda radical!')
+            pfRtn = scratchGDB + os.sep + 'pfRtn'
+            arcpy.analysis.PairwiseClip(tmpPF, sbbClusters, pfRtn)
+            # Need to make a new feature layer, also
+            pf2 = arcpy.management.MakeFeatureLayer(pfRtn, "PF_lyr2") 
             
             # Use erase features to chop out areas of ProtoSites
             printMsg('Erasing portions of ProtoSites...')
@@ -1899,7 +1910,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Remove any ProtoSite fragments too far from a PF
             printMsg('Culling ProtoSite fragments...')
             psRtn = scratchGDB + os.sep + 'psRtn'
-            CullFrags(psFrags, tmpPF, searchDist, psRtn)
+            CullFrags(psFrags, pfRtn, searchDist, psRtn)
             
             # Loop through the retained ProtoSite fragments (aka "Split Sites")
             counter2 = 1
@@ -1910,12 +1921,12 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   tmpSS = mySS[0]
                            
                   # Get PFs within split site
-                  arcpy.management.SelectLayerByLocation("PF_lyr", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
+                  arcpy.management.SelectLayerByLocation("PF_lyr2", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
                   
                   # Select retained SBB fragments corresponding to selected PFs
                   tmpSBB2 = scratchGDB + os.sep + 'tmpSBB2' 
                   tmpPF2 = scratchGDB + os.sep + 'tmpPF2'
-                  SubsetSBBandPF(sbbRtn, "PF_lyr", "SBB", fld_SFID, tmpSBB2, tmpPF2)
+                  SubsetSBBandPF(sbbRtn, "PF_lyr2", "SBB", fld_SFID, tmpSBB2, tmpPF2)
                   
                   # ShrinkWrap retained SBB fragments
                   csShrink = scratchGDB + os.sep + 'csShrink' + str(counter2)

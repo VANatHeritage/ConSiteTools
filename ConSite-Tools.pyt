@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-07-27
+# Last Edit: 2022-08-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -787,6 +787,8 @@ class create_sbb(object):
       else:
          scratchParm = "in_memory" 
 
+      # Run the function
+      arcpy.env.extent = getViewExtent()
       CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
 
@@ -863,6 +865,8 @@ class expand_sbb(object):
       else:
          scratchParm = "in_memory" 
 
+      # Run the function
+      arcpy.env.extent = getViewExtent()
       ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
       
@@ -1003,6 +1007,11 @@ class create_consite(object):
       # Set up parameter names and values
       declareParams(parameters)
       
+      if scratch_GDB != 'None':
+         scratchParm = scratch_GDB 
+      else:
+         scratchParm = "in_memory" 
+      
       # Parse out transportation datasets
       if site_Type == 'TERRESTRIAL':
          Trans = in_TranSurf.split(';')
@@ -1011,14 +1020,11 @@ class create_consite(object):
       else:
          Trans = None
       
-      if scratch_GDB != 'None':
-         scratchParm = scratch_GDB 
-      else:
-         scratchParm = "in_memory" 
+      # Run the function
+      arcpy.env.extent = getViewExtent()
       CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, Trans, in_Exclude, scratchParm)
 
       return out_ConSites
-
 
 # SCS Delineation Tools              
 class servLyrs_scs(object):
