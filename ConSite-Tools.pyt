@@ -788,9 +788,13 @@ class create_sbb(object):
          scratchParm = "in_memory" 
 
       # Run the function
-      arcpy.env.extent = getViewExtent()
+      try:
+         arcpy.env.extent = getViewExtent()
+      except:
+         pass
       CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
+      arcpy.env.extent = "MAXOF"
 
       return out_SBB
       
@@ -866,9 +870,13 @@ class expand_sbb(object):
          scratchParm = "in_memory" 
 
       # Run the function
-      arcpy.env.extent = getViewExtent()
+      try:
+         arcpy.env.extent = getViewExtent()
+      except:
+         pass
       ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
+      arcpy.env.extent = "MAXOF"
       
       return out_SBB
       
@@ -1021,8 +1029,12 @@ class create_consite(object):
          Trans = None
       
       # Run the function
-      arcpy.env.extent = getViewExtent()
+      try:
+         arcpy.env.extent = getViewExtent()
+      except:
+         pass
       CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, Trans, in_Exclude, scratchParm)
+      arcpy.env.extent = "MAXOF"
 
       return out_ConSites
 
@@ -1176,7 +1188,10 @@ class ntwrkPts_scs(object):
          scratchParm = "in_memory" 
       
       # Run the function
-      arcpy.env.extent = getViewExtent()
+      try:
+         arcpy.env.extent = getViewExtent()
+      except:
+         pass
       scsPoints = MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID, fld_Tidal, scratchParm)
       arcpy.env.extent = "MAXOF"
       
@@ -1371,7 +1386,10 @@ class sites_scs(object):
          scratchParm = "in_memory"
 
       # Run the function
-      arcpy.env.extent = getViewExtent()
+      try:
+         arcpy.env.extent = getViewExtent()
+      except:
+         pass
       if siteType == "SCU":
          buffDist = 5
       else:

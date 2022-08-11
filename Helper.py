@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-07-22
+# Last Edit: 2022-08-11
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -79,12 +79,12 @@ def CleanFeatures(inFeats, outFeats):
    '''Repairs geometry, then explodes multipart polygons to prepare features for geoprocessing.'''
    
    # Process: Repair Geometry
-   printMsg("Repairing geometry...")
+   # printMsg("Repairing geometry...")
    arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
 
    # Have to add the while/try/except below b/c polygon explosion sometimes fails inexplicably.
    # This gives it 10 tries to overcome the problem with repeated geometry repairs, then gives up.
-   printMsg("Exploding multiparts...")
+   # printMsg("Exploding multiparts...")
    counter = 1
    while counter <= 10:
       try:
@@ -505,7 +505,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
    
    # Prep features
-   printMsg("Dissolving and cleaning features...")
+   # printMsg("Dissolving and cleaning features...")
    dissFeats = scratchGDB + os.sep + "dissFeats"
    arcpy.analysis.PairwiseDissolve(inFeats, dissFeats, "", "", "SINGLE_PART")
    trashList.append(dissFeats)
@@ -518,20 +518,20 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr") 
 
    # Aggregate features
-   printMsg("Aggregating features...")
+   # printMsg("Aggregating features...")
    aggFeats = scratchGDB + os.sep + "aggFeats"
    arcpy.cartography.AggregatePolygons(inFeats_lyr, aggFeats, searchDist, "0 SquareMeters", "0 SquareMeters", "NON_ORTHOGONAL")
    trashList.append(aggFeats)
 
    # Process:  Get Count
    c = countFeatures(aggFeats)
-   arcpy.AddMessage("There are %s clusters to shrinkwrap..."%c)
+   # arcpy.AddMessage("There are %s clusters to shrinkwrap..."%c)
 
    # Loop through the aggregated features
    counter = 1
    with arcpy.da.SearchCursor(aggFeats, ["SHAPE@"]) as myFeats:
       for Feat in myFeats:
-         printMsg("Working on cluster %s..." % str(counter))
+         # printMsg("Working on cluster %s..." % str(counter))
          featSHP = Feat[0]
 
          # Get input features within aggregate feature
@@ -554,7 +554,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
          trashList.append(noGapFeats)
          
          # Process:  Append the final geometry to the ShrinkWrap feature class
-         arcpy.AddMessage("Appending feature...")
+         # arcpy.AddMessage("Appending feature...")
          arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
          
          counter +=1
@@ -563,7 +563,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    # Cleanup
    if scratchGDB == "in_memory":
       garbagePickup(trashList)
-      
+
    return outFeats
    
 def CompareSpatialRef(in_Data, in_Template):
