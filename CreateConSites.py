@@ -621,7 +621,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Determine how many old sites are overlapped by each automated site.  
    # Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
-   # Join1 = scratchGDB + os.sep + "Join1"
    fldmap = "Shape_Length \"Shape_Length\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Length,-1,-1;Shape_Area \"Shape_Area\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Area,-1,-1"
    arcpy.analysis.SpatialJoin(auto_CS, orig_CS, out_Sites, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldmap, "INTERSECT")
    
@@ -631,8 +630,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Get the new sites.
    # These are automated sites with no corresponding old site
    printMsg("Separating out brand new sites...")
-   # NewSites = scratchGDB + os.sep + "NewSites"
-   # arcpy.analysis.Select(Join1, NewSites, "Join_Count = 0")
    qry = "Join_Count = 0"
    arcpy.management.MakeFeatureLayer(out_Sites, "newLyr", qry)
    arcpy.management.CalculateField("newLyr", "ModType", '"N"')
@@ -640,8 +637,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Get the single and split sites.
    # These are sites that overlap exactly one old site each. This may be a one-to-one correspondence or a split.
    printMsg("Separating out sites that may be singles or splits...")
-   # ssSites = scratchGDB + os.sep + "ssSites"
-   # arcpy.analysis.Select(Join1, ssSites, "Join_Count = 1")
    qry = "Join_Count = 1"
    arcpy.management.MakeFeatureLayer(out_Sites, "ssLyr", qry)
    arcpy.management.CalculateField("ssLyr", "ModType", '"S"')
@@ -649,8 +644,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Get the merged sites.
    # These are sites overlapping multiple old sites. Some may be pure merges, others combo merge/split sites.
    printMsg("Separating out merged sites...")
-   # mSites = scratchGDB + os.sep + "mSites"
-   # arcpy.Select_analysis(Join1, mSites, "Join_Count > 1")
    qry = "Join_Count > 1"
    arcpy.management.MakeFeatureLayer(out_Sites, "mergeLyr", qry)
    arcpy.management.CalculateField("mergeLyr", "ModType", '"M"')
@@ -680,8 +673,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Get the single sites (= no splits or merges; one-to-one relationship with old sites)
    printMsg("Separating out identical and boundary-change-only sites...")
    arcpy.management.SelectLayerByLocation("ssLyr", "INTERSECT", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   # SingleSites = scratchGDB + os.sep + "SingleSites"
-   # arcpy.management.CopyFeatures("ssLyr", SingleSites)
    c = countSelectedFeatures("ssLyr")
    if c > 0:
       printMsg("There are %s single sites (no splits or merges)"%str(c))
@@ -705,28 +696,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       printMsg("%s sites are identical to the old ones..."%str(c))
       arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
    
-   # # Get the simple split sites
-   # printMsg("Separating out simple split sites...")
-   # # arcpy.SelectLayerByAttribute_management("ssLyr", "SWITCH_SELECTION", "")
-   # arcpy.management.SelectLayerByLocation("ssLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   # # SplitSites = scratchGDB + os.sep + "SplitSites"
-   # # arcpy.management.CopyFeatures("ssLyr", SplitSites)
-   # c = countSelectedFeatures("ssLyr")
-   # if c > 0:
-      # printMsg("There are %s simple split sites"%str(c))
-      # arcpy.management.CalculateField("ssLyr", "ModType", '"S"')
-   
-   # # Get the simple merge sites
-   # printMsg("Separating out simple merge sites...")
-   # # arcpy.SelectLayerByAttribute_management("mergeLyr", "SWITCH_SELECTION", "")
-   # arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "INVERT")
-   # # MergeSites = scratchGDB + os.sep + "MergeSites"
-   # # arcpy.management.CopyFeatures("mergeLyr", MergeSites)
-   # c = countSelectedFeatures("mergeLyr")
-   # if c > 0:
-      # printMsg("There are %s simple merge sites"%str(c))
-      # arcpy.management.CalculateField("mergeLyr", "ModType", '"M"')
-   
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
    arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
@@ -736,19 +705,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    if c > 0:
       printMsg("There are %s combo split-merge sites"%str(c))
       arcpy.management.CalculateField("mergeLyr", "ModType", '"C"')
-
-   # # Save out the single sites that are identical to old sites
-   # arcpy.MakeFeatureLayer_management(SingleSites, "SingleLyr")
-   # printMsg("Separating out single sites that are identical to old sites...")
-   # arcpy.SelectLayerByLocation_management("SingleLyr", "ARE_IDENTICAL_TO", orig_CS, "", "NEW_SELECTION", "NOT_INVERT")
-   # IdentSites = scratchGDB + os.sep + "IdentSites"
-   # arcpy.CopyFeatures_management("SingleLyr", IdentSites, "", "0", "0", "0")
-
-   # # Save out the single sites that are NOT identical to old sites
-   # printMsg("Separating out single sites where boundaries have changed...")
-   # arcpy.SelectLayerByAttribute_management("SingleLyr", "SWITCH_SELECTION", "")
-   # BndChgSites = scratchGDB + os.sep + "BndChgSites"
-   # arcpy.CopyFeatures_management("SingleLyr", BndChgSites, "", "0", "0", "0")
 
    # Process:  Add Fields; Calculate Fields
    printMsg("Calculating fields...")
@@ -763,10 +719,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    Expression = "Flag(!ModType!)"
    arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock) 
       
-   # for tbl in [IdentSites, BndChgSites]:
-      # arcpy.CalculateField_management (tbl, "AssignID", "!%s!" %fld_SiteID, "PYTHON") 
-      # arcpy.DeleteField_management (tbl, "%s" %fld_SiteID) 
-      
    # Loop through the individual Boundary Change sites and check for amount of change
    qry = "ModType = 'B'"
    arcpy.management.MakeFeatureLayer(out_Sites, "B_Lyr", qry)
@@ -780,15 +732,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
             myID = site[1]
             printMsg("\nWorking on Site ID %s" %myID)
             
-            # Process:  Select (Analysis)
-            # Create temporary feature classes including only the current new and old sites
-            # myWhereClause_AutoSites = '"AssignID" = \'%s\'' %myID
-            # qry1 = "AssignID = '%s'" %myID
-            # tmpAutoSite = "in_memory" + os.sep + "tmpAutoSite"
-            # arcpy.Select_analysis (BndChgSites, tmpAutoSite, myWhereClause_AutoSites)
-            # tmpOldSite = "in_memory" + os.sep + "tmpOldSite"
-            # myWhereClause_OldSite = '"%s" = \'%s\'' %(fld_SiteID, myID)
-            # arcpy.Select_analysis (orig_CS, tmpOldSite, myWhereClause_OldSite)
             qry = '"%s" = \'%s\'' %(fld_SiteID, myID)
             tmpOldSite = arcpy.management.MakeFeatureLayer(orig_CS, "tmpLyr", qry)
 
@@ -846,11 +789,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
             myIndex += 1 
             arcpy.Delete_management("in_memory")
 
-   # # Process:  Merge
-   # printMsg("Merging sites into final feature class...")
-   # fcList = [NewSites, MergeSites, ComboSites, SplitSites, IdentSites, BndChgSites]
-   # arcpy.Merge_management (fcList, out_Sites) 
-   
    return out_Sites
 
 
@@ -959,10 +897,6 @@ def ExpandSBBselection(inSBB, inPF, fld_SFID, inConSites, SearchDist, outSBB, ou
    # Make Feature Layers from PFs and ConSites
    arcpy.MakeFeatureLayer_management(inPF, "PF_lyr")   
    arcpy.MakeFeatureLayer_management(inConSites, "Sites_lyr")
-      
-   # # Process: Select subset of terrestrial ConSites
-   # # WhereClause = "TYPE = 'Conservation Site'" 
-   # arcpy.SelectLayerByAttribute_management ("Sites_lyr", "NEW_SELECTION", '')
 
    # Initialize row count variables
    initRowCnt = 0
@@ -1553,10 +1487,8 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    # Merge, then dissolve original SBBs with buffered SBBs to get final shapes
    printMsg('Merging all SBBs...')
    sbbAll = scratchGDB + os.sep + "sbbAll"
-   #sbbFinal = myWorkspace + os.sep + "sbbFinal"
    arcpy.Merge_management ([SBB_sub, sbbExpand], sbbAll)
    arcpy.Dissolve_management (sbbAll, out_SBB, [fld_SFID, "intRule"], "")
-   #arcpy.MakeFeatureLayer_management(sbbFinal, "SBB_lyr") 
    
    printMsg('SBB processing complete')
    
@@ -1565,18 +1497,6 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    printMsg("Processing complete. Total elapsed time: %s" %deltaString)
    
    return out_SBB
-
-def ParseSBBs(in_SBB, out_terrSBB, out_ahzSBB):
-   '''Splits input SBBs into two feature classes, one for standard terrestrial SBBs and one for AHZ SBBs.
-   OBSOLETE function because now we parse the PFs by site type instead.
-   '''
-   terrQry = "intRule <> -1" 
-   ahzQry = "intRule = -1"
-   arcpy.Select_analysis (in_SBB, out_terrSBB, terrQry)
-   arcpy.Select_analysis (in_SBB, out_ahzSBB, ahzQry)
-   
-   sbbTuple = (out_terrSBB, out_ahzSBB)
-   return sbbTuple
 
 def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type, in_Hydro, in_TranSurf = None, in_Exclude = None, scratchGDB = "in_memory"):
    '''Creates Conservation Sites from the specified inputs:
@@ -1627,12 +1547,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    path, filename = os.path.split(path)
    myWorkspace = drive + path
    Output_CS_fname = filename
-   
-   # # Parse out transportation datasets
-   # if site_Type == 'TERRESTRIAL':
-      # Trans = in_TranSurf.split(';')
-      # for i in range(len(Trans)):
-         # Trans[i] = Trans[i].replace("'","")
    
    # If applicable, clear any selections on non-SBB inputs
    for fc in [in_PF, in_Hydro]:
@@ -1823,30 +1737,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                arcpy.management.Merge([sbbErase, efClp], finErase)
             else:
                finErase = sbbErase
-            
-            # # Use erase features to chop out areas of SBBs
-            # printMsg('Erasing portions of SBBs...')
-            # sbbFrags = scratchGDB + os.sep + 'sbbFrags'
-            # CleanErase (tmpSBB, finErase, sbbFrags, scratchParm) 
-            
-            # # Remove any SBB fragments too far from a PF
-            # printMsg('Culling SBB fragments...')
-            # sbbRtn = scratchGDB + os.sep + 'sbbRtn'
-            # CullFrags(sbbFrags, tmpPF, searchDist, sbbRtn)
-            # # arcpy.MakeFeatureLayer_management(sbbRtn, "sbbRtn_lyr")
-            
-            # # Modify ProtoSites and Erase Features
-            # printMsg('Chopping ProtoSites and modifying erase features...')
-            # psClusters = scratchGDB + os.sep + 'psClusters'
-            # psErase = scratchGDB + os.sep + 'psErase'
-            # ChopMod(tmpPF, tmpPS, finErase, psClusters, psErase, "10 METERS", scratchParm)
-            
-            # # For non-AHZ sites, force the manual exclusion features back into erase features
-            # if site_Type == 'TERRESTRIAL':
-               # finErase2 = scratchGDB + os.sep + "finErase2"
-               # arcpy.management.Merge([psErase, efClp], finErase2)
-            # else:
-               # finErase2 = psErase
                
             # Clip SBBs and PFs to the SBB clusters created with the ChopMod function
             # printMsg('Clipping SBBs to clusters...')
@@ -1911,23 +1801,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter)
             Coalesce(tmpSS_grp, "10 METERS", smoothBnd, scratchParm)
 
-            # finBuff = scratchGDB + os.sep + "finBuff"
-            # overlaps = scratchGDB + os.sep + "overlaps"
-            # mergeSites = scratchGDB + os.sep + "mergeSites"
-            # dissSites = scratchGDB + os.sep + "dissSites"
-            # arcpy.analysis.PairwiseBuffer(tmpSS_grp, finBuff, "50 METERS", "NONE")
-            # arcpy.analysis.CountOverlappingFeatures(finBuff, overlaps, 2)
-            # arcpy.management.Merge([overlaps, tmpSS_grp], mergeSites)
-            # arcpy.analysis.PairwiseDissolve(mergeSites, dissSites, "", "", "SINGLE_PART")
-            
-            # # Final removal of manual exclusions
-            # if site_Type == 'TERRESTRIAL':
-               # printMsg("Final removal of manual exclusion features...")
-               # finBnd = scratchGDB + os.sep + "finBnd"
-               # CleanErase (smoothBnd, efClp, finBnd, scratchParm) 
-            # else:
-               # finBnd = smoothBnd
-            
             # Eliminate holes
             printMsg("Eliminating holes...")
             finBnd = scratchGDB + os.sep + "finBnd"
@@ -2239,7 +2112,6 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
          arcpy.CopyFeatures_management(inLines, outLines)
          arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
          # printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
-         # arcpy.SaveToLayerFile_management(inLyr, outLyr)
          lines.append(outLines)
       else:
          pass
@@ -2279,7 +2151,6 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    fillRiverPoly = out_Scratch + os.sep + "fillRiverPoly"
    clipLakePoly = out_Scratch + os.sep + "clipLakePoly"
    fillLakePoly = out_Scratch + os.sep + "fillLakePoly"
-   # clipLines = out_Scratch + os.sep + "clipLines"
    StreamRiverBuff = out_Scratch + os.sep + "StreamRiverBuff"
    LakePondBuff = out_Scratch + os.sep + "LakePondBuff"
    LineBuff = out_Scratch + os.sep + "LineBuff"
@@ -2297,9 +2168,6 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    CleanClip("LakePond_Poly", in_Catch, clipLakePoly)
    arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
-   
-   # printMsg("Clipping SCU lines...")
-   # arcpy.Clip_analysis(in_Lines, in_Catch, clipLines)
    
    # Select clipped NHD polygons intersecting SCU lines
    ### Is this step necessary? Yes. Otherwise little off-network ponds influence result.
@@ -2327,7 +2195,6 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    # Clip buffers to catchment
    printMsg("Clipping buffer zone to catchments...")
    CleanClip(dissBuff, in_Catch, out_Buffers)
-   # arcpy.MakeFeatureLayer_management (out_Buffers, "clipBuffers")
    
    return out_Buffers
 
@@ -2395,22 +2262,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
          arcpy.Delete_management(flowBuff)
       arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
       
-      # ### This is never used; why did I do this??
-      # # Create empty feature class to store clipping buffers
-      # printMsg("Creating empty feature class for clipping buffers")
-      # sr = arcpy.Describe(in_FlowBuff).spatialReference
-      # fname = "clipBuffers"
-      # fpath = out_Scratch
-      # clipBuffers = fpath + os.sep + fname
-      
-      # if arcpy.Exists(clipBuffers):
-         # arcpy.Delete_management(clipBuffers)
-      # arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
-      
-      # # Reproject input lines, if necessary
-      # tmpLines = out_Scratch + os.sep + "lines_prj" # Can NOT project to in_memory
-      # lines_prj = ProjectToMatch_vec(in_Lines, in_FlowBuff, tmpLines, copy = 0)
-      
       with arcpy.da.SearchCursor(in_Lines, ["SHAPE@", "OBJECTID"]) as myLines:
          for line in myLines:
             try:
@@ -2433,18 +2284,10 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                # Clip the flow buffer to the clipping buffer 
                printMsg("Clipping the flow buffer ...")
                arcpy.env.extent = clipBuff
-               # clipRasterToPoly(in_FlowBuff, clipBuff, clipFlow)
                arcpy.Clip_analysis (in_FlowBuff, clipBuff, flowPoly)
-               
-               # printMsg("Converting flow buffer raster to polygon...")
-               # arcpy.RasterToPolygon_conversion (clipFlow, flowPoly, "NO_SIMPLIFY", "VALUE")
                
                printMsg("Appending feature %s..." %lineID)
                arcpy.Append_management (flowPoly, flowBuff, "NO_TEST")
-               
-               # ###This is not used again; why did I do this??
-               # printMsg("Appending feature %s..." %lineID)
-               # arcpy.Append_management (clipBuff, clipBuffers, "NO_TEST")
 
             except:
                printMsg("Process failure for feature %s. Passing..." %lineID)
@@ -2471,12 +2314,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       arcpy.SelectLayerByLocation_management (catch, "INTERSECT", in_Lines)
       in_Polys = catch
    
-      # # Dissolve catchments
-      # printMsg("Dissolving catchments...")
-      # dissCatch = out_Scratch + os.sep + "dissCatch"
-      # arcpy.Dissolve_management ("lyr_Catchments", dissCatch, "", "", "SINGLE_PART", "")
-      # in_Polys = dissCatch
-   
    # Dissolve adjacent/overlapping features and fill in gaps 
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
@@ -2493,11 +2330,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       
    # Append final shapes to template
    arcpy.Append_management (fillPolys, out_ConSites, "NO_TEST")
-   
-   # # Coalesce to create final sites - 
-   # # This takes forever! Like 9 hours. Don't include unless committee really wants it
-   # printMsg("Coalescing...")
-   # Coalesce(fillPolys, 10, out_ConSites)
    
    # timestamp
    t1 = datetime.now()
