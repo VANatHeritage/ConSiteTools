@@ -666,16 +666,31 @@ class expand_selection(object):
       lyrs = map.listLayers()
       lnames = [l.name for l in lyrs]
       
-      parm0 = defineParam("inLyr", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
+      parm0 = defineParam("inPF_lyr", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "pfTerrestrial" in lnames:
          parm0.value = "pfTerrestrial"
       elif map.name == "AHZ" and "pfAnthro" in lnames:
          parm0.value = "pfAnthro"
       else:
          pass
-      parm1 = defineParam("SearchDist", "Search distance", "GPLinearUnit", "Required", "Input", "1500 METERS")
 
-      parms = [parm0, parm1]
+      parm1 = defineParam("inCS_lyr", "Input ConSites", "GPFeatureLayer", "Required", "Input")
+      if map.name == "TCS" and "csTerrestrial" in lnames:
+         parm1.value = "csTerrestrial"
+      elif map.name == "AHZ" and "csAnthro" in lnames:
+         parm1.value = "csAnthro"
+      else:
+         pass
+      
+      parm2 = defineParam("SearchDist", "Search distance", "GPLinearUnit", "Required", "Input")
+      if map.name == "TCS":
+         parm2.value = "1500 METERS"
+      elif map.name == "AHZ":
+         parm2.value = "500 METERS"
+      else:
+         pass
+
+      parms = [parm0, parm1, parm2]
       return parms
 
    def isLicensed(self):
@@ -699,8 +714,8 @@ class expand_selection(object):
       declareParams(parameters)
       
       # Run the function
-      ExpandSelection(inLyr, SearchDist)
-      return inLyr
+      ExpandPFselection(inPF_lyr, inCS_lyr, SearchDist)
+      return inPF_lyr
 
 class create_sbb(object):
    def __init__(self):

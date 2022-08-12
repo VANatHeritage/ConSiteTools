@@ -232,7 +232,7 @@ def ExpandSelection(inLyr, SearchDist):
          
          # Get updated selection count
          c1 = countSelectedFeatures(inLyr)
-      printMsg("Updated selection: %s features are selected"%str(c1))
+      
    return inLyr
       
 def unique_values(table, field):
