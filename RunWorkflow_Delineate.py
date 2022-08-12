@@ -2,7 +2,7 @@
 # RunWorkflow_Delineate.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2020-06-03
-# Last Edit: 2022-08-11
+# Last Edit: 2022-08-12
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -28,6 +28,9 @@ def main():
    # Choices are Y or N
    ysnQC = "Y" 
    
+   # Specify the cutoff percentage area difference, used to flag significantly changed site boundaries
+   cutVal = 5  
+   
    # Geodatabase containing parsed Biotics data 
    bioticsGDB = r"E:\ProProjects\ConSites\BioticsData.gdb"
    
@@ -49,8 +52,7 @@ def main():
    in_Exclude = modsGDB + os.sep + "ExclusionFeatures" # highly dynamic
    in_Hydro = modsGDB + os.sep + "HydrographicFeatures" # highly dynamic
    in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces" # somewhat dynamic
-   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces" # somewhat dynamic
-   in_Trans = [in_Rail, in_Roads] # somewhat dynamic
+   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces" # somewhat dynamic 
    in_Dams = modsGDB + os.sep + "NID_damsVA" # somewhat dynamic
    in_Cores = modsGDB + os.sep + "Cores123" # relatively static
    in_NWI = modsGDB + os.sep + "VA_Wetlands" # relatively static
@@ -78,7 +80,6 @@ def main():
    fld_SiteID = "SITEID" # Conservation Site ID
    fld_Tidal = "Tidal"
    in_TranSurf = "%s;%s" %(in_Roads, in_Rail)
-   cutVal = 5 # a cutoff percentage used to flag significantly changed site boundaries
    
    # TCS Outputs
    tcs_SBB = outGDB + os.sep + "sbb_tcs"
@@ -120,7 +121,7 @@ def main():
          ExpandSBBs(in_Cores, tcs_SBB, pfTCS, fld_SFID, tcs_SBB_exp, scratchGDB)
          
          printMsg("Creating terrestrial ConSites...")
-         CreateConSites(tcs_SBB_exp, pfTCS, fld_SFID, csTCS, tcs_sites, "TERRESTRIAL", in_Hydro, in_Trans, in_Exclude, scratchGDB)
+         CreateConSites(tcs_SBB_exp, pfTCS, fld_SFID, csTCS, tcs_sites, "TERRESTRIAL", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
          
          if ysnQC == "Y":
             printMsg("Reviewing terrestrial ConSites...")
@@ -142,7 +143,7 @@ def main():
          
          # Create ConSites
          printMsg("Creating Sites...")
-         CreateConSites(ahz_SBB, pfAHZ, fld_SFID, csAHZ, ahz_sites, "AHZ", in_Hydro, in_Trans, in_Exclude, scratchGDB)
+         CreateConSites(ahz_SBB, pfAHZ, fld_SFID, csAHZ, ahz_sites, "AHZ", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
          
          # Review ConSites
          if ysnQC == "Y":

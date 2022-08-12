@@ -1,6 +1,6 @@
 # ---------------------------------------------------------------------------
 # RunWorkflow_Prioritize.py
-# Version:  ArcGIS 10.3 / Python 2.7
+# Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2020-09-15
 # Last Edit: 2022-06-06
 # Creator:  Kirsten R. Hazler
