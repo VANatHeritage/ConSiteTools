@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-08-10
+# Last Edit: 2022-08-12
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -450,9 +450,6 @@ class review_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         parameters[3].value = "%s_QC"%parameters[0].valueAsText
-      
       if parameters[1].altered:
          fc = parameters[1].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc)]

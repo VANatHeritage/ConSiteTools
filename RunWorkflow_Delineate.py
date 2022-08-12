@@ -115,17 +115,41 @@ def main():
    if siteType in ("TCS", "COMBO"):
       if countFeatures(pfTCS) > 0:
          printMsg("Creating terrestrial SBBs...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          CreateSBBs(pfTCS, fld_SFID, fld_Rule, fld_Buff, in_NWI, tcs_SBB, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("TCS SBB creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          printMsg("Expanding terrestrial SBBs...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          ExpandSBBs(in_Cores, tcs_SBB, pfTCS, fld_SFID, tcs_SBB_exp, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("TCS SBB expansion ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          printMsg("Creating terrestrial ConSites...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          CreateConSites(tcs_SBB_exp, pfTCS, fld_SFID, csTCS, tcs_sites, "TERRESTRIAL", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("TCS Site creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          if ysnQC == "Y":
             printMsg("Reviewing terrestrial ConSites...")
+            tStart = datetime.now()
+            printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
             ReviewConSites(tcs_sites, csTCS, cutVal, tcs_sites_qc, fld_SiteID, scratchGDB)
+            tEnd = datetime.now()
+            printMsg("TCS Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
+            deltaString = GetElapsedTime (tStart, tEnd)
+            printMsg("Elapsed time: %s" %deltaString)
             
          printMsg("Completed Terrestrial Conservation Sites.")
       else:
@@ -138,17 +162,36 @@ def main():
          printMsg("Working on Anthropogenic Habitat Zones...")
          
          # Create SBBs
-         printMsg("Creating SBBs...")
+         printMsg("Creating AHZ SBBs...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          CreateSBBs(pfAHZ, fld_SFID, fld_Rule, fld_Buff, in_NWI, ahz_SBB, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("AHZ SBB creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          # Create ConSites
-         printMsg("Creating Sites...")
+         printMsg("Creating AHZ Sites...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          CreateConSites(ahz_SBB, pfAHZ, fld_SFID, csAHZ, ahz_sites, "AHZ", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("AHZ Site creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          # Review ConSites
          if ysnQC == "Y":
             printMsg("Comparing new sites to old sites for QC...")
+            printMsg("Reviewing AHZ ConSites...")
+            tStart = datetime.now()
+            printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
             ReviewConSites(out_AHZ, csAHZ, cutVal, out_AHZqc, fld_SiteID, scratchGDB)
+            tEnd = datetime.now()
+            printMsg("AHZ Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
+            deltaString = GetElapsedTime (tStart, tEnd)
+            printMsg("Elapsed time: %s" %deltaString)
             
          printMsg("Completed Anthropogenic Habitat Zones.")
       else:
@@ -162,37 +205,79 @@ def main():
          
          # Create service layers
          printMsg("Creating service layers...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet, in_Dams)
+         tEnd = datetime.now()
+         printMsg("Service layers creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          # Create SCS points
          printMsg("Creating points on hydro network...")
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
          MakeNetworkPts_scs(pfSCS, in_hydroNet, in_Catch, in_NWI, scsPts, fld_SFID, fld_Tidal, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("SCS points creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          # Create SCS lines
          printMsg("Creating SCS lines...")
-         (scsPts, lyrDownTrace, lyrUpTrace, lyrTidalTrace, scsLines, fld_Tidal, scratchGDB)
+         tStart = datetime.now()
+         printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
+         CreateLines_scs(scsPts, lyrDownTrace, lyrUpTrace, lyrTidalTrace, scsLines, fld_Tidal, scratchGDB)
+         tEnd = datetime.now()
+         printMsg("SCS lines creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+         deltaString = GetElapsedTime (tStart, tEnd)
+         printMsg("Elapsed time: %s" %deltaString)
          
          if siteType in ("SCU", "COMBO"):
             # Delineate Stream Conservation Units
             printMsg("Creating Stream Conservation Units...")
+            tStart = datetime.now()
+            printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
             DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scuPolys, in_FlowBuff, fld_Rule, trim, 5, scratchGDB)
+            tEnd = datetime.now()
+            printMsg("SCU creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+            deltaString = GetElapsedTime (tStart, tEnd)
+            printMsg("Elapsed time: %s" %deltaString)
             
             # Review ConSites
             if ysnQC == "Y":
                printMsg("Comparing new sites to old sites for QC...")
+               tStart = datetime.now()
+               printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
                ReviewConSites(scuPolys, csSCS, cutVal, scuPolys_qc, fld_SiteID, scratchGDB)
+               tEnd = datetime.now()
+               printMsg("SCU review ended at %s" %tEnd.strftime("%H:%M:%S"))
+               deltaString = GetElapsedTime (tStart, tEnd)
+               printMsg("Elapsed time: %s" %deltaString)
          
          if siteType in ("SCS", "COMBO"):
             # Delineate Stream Conservation Sites
             printMsg("Creating Stream Conservation Sites...")
+            tStart = datetime.now()
+            printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
             DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scuPolys, in_FlowBuff, fld_Rule, trim, 150, scratchGDB)
+            tEnd = datetime.now()
+            printMsg("SCS creation ended at %s" %tEnd.strftime("%H:%M:%S"))
+            deltaString = GetElapsedTime (tStart, tEnd)
+            printMsg("Elapsed time: %s" %deltaString)
             
             # Review ConSites
             if ysnQC == "Y":
                printMsg("Comparing new sites to old sites for QC...")
+               tStart = datetime.now()
+               printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
                ReviewConSites(scsPolys, csSCS, cutVal, scsPolys_qc, fld_SiteID, scratchGDB)
+               tEnd = datetime.now()
+               printMsg("SCS review ended at %s" %tEnd.strftime("%H:%M:%S"))
+               deltaString = GetElapsedTime (tStart, tEnd)
+               printMsg("Elapsed time: %s" %deltaString)
             
-         printMsg("Completed Stream Conservation Sites.")
+         printMsg("Completed Stream Conservation Units and/or Sites.")
          
       else:
          printMsg("No SCS features to process.")
