@@ -1614,7 +1614,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    printMsg("Creating ProtoSites by shrinkwrapping SBBs...")
    outPS = myWorkspace + os.sep + 'ProtoSites'
    printMsg('ProtoSites will be stored here: %s' % outPS)
-   ShrinkWrap("SBB_lyr", clusterDist, outPS)
+   ShrinkWrap("SBB_lyr", clusterDist, outPS, smthMulti = 4)
 
    # Generalize Features in hopes of speeding processing and preventing random processing failures 
    # arcpy.AddMessage("Simplifying features...")
@@ -1780,8 +1780,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   arcpy.management.SelectLayerByLocation("PF_lyr2", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
                   
                   # Select retained SBB fragments corresponding to selected PFs
-                  tmpSBB2 = scratchGDB + os.sep + 'tmpSBB2' 
-                  tmpPF2 = scratchGDB + os.sep + 'tmpPF2'
+                  tmpSBB2 = scratchGDB + os.sep + 'tmpSBB' + str(counter2)
+                  tmpPF2 = scratchGDB + os.sep + 'tmpPF' + str(counter2)
                   SubsetSBBandPF(sbbRtn, "PF_lyr2", "SBB", fld_SFID, tmpSBB2, tmpPF2)
                   
                   # ShrinkWrap retained SBB fragments
@@ -1790,40 +1790,54 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   
                   # Use erase features to chop out areas of sites
                   # printMsg('Erasing portions of sites...')
-                  siteFrags = scratchGDB + os.sep + 'siteFrags'
+                  siteFrags = scratchGDB + os.sep + 'siteFrags' + str(counter2)
                   CleanErase (csShrink, finErase, siteFrags, scratchParm) 
                   
                   # Cull site fragments
                   # printMsg('Culling site fragments...')
-                  ssBnd = scratchGDB + os.sep + 'ssBnd'
+                  ssBnd = scratchGDB + os.sep + 'ssBnd' + str(counter2)
                   CullFrags(siteFrags, tmpPF2, searchDist, ssBnd)
+                  
+                  # Final smoothing operation. Yes this is necessary!
+                  printMsg('Smoothing boundaries...')
+                  smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter2)
+                  Coalesce(ssBnd, "10 METERS", smoothBnd, scratchParm)
 
                   # Append the final geometry to the split sites group feature class.
                   # printMsg("Appending feature...")
-                  arcpy.management.Append(ssBnd, tmpSS_grp, "NO_TEST", "", "")
+                  # arcpy.management.Append(ssBnd, tmpSS_grp, "NO_TEST", "", "")
+                  arcpy.management.Append(smoothBnd, tmpSS_grp, "NO_TEST", "", "")
                   
                   counter2 +=1
                   del mySS
             
-            # Final smoothing operation. Yes this is necessary!
-            printMsg('Smoothing boundaries...')
-            smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter)
-            # Coalesce(tmpSS_grp, "10 METERS", smoothBnd, scratchParm)
-            ShrinkWrap(tmpSS_grp, coalDist, smoothBnd, smthMulti = 2)
+            # # Final smoothing operation. Yes this is necessary!
+            # printMsg('Smoothing boundaries...')
+            # smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter)
+            # # Coalesce(tmpSS_grp, "10 METERS", smoothBnd, scratchParm)
+            # ShrinkWrap(tmpSS_grp, coalDist, smoothBnd, smthMulti = 1)
             
+            # # Chop out the exclusion features once more
+            # if site_Type == 'TERRESTRIAL':  
+               # printMsg('Final excision of exclusion features...')
+               # modBnd = scratchGDB + os.sep + "mod%s"%str(counter)
+               # CleanErase (smoothBnd, efClp, modBnd, scratchParm) 
+               # smoothBnd = modBnd
+            # else:
+               # pass
+
             # Chop out the exclusion features once more
             if site_Type == 'TERRESTRIAL':  
                printMsg('Final excision of exclusion features...')
                modBnd = scratchGDB + os.sep + "mod%s"%str(counter)
-               CleanErase (smoothBnd, efClp, modBnd, scratchParm) 
-               smoothBnd = modBnd
+               CleanErase (tmpSS_grp, efClp, modBnd, scratchParm) 
             else:
-               pass
-
+               modBnd = tmpSS_grp
+               
             # Eliminate holes
             printMsg("Eliminating holes...")
             finBnd = scratchGDB + os.sep + "finBnd"
-            arcpy.management.EliminatePolygonPart(smoothBnd, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
+            arcpy.management.EliminatePolygonPart(modBnd, finBnd, "PERCENT", "", 99.99, "CONTAINED_ONLY")
             
             # Generalize
             printMsg('Generalizing boundary...')
