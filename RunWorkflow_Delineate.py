@@ -79,7 +79,7 @@ def main():
    fld_Buff = "BUFFER" # Source Feature Buffer field
    fld_SiteID = "SITEID" # Conservation Site ID
    fld_Tidal = "Tidal"
-   in_TranSurf = "%s;%s" %(in_Roads, in_Rail)
+   in_TranSurf = [in_Roads, in_Rail]
    
    # TCS Outputs
    tcs_SBB = outGDB + os.sep + "sbb_tcs"
