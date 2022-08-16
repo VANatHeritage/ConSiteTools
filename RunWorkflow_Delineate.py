@@ -2,7 +2,7 @@
 # RunWorkflow_Delineate.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2020-06-03
-# Last Edit: 2022-08-12
+# Last Edit: 2022-08-16
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -36,7 +36,7 @@ def main():
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   outGDB = r"E:\ProProjects\ConSites\ConSites_20220811.gdb" 
+   outGDB = r"E:\ProProjects\ConSites\ConSites_20220816.gdb" 
    
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
