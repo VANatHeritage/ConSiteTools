@@ -2345,7 +2345,8 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    printMsg("Filling in holes...")
    # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    fillPolys = out_Scratch + os.sep + "fillPolys"
-   arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   # arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
       
    # Append final shapes to template
    arcpy.Append_management (fillPolys, out_ConSites, "NO_TEST")
