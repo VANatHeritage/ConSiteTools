@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-08-15
+# Last Edit: 2022-08-16
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -972,32 +972,32 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    arcpy.MakeFeatureLayer_management(in_PF, "PF_CoreSub", where_clause)
    
    # Get PFs centered in the core
-   printMsg('Selecting PFs intersecting the core...')
+   # printMsg('Selecting PFs intersecting the core...')
    arcpy.SelectLayerByLocation_management("PF_CoreSub", "INTERSECT", in_Core, "", "NEW_SELECTION", "NOT_INVERT")
    
    # Get SBBs associated with selected PFs
-   printMsg('Copying selected PFs and their associated SBBs...')
+   # printMsg('Copying selected PFs and their associated SBBs...')
    sbbSub = scratchGDB + os.sep + 'sbb'
    pfSub = scratchGDB + os.sep + 'pf'
    SubsetSBBandPF(in_SBB, "PF_CoreSub", "SBB", fld_SFID, sbbSub, pfSub)
    
    # Buffer SBBs 
-   printMsg("Buffering SBBs...")
+   # printMsg("Buffering SBBs...")
    sbbBuff = scratchGDB + os.sep + "sbbBuff"
    arcpy.Buffer_analysis(sbbSub, sbbBuff, BuffDist, "FULL", "ROUND", "NONE", "", "PLANAR")
    
    # Clip buffers to core
-   printMsg("Clipping buffered SBBs to core...")
+   # printMsg("Clipping buffered SBBs to core...")
    clpBuff = scratchGDB + os.sep + "clpBuff"
    CleanClip(sbbBuff, in_Core, clpBuff, scratchGDB)
    
    # Remove any SBB fragments not containing a PF
-   printMsg('Culling SBB fragments...')
+   # printMsg('Culling SBB fragments...')
    sbbRtn = scratchGDB + os.sep + 'sbbRtn'
    CullFrags(clpBuff, pfSub, "0 METERS", sbbRtn)
    
    # Merge, then dissolve to get final shapes
-   printMsg('Dissolving original SBBs with buffered SBBs to get final shapes...')
+   # printMsg('Dissolving original SBBs with buffered SBBs to get final shapes...')
    sbbMerge = scratchGDB + os.sep + "sbbMerge"
    arcpy.Merge_management ([sbbSub, sbbRtn], sbbMerge)
    arcpy.Dissolve_management (sbbMerge, out_SBB, [fld_SFID, "intRule"], "")
@@ -1210,12 +1210,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
                if myBuff==0:
                   # This is the "buffer override" specification
-                  printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
+                  # printMsg("Using Procedural Feature as minimum buffer, and reducing maximum buffer")
                   buff1 = 0
                   buff2 = minBuff
                else:
                   # This is the standard specification
-                  printMsg("Creating minimum buffer")
+                  # printMsg("Creating minimum buffer")
                   buff1 = minBuff
                   buff2 = maxBuff
                   
@@ -1234,12 +1234,12 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                c = countSelectedFeatures("NWI_lyr")
                
                if c > 0:
-                  printMsg("Clipping NWI features to maximum buffer...")
+                  # printMsg("Clipping NWI features to maximum buffer...")
                   arcpy.analysis.PairwiseClip("NWI_lyr", "myMaxBuffer", "clipNWI")
                   arcpy.management.MakeFeatureLayer ("clipNWI", "clipNWI_lyr")
 
                   # Step 4: Select clipped NWI features within range
-                  printMsg("Selecting nearby NWI features...")
+                  # printMsg("Selecting nearby NWI features...")
                   arcpy.management.SelectLayerByLocation("clipNWI_lyr", "WITHIN_A_DISTANCE", myShape, searchDist, "NEW_SELECTION")
 
                   # If NWI features are in range, then process
@@ -1249,7 +1249,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                      ExpandSelection("clipNWI_lyr", searchDist)
                      
                      # Step 5: Create a buffer around the NWI feature(s)
-                     printMsg("Buffering selected NWI features...")
+                     # printMsg("Buffering selected NWI features...")
                      arcpy.analysis.PairwiseBuffer("clipNWI_lyr", "nwiBuff", nwiBuff)
 
                      # Step 6: Merge the minimum buffer with the NWI buffer
@@ -1257,20 +1257,20 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                      arcpy.management.Merge(feats2merge, "tmpMerged")
 
                      # Dissolve features into a single polygon
-                     printMsg("Dissolving buffered PF and NWI features into a single feature...")
+                     # printMsg("Dissolving buffered PF and NWI features into a single feature...")
                      arcpy.management.Dissolve ("tmpMerged", "tmpDissolved", "", "", "", "")
 
                      # Step 7: Clip the dissolved feature to the maximum buffer
-                     printMsg("Clipping dissolved feature to maximum buffer...")
+                     # printMsg("Clipping dissolved feature to maximum buffer...")
                      arcpy.analysis.PairwiseClip ("tmpDissolved", "myMaxBuffer", "tmpClip")
 
                      # Use the clipped, combined feature geometry as the final shape
                      myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
                   else:
-                     printMsg("No appropriate NWI features in range...")
+                     # printMsg("No appropriate NWI features in range...")
                      myFinalShape = defaultShape
                else:
-                  printMsg("No appropriate NWI features in range...")
+                  # printMsg("No appropriate NWI features in range...")
                   myFinalShape = defaultShape
 
                # Update the PF shape, replacing it with SBB shape
@@ -1278,7 +1278,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                myProcFeats.updateRow(myPF)
 
                # Add final progress message
-               printMsg("Finished processing feature " + str(myIndex))
+               # printMsg("Finished processing feature " + str(myIndex))
                
             except:
                # Add failure message and append failed feature ID to list
@@ -1454,11 +1454,11 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    PF_sub = scratchGDB + os.sep + 'PF_sub'
    
    # Subset PFs and SBBs
-   printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
+   # printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
    SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
    
    # Process: Select Layer By Location (Get Cores intersecting PFs)
-   printMsg('Selecting cores that intersect procedural features')
+   # printMsg('Selecting cores that intersect procedural features')
    arcpy.MakeFeatureLayer_management(in_Cores, "Cores_lyr")
    arcpy.MakeFeatureLayer_management(PF_sub, "PF_lyr") 
    arcpy.SelectLayerByLocation_management("Cores_lyr", "INTERSECT", "PF_lyr", "", "NEW_SELECTION", "NOT_INVERT")
@@ -1473,7 +1473,7 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    printMsg('There are %s cores to process.' %str(numCores))
    
    # Create Feature Class to store expanded SBBs
-   printMsg("Creating feature class to store buffered SBBs...")
+   # printMsg("Creating feature class to store buffered SBBs...")
    arcpy.CreateFeatureclass_management (scratchGDB, 'sbbExpand', "POLYGON", SBB_sub, "", "", SBB_sub) 
    sbbExpand = scratchGDB + os.sep + 'sbbExpand'
    
@@ -1494,16 +1494,16 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
          del core
    
    # Merge, then dissolve original SBBs with buffered SBBs to get final shapes
-   printMsg('Merging all SBBs...')
+   # printMsg('Merging all SBBs...')
    sbbAll = scratchGDB + os.sep + "sbbAll"
    arcpy.Merge_management ([SBB_sub, sbbExpand], sbbAll)
    arcpy.Dissolve_management (sbbAll, out_SBB, [fld_SFID, "intRule"], "")
    
-   printMsg('SBB processing complete')
+   printMsg('SBB expansion complete')
    
    tFinish = datetime.now()
    deltaString = GetElapsedTime (tStart, tFinish)
-   printMsg("Processing complete. Total elapsed time: %s" %deltaString)
+   printMsg("Total elapsed time: %s" %deltaString)
    
    return out_SBB
 
@@ -1614,7 +1614,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    printMsg("Creating ProtoSites by shrinkwrapping SBBs...")
    outPS = myWorkspace + os.sep + 'ProtoSites'
    printMsg('ProtoSites will be stored here: %s' % outPS)
-   ShrinkWrap("SBB_lyr", clusterDist, outPS, smthMulti = 4)
+   ShrinkWrap("SBB_lyr", clusterDist, outPS, smthMulti = 4, scratchGDB = scratchGDB, report = 1)
 
    # Generalize Features in hopes of speeding processing and preventing random processing failures 
    # arcpy.AddMessage("Simplifying features...")
@@ -1767,6 +1767,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             printMsg('Culling ProtoSite fragments...')
             psRtn = scratchGDB + os.sep + 'psRtn'
             CullFrags(psFrags, pfRtn, searchDist, psRtn)
+            numPSfrags = countFeatures(psRtn)
+            if numPSfrags > 1:
+               printMsg("ProtoSite has been split into %s fragments" %str(numPSfrags))
+            else:
+               printMsg("ProtoSite has only one fragment to process.")
             
             # Loop through the retained ProtoSite fragments (aka "Split Sites")
             counter2 = 1

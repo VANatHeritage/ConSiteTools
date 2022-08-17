@@ -41,7 +41,7 @@ def main():
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
    scratchGDB = "in_memory"
-   # scratchGDB = r"E:\ProProjects\ConSites\scratch_20220811.gdb"
+   # scratchGDB = r"E:\ProProjects\ConSites\scratch_20220816.gdb"
    
    # Exported feature service data used to create sites
    # Datasets marked "highly dynamic" are often edited by users and require regular fresh downloads

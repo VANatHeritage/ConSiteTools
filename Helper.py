@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-08-15
+# Last Edit: 2022-08-16
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -473,7 +473,7 @@ def ShrinkWrap_OBSOLETE(inFeats, searchDist, outFeats, smthMulti = 8, scratchGDB
       
    return outFeats
    
-def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_memory"):
+def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_memory", report = 0):
    '''Groups features first, then coalesces them into smooth shapes
    Parameters:
    - inFeats: the features to be shrinkwrapped
@@ -481,6 +481,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
    - outFeats: output shrinkwrapped features
    - smthMulti: a smoothing multiplier; determines buffer distance for coalescing
    - scratchGDB: geodatabase to store intermediate products
+   - report: indicates whether most progress messages should be suppressed (0) or not (1)
    '''
    # Parse dilation distance, and increase it to get smoothing distance
    smthMulti = float(smthMulti)
@@ -525,13 +526,15 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
 
    # Process:  Get Count
    c = countFeatures(aggFeats)
-   # arcpy.AddMessage("There are %s clusters to shrinkwrap..."%c)
+   if report == 1:
+      printMsg("There are %s clusters to shrinkwrap..."%c)
 
    # Loop through the aggregated features
    counter = 1
    with arcpy.da.SearchCursor(aggFeats, ["SHAPE@"]) as myFeats:
       for Feat in myFeats:
-         # printMsg("Working on cluster %s..." % str(counter))
+         if report == 1: 
+            printMsg("Working on cluster %s..." % str(counter))
          featSHP = Feat[0]
 
          # Get input features within aggregate feature
@@ -554,7 +557,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
          trashList.append(noGapFeats)
          
          # Process:  Append the final geometry to the ShrinkWrap feature class
-         # arcpy.AddMessage("Appending feature...")
+         # printMsg("Appending feature %s..." %str(counter))
          arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
          
          counter +=1
