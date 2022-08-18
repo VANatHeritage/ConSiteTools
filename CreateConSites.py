@@ -1098,7 +1098,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    arcpy.management.Dissolve(cleanFrags, dissFrags, "", "", "SINGLE_PART")
    
    # # Final smoothing operation. Yes this is necessary!
-   printMsg('Smoothing boundaries...')
+   printMsg('Smoothing clusters...')
    ShrinkWrap(dissFrags, "1 METERS", out_Clusters, smthMulti = 10)
    
    # Use fragment clusters to chop out sections of Erase Features
