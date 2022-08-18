@@ -1063,22 +1063,24 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
       lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
       ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthMulti = 1)
-      arcpy.management.Append("tmpCluster", initClusters, "NO_TEST")
+      arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
       
-   # Remove any fragments without procedural features
-   printMsg('Culling fragments...')
+   # Remove any fragments without procedural features, then dissolve
+   printMsg('Culling fragments and dissolving...')
    initClusters2 = scratchGDB + os.sep + 'initClusters2'
    CullFrags(initClusters, in_PF, 0, initClusters2)
+   dissClust = scratchGDB + os.sep + 'dissClust'
+   arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
    
    # # Shrinkwrap again to fill in gaps narrower than search distance
    # printMsg('Clustering clusters...')
    # ShrinkWrap(initClusters2, searchDist, out_Clusters, smthMulti = 1)
    
-   # Rejoin split clusters near each other for long stretches
+   # Rejoin clusters near each other for long stretches
    printMsg('Patching some gaps...')
    # Intersect thin outer buffers; keep those above size threshold
    outerBuff = scratchGDB + os.sep + "outBuff"
-   arcpy.analysis.Buffer(initClusters2, outerBuff, searchDist, "OUTSIDE_ONLY")
+   arcpy.analysis.Buffer(dissClust, outerBuff, searchDist, "OUTSIDE_ONLY")
    intBuff = scratchGDB + os.sep + "intBuff"
    arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
    arcpy.management.CalculateGeometryAttributes(intBuff, "LENGTH PERIMETER_LENGTH", "METERS") 
@@ -1091,7 +1093,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    
    # Merge and dissolve intersected buffers with adjacent split clusters
    mergeFrags = scratchGDB + os.sep + "mergeFrags"
-   arcpy.management.Merge([patchFrags, initClusters2], mergeFrags)
+   arcpy.management.Merge([patchFrags, dissClust], mergeFrags)
    cleanFrags = scratchGDB + os.sep + "cleanFrags"
    CleanFeatures(mergeFrags, cleanFrags)
    dissFrags = scratchGDB + os.sep + "dissFrags"
