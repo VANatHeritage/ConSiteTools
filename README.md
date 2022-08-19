@@ -1,10 +1,13 @@
 # ConSite Toolbox
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by K. Hazler, 2022-01-27):
+### Toolbox Version Notes (notes last updated by K. Hazler, 2022-08-19):
+
+#### Version 2.1  
+Implemented numerous algorithmic changes in an attempt to improve site boundaries, particularly for Terrestrial Conservation Sites.
 
 #### Version 2.0
-Updated toolbox to work with ArcGIS Pro
+Updated toolbox to work with ArcGIS Pro, and implemented some algorithmic changes in an attempt to improve site boundary shapes.
 
 #### Version 1.3
 - The Conservation Site delineation process for Terrestrial Conservation Sites and Anthropogenic Habitat Zones remains unchanged from previous version.

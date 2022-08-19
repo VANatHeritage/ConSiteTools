@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-08-16
+# Last Edit: 2022-08-18
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -473,20 +473,20 @@ def ShrinkWrap_OBSOLETE(inFeats, searchDist, outFeats, smthMulti = 8, scratchGDB
       
    return outFeats
    
-def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_memory", report = 0):
+def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory", report = 0):
    '''Groups features first, then coalesces them into smooth shapes
    Parameters:
    - inFeats: the features to be shrinkwrapped
    - searchDist: the distance used to cluster input features into groups to be coalesced
    - outFeats: output shrinkwrapped features
-   - smthMulti: a smoothing multiplier; determines buffer distance for coalescing
+   - smthDist: a smoothing parameter; determines buffer distance for coalescing
    - scratchGDB: geodatabase to store intermediate products
    - report: indicates whether most progress messages should be suppressed (0) or not (1)
    '''
-   # Parse dilation distance, and increase it to get smoothing distance
-   smthMulti = float(smthMulti)
+   # # Parse dilation distance, and increase it to get smoothing distance
+   # smthMulti = float(smthMulti)
    origDist, units, meas = multiMeasure(searchDist, 1)
-   smthDist, units, smthMeas = multiMeasure(searchDist, smthMulti)
+   # smthDist, units, smthMeas = multiMeasure(searchDist, smthMulti)
 
    # Parameter check
    if origDist <= 0:
@@ -542,7 +542,7 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthMulti = 4, scratchGDB = "in_me
          
          # Coalesce selected features
          coalFeats = scratchGDB + os.sep + 'coalFeats'
-         Coalesce(inFeats_lyr, smthMeas, coalFeats, scratchGDB)
+         Coalesce(inFeats_lyr, smthDist, coalFeats, scratchGDB)
          # Increasing the dilation distance improves smoothing and reduces the "dumbbell" effect. However, it can also cause some wonkiness which needs to be corrected in the next steps.
          trashList.append(coalFeats)
          
