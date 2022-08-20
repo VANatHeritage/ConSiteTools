@@ -1033,9 +1033,21 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    rtnParts = scratchGDB + os.sep + 'rtnParts'
    arcpy.management.EliminatePolygonPart(firstChop, rtnParts, 'PERCENT', '', 25, 'ANY')
    
-   # Had to repeat above two code blocks for PFs as well, otherwise PFs can be eliminated altogether in some situations!
+   # In some rare situations, the above code block removes SBB portion containing the PF!
+   # Gotta deal with that crap. This is why I'm still here after 6 pm on my last day.
+   # Have to do it in a loop so you don't pick up SBB fragments from other PFs.
+   # This is a real pain in my ass. Hi David! Enjoy...
+   explChop = scratchGDB + os.sep + 'explChop'
+   arcpy.management.MultipartToSinglepart(firstChop, explChop)
+   pfList = unique_values(in_PF, fld_ID)
+   for id in pfList:
+      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
+      arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
+      arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
+      arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
+      arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
+   
    # Use in_EraseFeats to chop out sections of PFs
-   # Use regular Erase, not Clean Erase; multipart is good output at this point
    # printMsg('Chopping polygons...')
    firstChop2 = scratchGDB + os.sep + 'firstChop2'
    arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
@@ -1045,6 +1057,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # printMsg('Eliminating insignificant fragments...')
    rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
    arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
+   arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
    
    # Shrinkwrap retained parts to fill in gaps narrower than search distance
    # Need to do this in a loop to avoid stitching together unrelated fragments
@@ -1883,7 +1896,9 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                printMsg('Checking if we should patch some gaps...')
                # Intersect thin outer buffers; keep those above size threshold
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
-               arcpy.analysis.Buffer(tmpSS_grp, outerBuff, coalDist, "OUTSIDE_ONLY")
+               # arcpy.analysis.Buffer(tmpSS_grp, outerBuff, coalDist, "OUTSIDE_ONLY")
+               arcpy.analysis.Buffer(tmpSS_grp, outerBuff, "50 METERS", "OUTSIDE_ONLY")
+               # Went wider than coalDist hoping to avoid some weirdness
                intBuff = scratchGDB + os.sep + "intBuff%s"%str(counter)
                arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
                
