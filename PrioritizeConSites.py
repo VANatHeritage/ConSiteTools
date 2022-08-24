@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # EssentialConSites.py
-# Version:  ArcGIS 10.3 / Python 2.7
+# Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2022-07-28
+# Last Edit: 2022-08-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -10,7 +10,6 @@
 # ---------------------------------------------------------------------------
 
 # Import modules and functions
-import Helper
 from Helper import *
 
 arcpy.env.overwriteOutput = True
@@ -1094,6 +1093,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       # arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, joinFeats, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mapping, "INTERSECT")
       arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, joinFeats, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mapping, "WITHIN_A_DISTANCE", slopFactor)
       for fld in ["CS_CONSVALUE", "CS_AREA_HA"]:
+         # todo: also add ConSite unique id, name?
          arcpy.JoinField_management (in_sortedEOs, "SF_EOID", joinFeats, "SF_EOID", fld)
       #printMsg('Field "CS_CONSVALUE" joined to table %s.' %in_sortedEOs)
 

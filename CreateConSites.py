@@ -1,15 +1,15 @@
 # ----------------------------------------------------------------------------------------
 # CreateConSites.py
-# Version:  ArcGIS Pro 2.9.x / Python 3.x
+# Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-08-19
+# Last Edit: 2022-08-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
 # Suite of functions to delineate and review Natural Heritage Conservation Sites.
 # Includes functionality to produce:
 # - Terrestrial Conservation Sites (TCS)
-# - Anthopogenic Habitat Zones (AHZ)
+# - Anthropogenic Habitat Zones (AHZ)
 # - Stream Conservation Sites (SCS) or Stream Conservation Units (SCU)
 
 # Dependencies:
@@ -17,7 +17,6 @@
 # ----------------------------------------------------------------------------------------
 
 # Import function libraries and settings
-import Helper
 from Helper import *
 from arcpy.sa import *
 import re # support for regular expressions
@@ -1018,7 +1017,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - out_Clusters: output clusters
    - out_subErase: output modified erase features
    - searchDist: search distance used to cluster fragments back together
-   - smthDist: dilation distance for smoothing
+   - smthDist: dilation distance for smoothing  (NOTE THIS IS NOT CURRENTLY USED - distances are entered directly).
    '''
 
    # Use in_EraseFeats to chop out sections of input features

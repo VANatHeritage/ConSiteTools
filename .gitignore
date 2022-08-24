@@ -1,2 +1,4 @@
-
+.idea
+*/*  # ignore sub-directories
 *.pyc
+recycling

@@ -1,10 +1,10 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.0
-# ArcGIS version: Pro 2.9.x
+# Toolbox version: 2.1
+# ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-08-12
+# Last Edit: 2022-08-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -41,18 +41,41 @@ def declareParams(params):
       
    for p in d:
       globals()[p] = d[p]
+
+   # Added logging settings below, as this is most convenient place to run pre-execution setting.
+   disableLog()
    return 
 
 def getViewExtent():
    '''Gets the extent of the active view.
    I'm using this to set the processing extent for every tool function that is using feature services as inputs. This way, processing is limited to only the features in the active view. This can save TONS of processing time!!! But the user needs to be careful that the view is big enough to encompass everything needed.
+   Will work on the active map. If something other than a map is active (e.g. a table), this will not work.
    '''
    aprx = arcpy.mp.ArcGISProject("CURRENT")
    mv = aprx.activeView
    ext = mv.camera.getExtent()
    viewExtent = "{}, {}, {}, {}".format(ext.XMin, ext.YMin, ext.XMax, ext.YMax)
    return viewExtent
-   
+
+def setViewExtent(lyrName, zoomBuffer=0, selected=True):
+   """
+   Zooms active view to the features in a layer.
+   Used after a tool is completed, to zoom to an output. Default is to zoom to selected features only. Can specify a
+   buffer distance with zoomBuffer. This zoomBuffer needs to be a number, provided in the same units as the map coordinate system.
+   Will work on the active map. If something other than a map is active (e.g. a table), this will not work.
+   """
+   try:
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      mv = aprx.activeView
+      lyr = map.listLayers(lyrName)[0]
+      e0 = mv.getLayerExtent(lyr, selected)
+      e1 = arcpy.Extent(e0.XMin - zoomBuffer, e0.YMin - zoomBuffer, e0.XMax + zoomBuffer, e0.YMax + zoomBuffer)
+      mv.camera.setExtent(e1)
+   except:
+      pass
+   return
+
 # Define the toolbox
 class Toolbox(object):
    def __init__(self):
@@ -651,6 +674,7 @@ class rules2nwi(object):
       return (inTab, inPolys)      
 
 # TCS/AHZ Delineation Tools 
+
 class expand_selection(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
@@ -715,6 +739,7 @@ class expand_selection(object):
       
       # Run the function
       ExpandPFselection(inPF_lyr, inCS_lyr, SearchDist)
+      setViewExtent(inPF_lyr, multiMeasure(SearchDist, 1)[0])
       return inPF_lyr
 
 class create_sbb(object):

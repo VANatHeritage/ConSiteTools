@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------------------------
 # Helper.py
-# Version:  ArcGIS Pro 2.9.x / Python 3.x
+# Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-08-18
+# Last Edit: 2022-08-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -36,15 +36,26 @@ def getScratchMsg(scratchGDB):
    
 def printMsg(msg):
    arcpy.AddMessage(msg)
-   print(msg)
-   
+   return
+
 def printWrng(msg):
    arcpy.AddWarning(msg)
-   print('Warning: ' + msg)
-   
+   return
+
 def printErr(msg):
    arcpy.AddError(msg)
-   print('Error: ' + msg)
+   return
+
+def disableLog():
+   """
+   Disables logging of geoprocessing history to xml and the metadata of outputs. This is used to improve
+   performance (hopefully).
+   """
+   if arcpy.GetLogHistory():
+      arcpy.SetLogHistory(False)
+   if arcpy.GetLogMetadata():
+      arcpy.SetLogMetadata(False)
+   return
 
 def garbagePickup(trashList):
    '''Deletes Arc files in list, with error handling. Argument must be a list.'''
@@ -198,8 +209,8 @@ def SelectCopy(in_FeatLyr, selFeats, selDist, out_Feats):
       # Create an empty dataset
       fc = os.path.basename(out_Feats)
       gdb = os.path.dirname(out_Feats)
-      geom = arcpy.Describe(in_Feats).shapeType
-      CreateFeatureclass_management (gdb, fc, geom, in_Feats)
+      geom = arcpy.Describe(in_FeatLyr).shapeType
+      arcpy.CreateFeatureclass_management (gdb, fc, geom, in_FeatLyr)
    else:
       arcpy.CopyFeatures_management (in_FeatLyr, out_Feats)
       
