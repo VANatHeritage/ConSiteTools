@@ -20,14 +20,15 @@ from CreateConSites import *
 from PrioritizeConSites import *
 
 # First define some handy functions
-def defineParam(p_name, p_displayName, p_datatype, p_parameterType, p_direction, defaultVal = None):
+def defineParam(p_name, p_displayName, p_datatype, p_parameterType, p_direction, defaultVal = None, multiVal = False):
    '''Simplifies parameter creation. Thanks to http://joelmccune.com/lessons-learned-and-ideas-for-python-toolbox-coding/'''
    param = arcpy.Parameter(
       name = p_name,
       displayName = p_displayName,
       datatype = p_datatype,
       parameterType = p_parameterType,
-      direction = p_direction)
+      direction = p_direction,
+      multiValue = multiVal)
    param.value = defaultVal 
    return param
 
@@ -86,10 +87,10 @@ class Toolbox(object):
       # List of tool classes associated with this toolbox
       Subroutine_Tools = [coalesceFeats, shrinkwrapFeats]
       Biotics_Tools = [extract_biotics, parse_siteTypes]
-      PrepReview_Tools = [copy_layers, rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands]
+      PrepReview_Tools = [copy_layers, rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands, tabulate_exclusions]
       TCS_AHZ_Tools = [expand_selection, create_sbb, expand_sbb, create_consite]
       SCS_Tools = [servLyrs_scs, ntwrkPts_scs, lines_scs, sites_scs] 
-      Portfolio_Tools = [tabulate_exclusions, attribute_eo, score_eo, build_portfolio, build_element_lists]
+      Portfolio_Tools = [make_ecs_dir, attribute_eo, score_eo, build_portfolio, build_element_lists]
       
       #self.tools = Subroutine_Tools + PrepReview_Tools + NWI_Proc_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
       
@@ -671,7 +672,51 @@ class rules2nwi(object):
 
       RulesToNWI(inTab, inPolys)
       
-      return (inTab, inPolys)      
+      return (inTab, inPolys)
+
+class tabulate_exclusions(object):
+   def __init__(self):
+      """Define the tool (tool name is the name of the class)."""
+      self.label = "Create Element Exclusion List"
+      self.description = ""
+      self.canRunInBackground = True
+      # self.category = "Conservation Portfolio Tools"
+      self.category = "Preparation and Review Tools"
+      # TODO: move this function to the proper section
+
+   def getParameterInfo(self):
+      """Define parameter definitions"""
+      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "DEFile", "GPValueTable", "Input")
+      parm00.columns = [["DEFile","CSV Files"]]
+      parm00.filters[0].list = ["csv"]
+      parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output", "ElementExclusions")
+
+      parms = [parm00, parm01]
+      return parms
+
+   def isLicensed(self):
+      """Set whether tool is licensed to execute."""
+      return True
+
+   def updateParameters(self, parameters):
+      """Modify the values and properties of parameters before internal
+      validation is performed.  This method is called whenever a parameter
+      has been changed."""
+      return
+
+   def updateMessages(self, parameters):
+      """Modify the messages created by internal validation for each tool
+      parameter.  This method is called after internal validation."""
+      return
+
+   def execute(self, parameters, messages):
+      """The source code of the tool."""
+      # Set up parameter names and values
+      declareParams(parameters)
+
+      MakeExclusionList(in_Tabs, out_Tab)
+
+      return (out_Tab)
 
 # TCS/AHZ Delineation Tools 
 
@@ -1438,22 +1483,43 @@ class sites_scs(object):
       return scsPolys
       
 # Conservation Portfolio Tools
-class tabulate_exclusions(object):
+class make_ecs_dir(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
-      self.label = "0: Create Element Exclusion List"
+      self.label = "0: Prepare Conservation Portfolio Inputs"
       self.description = ""
       self.canRunInBackground = True
       self.category = "Conservation Portfolio Tools"
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "DEFile", "GPValueTable", "Input")
-      parm00.columns = [["DEFile","CSV Files"]]
-      parm00.filters[0].list = ["csv"]
-      parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output", "ElementExclusions")
+      # aprx = arcpy.mp.ArcGISProject("CURRENT")
+      # map = aprx.activeMap
+      # lyrs = map.listLayers()
+      # lnames = [l.name for l in lyrs]
 
-      parms = [parm00, parm01]
+      parm00 = defineParam("output_path", "Project directory", "DEFolder", "Required", "Input")
+      parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
+      parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
+      parm03 = defineParam("in_ecoreg", "Input Eco-regions", "GPFeatureLayer", "Required", "Input")
+
+      # The function could also take the copies of Biotics PFs and Consites as input, which it then parses. Not using
+      # in the toolbox, as it doesn't match the Biotics workflow.
+      # parm02 = defineParam("in_PF", "Input procedural features", "GPFeatureLayer", "Required", "Input")
+      # if "Biotics ProcFeats" in lnames:
+      #    parm02.value = "Biotics ProcFeats"
+      # else:
+      #    pass
+      # parm03 = defineParam("in_ConSites", "Input conservation sites", "GPFeatureLayer", "Required", "Input")
+      # if "Biotics ConSites" in lnames:
+      #    parm03.value = "Biotics ConSites"
+      # else:
+      #    pass
+
+      # This could be a multivalue of outputs, all to be added to map.
+      parm04 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
+
+      parms = [parm00, parm01, parm02, parm03, parm04]
       return parms
 
    def isLicensed(self):
@@ -1475,11 +1541,13 @@ class tabulate_exclusions(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_ecoreg)
+      for l in lyrs:
+         replaceLayer(l)
+      printMsg("Make sure to add fresh copies of Biotics data to the input geodatabase: `" + ig + "`.")
+      return lyrs
 
-      MakeExclusionList(in_Tabs, out_Tab)
-
-      return (out_Tab)
-      
 class attribute_eo(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
@@ -1496,20 +1564,16 @@ class attribute_eo(object):
       parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "tncEcoRegions_lam")
       parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input", "GEN_REG")
-      parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input")
-      try:
-         parm06.value = datetime.now().year - 25
-      except:
-         pass
-      parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input")
-      try:
-         parm07.value = datetime.now().year - 20
-      except:
-         pass
-      parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
-      parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab")
+      parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
+      parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
+      parm08 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm08.filter.list = ["Local Database"]
+      # parm09 = defineParam("out_folder", "Project output folder", "DEFolder", "Required", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09]
+      # parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
+      # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
 
    def isLicensed(self):
@@ -1535,8 +1599,13 @@ class attribute_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      out_procEOs = os.path.join(out_gdb, "attribEOs")
+      out_sumTab = os.path.join(out_gdb, "sumTab")
+
+      # Run function
       AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab)
+      replaceLayer(out_procEOs)
+      replaceLayer(out_sumTab)
 
       return (out_procEOs, out_sumTab)
       
@@ -1550,17 +1619,11 @@ class score_eo(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm00.value = "attribEOs"
-      except:
-         pass
-      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input")
-      try:  
-         parm01.value = "sumTab"
-      except:
-         pass
-      parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
+      parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "attribEOs")
+      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
+      # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
+      parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm02.filter.list = ["Local Database"]
       parm03 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
       parm04 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
 
@@ -1586,9 +1649,11 @@ class score_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs')
+
       # Run function
       ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
+      replaceLayer(out_sortedEOs)
 
       return (out_sortedEOs)
       
@@ -1604,24 +1669,21 @@ class build_portfolio(object):
       """Define parameter definitions"""
       parm00 = defineParam("build", "Portfolio Build Option", "String", "Required", "Input", "NEW")
       parm00.filter.list = ["NEW", "NEW_EO", "NEW_CS", "UPDATE"]
-      parm01 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm01.value = "scoredEOs"
-      except:
-         pass
-      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input")
-      try:
-         parm02.value = "sumTab"
-      except:
-         pass
+      parm01 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "scoredEOs")
+      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
-      parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
-      parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab_upd")
-      parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")  
-      parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls") 
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
+      parm05 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm05.filter.list = ["Local Database"]
+      parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
+
+      # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
+      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab_upd")
+      # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
+      # parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -1643,9 +1705,16 @@ class build_portfolio(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      out_sortedEOs = os.path.join(out_gdb, 'priorEOs')
+      out_sumTab = os.path.join(out_gdb, 'sumTab_upd')
+      out_ConSites = os.path.join(out_gdb, 'priorConSites')
+      out_ConSites_XLS = os.path.join(out_folder, 'priorConSites.xls')
 
       # Run function
       BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_ConSites_XLS, in_consLands_flat, build)
+      replaceLayer(out_sortedEOs)
+      replaceLayer(out_sumTab)
+      replaceLayer(out_ConSites)
       
       return (out_sortedEOs, out_sumTab, out_ConSites)      
       
@@ -1659,25 +1728,21 @@ class build_element_lists(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm00.value = "priorConSites"
-      except:
-         pass
+      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
       parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input", "SITENAME")
-      parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input")
-      try:
-         parm02.value = "priorEOs"
-      except:
-         pass
-      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "DETable", "Required", "Input")
+      parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
+      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab_upd")
       # For some reason this is not working if you input a table view...
-      try:
-         parm03.value = "sumTab_upd"
-      except:
-         pass
-      parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")
-      parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output", "elementList.xls")
+      # try:
+      #    parm03.value = "sumTab_upd"
+      # except:
+      #    pass
+      # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")
+      # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output", "elementList.xls")
+
+      parm04 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm04.filter.list = ["Local Database"]
+      parm05 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
@@ -1694,9 +1759,9 @@ class build_element_lists(object):
          fc = parameters[0].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc)]
          parameters[1].filter.list = field_names
-      if parameters[5].valueAsText is not None:
-         if not parameters[5].valueAsText.endswith('xls'):
-            parameters[5].value = parameters[5].valueAsText.split('.')[0] + '.xls'
+      # if parameters[5].valueAsText is not None:
+      #    if not parameters[5].valueAsText.endswith('xls'):
+      #       parameters[5].value = parameters[5].valueAsText.split('.')[0] + '.xls'
       return
 
    def updateMessages(self, parameters):
@@ -1708,8 +1773,11 @@ class build_element_lists(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      out_Tab = os.path.join(out_gdb, 'elementList')
+      out_Excel = os.path.join(out_folder, 'elementList.xls')
 
       # Run function
       BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)
-      
-      return (out_Tab)      
+      replaceLayer(out_Tab)
+
+      return (out_Tab)

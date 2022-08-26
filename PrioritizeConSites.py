@@ -11,6 +11,7 @@
 
 # Import modules and functions
 from Helper import *
+from CreateConSites import bmiFlatten, ParseSiteTypes
 
 arcpy.env.overwriteOutput = True
 
@@ -536,6 +537,53 @@ def MakeExclusionList(in_Tabs, out_Tab):
       arcpy.management.Append ("tabView", out_Tab, 'NO_TEST')
       
    printMsg('Finished creating Element Exclusion table.')
+
+def MakeECSDir(ecs_dir, in_elExclude=[], in_conslands=None, in_ecoreg=None, in_PF=None, in_ConSites=None):
+   """
+   Sets up new ECS directory with necessary folders and input/output geodatabases. The input geodatabase is then
+   populated with necessary inputs for ECS. If provided, the Element exclusion table, conservation lands, and
+   eco-regions will be copied to the input geodatabase, and the bmiFlatten function is used to create 'flat'
+   conservation lands layer. If both are provided, ParseSiteTypes is used to create site-type feature classes from the
+   input PF and CS layers.
+   :param ecs_dir: ECS working directory
+   :param in_elExclude: list of source element exclusions tables (csv)
+   :param in_conslands: source conservation lands feature class
+   :param in_ecoreg: source eco-regions feature class
+   :param in_PF: Procedural features extract from Biotics (generated using 1: Extract Biotics data)
+   :param in_ConSites: ConSites extract from Biotics (generated using 1: Extract Biotics data)
+   :return: (input geodatabase, output geodatabase, spreadsheet directory, output datasets)
+   """
+   dt = datetime.today().strftime("%b%Y")  # would prefer %Y%m, but this is convention
+   wd = ecs_dir
+   sd = os.path.join(wd, "Spreadsheets_" + dt)
+   ig = os.path.join(wd, "ECS_Inputs_" + dt + ".gdb")
+   og = os.path.join(wd, "ECS_Outputs_" + dt + ".gdb")
+   if not os.path.exists(sd):
+      os.makedirs(sd)
+      printMsg("Folder `" + sd + "` created.")
+   createFGDB(ig)
+   createFGDB(og)
+   # Extracts RULE-specific PF/CS to the new input geodatabase (Note this is not used by the pyt toolbox).
+   if in_PF and in_ConSites:
+      ParseSiteTypes(in_PF, in_ConSites, ig)
+   # Copy ancillary datasets to ECS input GDB
+   if len(in_elExclude) != 0:
+      if len(in_elExclude) > 1:
+         MakeExclusionList(in_elExclude, ig + os.sep + 'ElementExclusions')
+      else:
+         printMsg("Copying element exclusions table...")
+         arcpy.CopyRows_management(in_elExclude[0], ig + os.sep + 'ElementExclusions')
+   if in_conslands:
+      printMsg("Copying " + in_conslands + "...")
+      arcpy.CopyFeatures_management(in_conslands, ig + os.sep + 'conslands_lam')
+      printMsg("Creating flat conslands layer...")
+      bmiFlatten(ig + os.sep + 'conslands_lam', ig + os.sep + 'conslands_flat')
+   if in_ecoreg:
+      printMsg("Copying " + in_ecoreg + "...")
+      arcpy.CopyFeatures_management(in_ecoreg, ig + os.sep + 'tncEcoRegions_lam')
+   printMsg("Finished preparation for ECS directory " + wd + ".")
+   lyrs = [ig + os.sep + a for a in ['ElementExclusions', 'conslands_lam', 'conslands_flat', 'tncEcoRegions_lam']]
+   return ig, og, sd, lyrs
   
 def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab):
    '''Dissolves Procedural Features by EO-ID, then attaches numerous attributes to the EOs, creating a new output EO layer as well as an Element summary table. The outputs from this function are subsequently used in the function ScoreEOs. 
@@ -1151,6 +1199,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
             
             # Rank by site conservation value
             printMsg('Filling slots based on overall site conservation value...')
+            # Headsup: Errors can happen here in addRanks if there are NULL values in CS_CONSVALUE, which is the case
+            #  when the EO is not [within/very close to] a ConSite. This can happen with non-TCS type EOs.
             addRanks("lyr_EO", "CS_CONSVALUE", "DESC", "RANK_csVal", 1, "ABS")
             availSlots = updateSlots("lyr_EO", elcode, Slots, "RANK_csVal")
             Slots = availSlots

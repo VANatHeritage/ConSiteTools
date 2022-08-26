@@ -57,6 +57,31 @@ def disableLog():
       arcpy.SetLogMetadata(False)
    return
 
+def replaceLayer(dataPath, layerName=None):
+   """
+   Remove current layer(s) or table(s) matching layerName from the active map, and add the data from dataPath to the map
+   :param dataPath: Path to new dataset to add to map
+   :param layerName: Layer name - if not given, will use the file name from dataPath
+   :return:
+   """
+   if layerName is None:
+      layerName = os.path.basename(dataPath)
+   try:
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      l = map.listLayers(layerName)
+      if len(l) >= 1:
+         for i in l:
+            map.removeLayer(i)
+      l = map.listTables(layerName)
+      if len(l) >= 1:
+         for i in l:
+            map.removeTable(i)
+      map.addDataFromPath(dataPath).name = layerName
+   except:
+      print("Could not add data `" + dataPath + "` to current map.")
+   return
+
 def garbagePickup(trashList):
    '''Deletes Arc files in list, with error handling. Argument must be a list.'''
    for t in trashList:
