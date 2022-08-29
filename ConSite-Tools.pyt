@@ -863,6 +863,7 @@ class create_sbb(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      removeLayerFromMap(out_SBB)
 
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
@@ -945,6 +946,7 @@ class expand_sbb(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      removeLayerFromMap(out_SBB)
 
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
@@ -1096,7 +1098,7 @@ class create_consite(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      removeLayerFromMap(out_ConSites)
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
       else:
@@ -1263,7 +1265,8 @@ class ntwrkPts_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      removeLayerFromMap(out_Points)
+
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
       else:
@@ -1350,7 +1353,8 @@ class lines_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      removeLayerFromMap(out_Lines)
+
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
       else:
@@ -1461,7 +1465,8 @@ class sites_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
+      removeLayerFromMap(out_ConSites)
+
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
       else:

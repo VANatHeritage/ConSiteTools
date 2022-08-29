@@ -57,6 +57,29 @@ def disableLog():
       arcpy.SetLogMetadata(False)
    return
 
+def removeLayerFromMap(layerName):
+   """
+   Removes layer(s) or table(s) from the active map matching the provided layerName. Will extract basename from the
+   layer name, making it suitable to pass the path to the layer.
+   :param layerName: name of layer or table to remove from active map
+   :return: active map
+   """
+   ln = os.path.basename(layerName)
+   try:
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      l = map.listLayers(ln)
+      if len(l) >= 1:
+         for i in l:
+            map.removeLayer(i)
+      l = map.listTables(ln)
+      if len(l) >= 1:
+         for i in l:
+            map.removeTable(i)
+   except:
+      pass
+   return map
+
 def replaceLayer(dataPath, layerName=None):
    """
    Remove current layer(s) or table(s) matching layerName from the active map, and add the data from dataPath to the map
@@ -67,16 +90,7 @@ def replaceLayer(dataPath, layerName=None):
    if layerName is None:
       layerName = os.path.basename(dataPath)
    try:
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      l = map.listLayers(layerName)
-      if len(l) >= 1:
-         for i in l:
-            map.removeLayer(i)
-      l = map.listTables(layerName)
-      if len(l) >= 1:
-         for i in l:
-            map.removeTable(i)
+      map = removeLayerFromMap(layerName)
       map.addDataFromPath(dataPath).name = layerName
    except:
       print("Could not add data `" + dataPath + "` to current map.")
