@@ -1,30 +1,38 @@
 # ---------------------------------------------------------------------------
 # RunWorkflow_Prioritize.py
-# Version:  ArcGIS Pro 2.9.x / Python 3.x
+# Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2020-09-15
-# Last Edit: 2022-06-06
+# Last Edit: 2022-09-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
-# Workflow for all steps needed to prioritize Conservation Sites using a script rather than the ConSite Toolbox. This script is intended for prioritization of Terrestrial Conservation Sites (TCS), Stream Conservation Sites (SCS), and Karst Conservation Sites (KCS).  
+# Workflow for all steps needed to prioritize Conservation Sites using a script rather than the ConSite Toolbox.
+# This script is intended for prioritization of Terrestrial Conservation Sites (TCS), Stream Conservation Sites (SCS),
+# and Karst Conservation Sites (KCS).
 
 # Usage:
-# Prior to running this script, the following preliminary steps must be carried out:
-# - Create a new working directory to contain the run inputs and outputs, named to include a date tag, i.e., "ECS_Run_[MonthYear]"
-# - Within the new working directory, create a sub-directory to hold spreadsheets, i.e., "Spreadsheets_[MonthYear]"
-# - Open the existing map document set up for the previous ECS run (i.e., ECS_Working_yyyymmdd.mxd), and save it as a new document with the correct date tags, within the new working directory.
-# - Within the working directory, create an input geodatabase named ECS_Inputs_[MonthYear].gdb. 
-# - Within the working directory, create an output geodatabase named ECS_Outputs_[MonthYear].gdb. 
-# - Import required inputs into the INPUT geodatabase:
-#   -- ElementExclusions table (get annually from biologists)
-#   -- ConsLands feature class (get quarterly from Dave Boyd)
-#   -- EcoRegions feature class (fairly static data; keep using the same until specified otherwise)
-# - Run the "Extract Biotics data" tool, with output going to the INPUT geodatabase
-# - Run the "Parse site types" tool, with output going to the INPUT geodatabase. 
-# - Run the "Flatten Conservation Lands" tool, with output going to the INPUT geodatabase.
-# - Remove any newly created layers in the map; retain only the pre-existing ones.
-# - In the main function below, update the input variables by specifying the correct file paths and cutoff years as needed. (It is safest if you copy/paste full paths from the catalog window, to avoid typos that would crash the script.)
-# - Close ArcMap and run this script from the Python environment. This takes approx. 45 minutes.
+# - In the main function below, update input variables by specifying the correct file paths to ECS inputs. These include:
+   # - Path to the ECS working directory, to contain the run inputs and outputs, named to include a date tag, i.e., "ECS_Run_[MonthYear]". This will be created during execution.
+   # - ElementExclusions table(s) (get annually from biologists)
+   # - ConsLands feature class (get quarterly from Dave Boyd).
+   # - EcoRegions feature class (fairly static data; keep using the same until specified otherwise)
+   # - Latest Procedural Feature and Conservation Site extracts from Biotics.
+   #     - These are the outputs for the "Extract Biotics data" tool, which should be run once Biotics is 'frozen' for quarterly updates
+# The preparation function (MakeECSDir) will run a series of preliminary steps:
+   # Creates the ECS working directory.
+   #  - Creates a sub-directory to hold spreadsheets, i.e., "Spreadsheets_[MonthYear]"
+   #  - Creates an input geodatabase named ECS_Inputs_[MonthYear].gdb.
+   #  - Creates an output geodatabase named ECS_Outputs_[MonthYear].gdb.
+   #  - Imports required inputs into the INPUT geodatabase:
+   #     - Procedural features and Conservation Sites
+   #        - runs the "Parse site types" tool, to create pf* and cs* feature classes for each ConSite type.
+   #     - Element exclusion table(s)
+   #        - copies/creates ElementExclusions, running the MakeExclusionList function if multiple tables are provided.
+   #     - ConsLands feature class
+   #        - copies to: conslands_lam
+   #        - creates conslands_flat, by running the bmiFlatten tool to make a flat version of the conservation lands
+   #     - EcoRegions feature class
+   #        - copies to: tncEcoRegions_lam
 # - Once the script has finished running, open the map document again, and update the sources for all the layers. Save and close the map.
 # - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
 
@@ -32,43 +40,58 @@
 # ---------------------------------------------------------------------------
 
 # Import function libraries and settings
-import PrioritizeConSites
 from PrioritizeConSites import *
 
 # Use the main function below to run desired function(s) directly from Python IDE or command line with hard-coded variables
 def main():
    ### Set up input variables ###
    # Paths to input and output geodatabases and directories - change these every time
-   in_GDB = r'N:\EssentialConSites\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb'
-   out_GDB = r'N:\EssentialConSites\ECS_Run_Jun2022\ECS_Outputs_Jun2022.gdb'
-   out_DIR = r'N:\EssentialConSites\ECS_Run_Jun2022\Spreadsheets_Jun2022' 
-   
+
+   # ECS output directory for this quarter. This does not need to exist (it is created in MakeECSDir).
+   ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Aug2022'
+
+   # Fairly static data; keep using the same until specified otherwise
+   src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
+
+   # Element exclusion tables are currently updated once annually, prior to December updates. This is a list because
+   # multiple tables can be provided, in which case they are merged into one table.
+   src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\ElementExclusions']
+
+   # These will need updates for every run. Updates paths as needed.
+   src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam220830\conslands_lam.shp'
+   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20220830_174348'
+   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20220830_174348'
+
+   # Create ECS directory
+   in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
+
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
    in_pf_tcs = in_GDB + os.sep + 'pfTerrestrial'
-   in_pf_scu = in_GDB + os.sep + 'pfStream'
-   in_pf_kcs = in_GDB + os.sep + 'pfKarst'
-   
+   # in_pf_scu = in_GDB + os.sep + 'pfStream'
+   # in_pf_kcs = in_GDB + os.sep + 'pfKarst'
+
    # Input Conservation Sites by type
    # No need to change these as long as your in_GDB above is valid
    in_cs_tcs = in_GDB + os.sep + 'csTerrestrial'
-   in_cs_scu = in_GDB + os.sep + 'csStream'
-   in_cs_kcs = in_GDB + os.sep + 'csKarst'
-   
+   # in_cs_scu = in_GDB + os.sep + 'csStream'
+   # in_cs_kcs = in_GDB + os.sep + 'csKarst'
+
    # Input other standard variables
    # No need to change this if in_GDB is valid and naming conventions maintained
    in_elExclude = in_GDB + os.sep + 'ElementExclusions'
    in_consLands = in_GDB + os.sep + 'conslands_lam'
-   in_consLands_flat = in_GDB + os.sep + 'conslands_lam_flat'
+   in_consLands_flat = in_GDB + os.sep + 'conslands_flat'
    in_ecoReg = in_GDB + os.sep + 'tncEcoRegions_lam'
    fld_RegCode = 'GEN_REG'
-   
+
    # Input cutoff years
    # This should change every calendar year
-   cutYear = 1997 # yyyy - 25 for TCS and SCU
-   flagYear = 2002 # yyyy - 20 for TCS and SCU
-   cutYear_kcs = 1982 # yyyy - 40 for KCS
-   flagYear_kcs = 1987 # yyyy - 35 for KCS
+   yyyy = int(time.strftime('%Y'))
+   cutYear = yyyy - 25  # yyyy - 25 for TCS and SCU
+   flagYear = yyyy - 20  # yyyy - 20 for TCS and SCU
+   # cutYear_kcs = yyyy - 40  # yyyy - 40 for KCS
+   # flagYear_kcs = yyyy - 35  # yyyy - 35 for KCS
 
    # Set up outputs by type - no need to change these as long as your out_GDB and out_DIR above are valid
    attribEOs_tcs = out_GDB + os.sep + 'attribEOs_tcs'
@@ -83,29 +106,29 @@ def main():
    qcList_tcs_EOs = out_DIR + os.sep + 'qcList_tcs_EOs.xls'
    qcList_tcs_sites  = out_DIR + os.sep + 'qcList_tcs_sites.xls'
    
-   attribEOs_scu = out_GDB + os.sep + 'attribEOs_scu'
-   sumTab_scu = out_GDB + os.sep + 'sumTab_scu'
-   scoredEOs_scu = out_GDB + os.sep + 'scoredEOs_scu'
-   priorEOs_scu = out_GDB + os.sep + 'priorEOs_scu'
-   sumTab_upd_scu = out_GDB + os.sep + 'sumTab_upd_scu'
-   priorConSites_scu = out_GDB + os.sep + 'priorConSites_scu'
-   priorConSites_scu_XLS = out_DIR + os.sep + 'priorConSites_scu.xls'
-   elementList_scu = out_GDB + os.sep + 'elementList_scu'
-   elementList_scu_XLS = out_DIR + os.sep + 'elementList_scu.xls'   
-   qcList_scu_EOs = out_DIR + os.sep + 'qcList_scu_EOs.xls'
-   qcList_scu_sites  = out_DIR + os.sep + 'qcList_scu_sites.xls'
-      
-   attribEOs_kcs = out_GDB + os.sep + 'attribEOs_kcs'
-   sumTab_kcs = out_GDB + os.sep + 'sumTab_kcs'
-   scoredEOs_kcs = out_GDB + os.sep + 'scoredEOs_kcs'
-   priorEOs_kcs = out_GDB + os.sep + 'priorEOs_kcs'
-   sumTab_upd_kcs = out_GDB + os.sep + 'sumTab_upd_kcs'
-   priorConSites_kcs = out_GDB + os.sep + 'priorConSites_kcs'
-   priorConSites_kcs_XLS = out_DIR + os.sep + 'priorConSites_kcs.xls'
-   elementList_kcs = out_GDB + os.sep + 'elementList_kcs'
-   elementList_kcs_XLS = out_DIR + os.sep + 'elementList_kcs.xls'
-   qcList_kcs_EOs = out_DIR + os.sep + 'qcList_kcs_EOs.xls'
-   qcList_kcs_sites  = out_DIR + os.sep + 'qcList_kcs_sites.xls'
+   # attribEOs_scu = out_GDB + os.sep + 'attribEOs_scu'
+   # sumTab_scu = out_GDB + os.sep + 'sumTab_scu'
+   # scoredEOs_scu = out_GDB + os.sep + 'scoredEOs_scu'
+   # priorEOs_scu = out_GDB + os.sep + 'priorEOs_scu'
+   # sumTab_upd_scu = out_GDB + os.sep + 'sumTab_upd_scu'
+   # priorConSites_scu = out_GDB + os.sep + 'priorConSites_scu'
+   # priorConSites_scu_XLS = out_DIR + os.sep + 'priorConSites_scu.xls'
+   # elementList_scu = out_GDB + os.sep + 'elementList_scu'
+   # elementList_scu_XLS = out_DIR + os.sep + 'elementList_scu.xls'
+   # qcList_scu_EOs = out_DIR + os.sep + 'qcList_scu_EOs.xls'
+   # qcList_scu_sites  = out_DIR + os.sep + 'qcList_scu_sites.xls'
+   #
+   # attribEOs_kcs = out_GDB + os.sep + 'attribEOs_kcs'
+   # sumTab_kcs = out_GDB + os.sep + 'sumTab_kcs'
+   # scoredEOs_kcs = out_GDB + os.sep + 'scoredEOs_kcs'
+   # priorEOs_kcs = out_GDB + os.sep + 'priorEOs_kcs'
+   # sumTab_upd_kcs = out_GDB + os.sep + 'sumTab_upd_kcs'
+   # priorConSites_kcs = out_GDB + os.sep + 'priorConSites_kcs'
+   # priorConSites_kcs_XLS = out_DIR + os.sep + 'priorConSites_kcs.xls'
+   # elementList_kcs = out_GDB + os.sep + 'elementList_kcs'
+   # elementList_kcs_XLS = out_DIR + os.sep + 'elementList_kcs.xls'
+   # qcList_kcs_EOs = out_DIR + os.sep + 'qcList_kcs_EOs.xls'
+   # qcList_kcs_sites  = out_DIR + os.sep + 'qcList_kcs_sites.xls'
    
    
    ### Specify functions to run - no need to change these as long as all your input/output variables above are valid ###

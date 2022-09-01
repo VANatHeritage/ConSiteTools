@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # EssentialConSites.py
-# Version:  ArcGIS Pro 3.0.x / Python 3.x
+# Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2022-08-23
+# Last Edit: 2022-09-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -92,7 +92,7 @@ def addRanks(in_Table, fld_Sorting, order = 'ASCENDING', fld_Ranking='RANK', thr
       valList = [round(val, rounding) for val in valList]
    if order == "DESC" or order == "DESCENDING":
       valList.reverse()
-   printMsg('Values in order are: %s' % str(valList))
+   # printMsg('Values in order are: %s' % str(valList))
    rankDict = {}
    rank = 1
    sortVal = valList[0]
@@ -565,7 +565,9 @@ def MakeECSDir(ecs_dir, in_elExclude=[], in_conslands=None, in_ecoreg=None, in_P
    createFGDB(og)
    # Extracts RULE-specific PF/CS to the new input geodatabase (Note this is not used by the pyt toolbox).
    if in_PF and in_ConSites:
-      ParseSiteTypes(in_PF, in_ConSites, ig)
+      arcpy.CopyFeatures_management(in_PF, ig + os.sep + os.path.basename(in_PF))
+      arcpy.CopyFeatures_management(in_ConSites, ig + os.sep + os.path.basename(in_ConSites))
+      ParseSiteTypes(ig + os.sep + os.path.basename(in_PF), ig + os.sep + os.path.basename(in_ConSites), ig)
    # Copy ancillary datasets to ECS input GDB
    if len(in_elExclude) != 0:
       if len(in_elExclude) > 1:
@@ -915,9 +917,9 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
             Slots = availSlots
          
          if Slots > 0:
-            printMsg('Choice ties remain.')
+            printMsg('Choice ties remain for elcode %s.' %elcode)
          else:
-            printMsg('All slots filled.')
+            printMsg('All slots filled for elcode %s.' %elcode)
 
       except:
          printWrng('There was a problem processing elcode %s.' %elcode)
@@ -1042,9 +1044,11 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    - slopFactor: Maximum distance allowable between features for them to still me considered coincident
    '''
    
-   scratchGDB = arcpy.env.scratchGDB
+   # scratchGDB = arcpy.env.scratchGDB
    # Lesson learned: Don't try to write to in_memory for this, because then the "SHAPE_Area" field no longer exists and then your code fails and then you haz a sad.
-   
+   # Update: workaround using !shape.area@squaremeters!, so setting back to memory
+   scratchGDB = "in_memory"
+
    # Make copies of inputs
    printMsg('Making temporary copies of inputs...')
    tmpEOs = scratchGDB + os.sep + "tmpEOs"
@@ -1119,7 +1123,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       
       # Add "CS_AREA_HA" field to ConSites, and calculate
       arcpy.AddField_management(in_ConSites, "CS_AREA_HA", "DOUBLE")
-      expression = '!SHAPE_Area!/10000'
+      expression = '!shape.area@squaremeters!/10000'
       arcpy.CalculateField_management(in_ConSites, "CS_AREA_HA", expression, "PYTHON_9.3")
       
       # Tabulate Intersection of ConSites with conservation lands of specified BMI values, and score
