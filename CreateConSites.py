@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-08-19
+# Last Edit: 2022-09-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -678,7 +678,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       printMsg("There are %s single sites (no splits or merges)"%str(c))
       arcpy.management.CalculateField("ssLyr", "ModType", '"B"')
       qry = "ModType = 'B'"
-      arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
+      bLyr = arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
       # Get the old site IDs to attach to SingleSites.  
       # Single Sites provide the output geometry
       printMsg("Attaching site IDs...")
@@ -688,13 +688,17 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
    else:
       arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
+      bLyr = None
    
    # Get the subset of single sites that are identical to old sites
-   arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   c = countSelectedFeatures("ssLyr")
-   if c > 0:
-      printMsg("%s sites are identical to the old ones..."%str(c))
-      arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
+   if bLyr: 
+      arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+      c = countSelectedFeatures("ssLyr")
+      if c > 0:
+         printMsg("%s sites are identical to the old ones..."%str(c))
+         arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
+   else:
+      pass
    
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
@@ -1020,6 +1024,17 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - searchDist: search distance used to cluster fragments back together
    - smthDist: dilation distance for smoothing
    '''
+   # Use in_EraseFeats to chop out sections of PFs
+   # printMsg('Chopping polygons...')
+   firstChopPF = scratchGDB + os.sep + 'firstChopPF'
+   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
+
+   # Eliminate parts comprising less than 5% of total original feature size
+   # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
+   # printMsg('Eliminating insignificant fragments...')
+   rtnPartsPF = scratchGDB + os.sep + 'rtnPartsPF'
+   arcpy.management.EliminatePolygonPart(firstChopPF, rtnPartsPF, 'PERCENT', '', 5, 'ANY')
+   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
 
    # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
@@ -1036,28 +1051,30 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # In some rare situations, the above code block removes SBB portion containing the PF!
    # Gotta deal with that crap. This is why I'm still here after 6 pm on my last day.
    # Have to do it in a loop so you don't pick up SBB fragments from other PFs.
-   # This is a real pain in my ass. Hi David! Enjoy...
+   # Also, had to reverse order of chopping PFs and SBBs, so you're only dealing with relevant part of PF.
    explChop = scratchGDB + os.sep + 'explChop'
    arcpy.management.MultipartToSinglepart(firstChop, explChop)
    pfList = unique_values(in_PF, fld_ID)
    for id in pfList:
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
+      # arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
+      arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
       arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
       arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
    
-   # Use in_EraseFeats to chop out sections of PFs
-   # printMsg('Chopping polygons...')
-   firstChop2 = scratchGDB + os.sep + 'firstChop2'
-   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
+   # # Use in_EraseFeats to chop out sections of PFs
+   # # printMsg('Chopping polygons...')
+   # firstChop2 = scratchGDB + os.sep + 'firstChop2'
+   # arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
 
-   # Eliminate parts comprising less than 5% of total original feature size
-   # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
-   # printMsg('Eliminating insignificant fragments...')
-   rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
-   arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
-   arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   # # Eliminate parts comprising less than 5% of total original feature size
+   # # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
+   # # printMsg('Eliminating insignificant fragments...')
+   # rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
+   # arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
+   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
    
    # Shrinkwrap retained parts to fill in gaps narrower than search distance
    # Need to do this in a loop to avoid stitching together unrelated fragments
@@ -1071,24 +1088,26 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
       lyr = arcpy.management.MakeFeatureLayer(rtnParts, "tmpLyr", qry)
       ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist = "20 METERS")
       arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
-   # Do it again for PFs
-   idList = unique_values(rtnParts2, fld_ID)
-   for id in idList:
-      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
-      ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist = "20 METERS")
-      arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
+   # # Do it again for PFs
+   # idList = unique_values(rtnParts2, fld_ID)
+   # for id in idList:
+      # qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
+      # lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
+      # ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist = "20 METERS")
+      # arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
       
-   # Remove any fragments without procedural features, then dissolve
+   # Remove any fragments without procedural features
    printMsg('Culling fragments and dissolving...')
    initClusters2 = scratchGDB + os.sep + 'initClusters2'
-   CullFrags(initClusters, in_PF, 0, initClusters2)
-   dissClust = scratchGDB + os.sep + 'dissClust'
-   arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
+   # CullFrags(initClusters, in_PF, 0, initClusters2)
+   CullFrags(initClusters, rtnPartsPF, 0, initClusters2)
+   # dissClust = scratchGDB + os.sep + 'dissClust'
+   # arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
    
    # Shrinkwrap again to fill in gaps narrower than search distance
    printMsg('Clustering clusters...')
-   ShrinkWrap(dissClust, searchDist, out_Clusters, smthDist = "20 METERS")
+   # ShrinkWrap(dissClust, searchDist, out_Clusters, smthDist = "20 METERS")
+   ShrinkWrap(initClusters2, searchDist, out_Clusters, smthDist = "20 METERS")
    
    # # Rejoin clusters near each other for long stretches
    # printMsg('Patching some gaps...')
@@ -1873,7 +1892,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Cull site fragments
                   printMsg('Culling site fragments...')
                   ssBnd = scratchGDB + os.sep + 'ssBnd' + str(counter2)
-                  CullFrags(siteFrags, tmpPF, searchDist, ssBnd)
+                  CullFrags(siteFrags, pfRtn, searchDist, ssBnd)
                   
                   # Final smoothing operation. Yes this is necessary!
                   printMsg('Smoothing boundaries...')
@@ -1894,7 +1913,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             c = countFeatures(tmpSS_grp)
             if c > 1:            
                printMsg('Checking if we should patch some gaps...')
-               # Intersect thin outer buffers; keep those above size threshold
+               # Intersect thin outer buffers
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
                # arcpy.analysis.Buffer(tmpSS_grp, outerBuff, coalDist, "OUTSIDE_ONLY")
                arcpy.analysis.Buffer(tmpSS_grp, outerBuff, "50 METERS", "OUTSIDE_ONLY")
@@ -1907,7 +1926,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # intBuff is multipart but that's okay, want full length of it
                   arcpy.management.CalculateGeometryAttributes(intBuff, "LENGTH PERIMETER_LENGTH", "METERS") 
                   # Calculation necessary b/c shape_length doesn't persist in_memory
-                  qry = "LENGTH > 500" # May want to experiment with different lengths here
+                  qry = "LENGTH > 1000" # Size threshold; may want to experiment with different lengths here
                   patchFrags = scratchGDB + os.sep + "patchFrags%s"%str(counter)
                   arcpy.analysis.Select(intBuff, patchFrags, qry)
                   
@@ -1923,12 +1942,19 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                      selPatches = countSelectedFeatures("patch_lyr")
                      if selPatches > 0:
                         printMsg("There are %s interstitial patches retained. Patching..."%str(selPatches))
-                        # Buffer to make a smoother patch
+                        # Make a smoother patch
                         buffFrags = scratchGDB + os.sep + "buffFrags%s"%str(counter)
-                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "50 METERS")
+                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "100 METERS")  
+                        circFrags = scratchGDB + os.sep + "circFrags%s"%str(counter)   
+                        arcpy.management.MinimumBoundingGeometry("patch_lyr", circFrags, "CIRCLE")
+                        buffCirc = scratchGDB + os.sep + "buffCirc%s"%str(counter)
+                        arcpy.analysis.Buffer(circFrags, buffCirc, "-50 METERS")  
+                        clipFrags = scratchGDB + os.sep + "clipFrags%s"%str(counter) 
+                        arcpy.analysis.PairwiseClip(buffCirc, buffFrags, clipFrags)
                         # Merge and dissolve with adjacent split sites
                         mergeFrags = scratchGDB + os.sep + "mergeFrags%s"%str(counter)
-                        arcpy.management.Merge([buffFrags, tmpSS_grp], mergeFrags)
+                        # arcpy.management.Merge([buffFrags, tmpSS_grp], mergeFrags)
+                        arcpy.management.Merge([clipFrags, tmpSS_grp], mergeFrags)
                         dissFrags = scratchGDB + os.sep + "dissFrags%s"%str(counter)
                         arcpy.management.Dissolve(mergeFrags, dissFrags, "", "", "SINGLE_PART")
                      else:
