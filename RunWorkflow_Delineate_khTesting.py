@@ -39,7 +39,7 @@ def main():
    outGDB = r"E:\DCR_ProProjects\ConSites\testing_20220831.gdb" 
    
    # Test number ID
-   testNum = "test06"
+   testNum = "test07"
    
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
