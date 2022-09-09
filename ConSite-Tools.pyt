@@ -135,7 +135,8 @@ class shrinkwrapFeats(object):
       parm0 = defineParam("in_Feats", "Input features", "GPFeatureLayer", "Required", "Input")
       parm1 = defineParam("searchDist", "Search distance", "GPLinearUnit", "Required", "Input")
       parm2 = defineParam("out_Feats", "Output features", "DEFeatureClass", "Required", "Output")
-      parm3 = defineParam("smthMulti", "Smoothing multiplier", "GPDouble", "Optional", "Input", 4)
+      # parm3 = defineParam("smthMulti", "Smoothing multiplier", "GPDouble", "Optional", "Input", 4)
+      parm3 = defineParam("smthDist", "Smoothing distance", "GPLinearUnit", "Required", "Input")
       parm4 = defineParam("scratch_GDB", "Scratch geodatabase", "DEWorkspace", "Optional", "Input")
       
       parm4.filter.list = ["Local Database"]
@@ -165,14 +166,15 @@ class shrinkwrapFeats(object):
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
       else:
-         scratchParm = "in_memory" 
-         
-      if smthMulti != 'None':
-         multiParm = smthMulti
-      else:
-         multiParm = 4
-      
-      ShrinkWrap(in_Feats, searchDist, out_Feats, multiParm, scratchParm)
+         scratchParm = "in_memory"
+
+      ShrinkWrap(in_Feats, searchDist, out_Feats, smthDist, scratchParm)
+
+      # if smthMulti != 'None':
+      #    multiParm = smthMulti
+      # else:
+      #    multiParm = 4
+      # ShrinkWrap(in_Feats, searchDist, out_Feats, multiParm, scratchParm)
 
       return out_Feats
 
