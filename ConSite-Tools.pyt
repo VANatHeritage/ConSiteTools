@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 2.9.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-08-12
+# Last Edit: 2022-09-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1208,6 +1208,7 @@ class ntwrkPts_scs(object):
          pass
       scsPoints = MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID, fld_Tidal, scratchParm)
       arcpy.env.extent = "MAXOF"
+      parameters[1].value = out_Points
       
       return scsPoints
       
@@ -1293,6 +1294,7 @@ class lines_scs(object):
           
       # Update the derived parameters.
       # This enables layers to be displayed automatically if running tool from ArcMap.
+      parameters[1].value = out_Lines
       parameters[2].value = lyrDownTrace
       parameters[3].value = lyrUpTrace
       parameters[4].value = lyrTidalTrace
@@ -1411,6 +1413,7 @@ class sites_scs(object):
       trim = "true"
       scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, trim, buffDist, scratchParm)
       arcpy.env.extent = "MAXOF"
+      parameters[2].value = out_ConSites
 
       return scsPolys
       

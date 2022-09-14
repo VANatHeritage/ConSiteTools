@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-09-01
+# Last Edit: 2022-09-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2036,8 +2036,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
 def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
-   """Creates three Network Analyst service layers needed for SCU delineation. 
-   This tool only needs to be run the first time you run the suite of SCU delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCU delineation sequence.
+   """Creates three Network Analyst service layers needed for SCS delineation.
+   This tool only needs to be run the first time you run the suite of SCS delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCS delineation sequence.
    
    NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually). If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
    
@@ -2117,7 +2117,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
 def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal", out_Scratch = "in_memory"):
-   """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
+   """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCS-worthy."
    
    Parameters:
    - in_PF = Input Procedural Features
@@ -2236,7 +2236,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    return out_Points
    
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): 
-   """Loads SCU points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCUs.
+   """Loads SCS points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCS.
    
    Parameters:
    
@@ -2303,10 +2303,11 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
 
          # Get lines layer
          if inLyr.endswith(".lyrx"):
-            # This is used when the layer file (lyrx) is passed to the function (i.e. in python IDE).
+            # This is used when the layer file (lyrx) is passed to the function
             na_lyr = arcpy.mp.LayerFile(inLyr)
             inLines = na_lyr.listLayers("Lines")[0]
          else:
+            # This is used when the map layer is passed to the function (in ArcPro GUI)
             inLines = inLyr + "\Lines"
 
          printMsg("Saving out lines...")
@@ -2335,16 +2336,16 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    return (out_Lines, in_downTrace, in_upTrace, in_tidalTrace)
 
 def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
-   """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function, within a loop. 
+   """Buffers streams and rivers associated with SCS-lines within catchments. This function is called by the DelinSite_scs function, within a loop.
    
    Parameters:
-   in_Lines = Input SCU lines, generated as output from CreateLines_scu function
+   in_Lines = Input SCS lines, generated as output from CreateLines_scs function
    in_StreamRiver = Input StreamRiver polygons from NHD
    in_LakePond = Input LakePond polygons from NHD
    in_Catch = Input catchments from NHDPlus
-   out_Buffers = Output buffered SCU lines
+   out_Buffers = Output buffered SCS lines
    out_Scratch = Geodatabase to contain output products 
-   buffDist = Distance, in meters, to buffer the SCU lines and their associated NHD polygons
+   buffDist = Distance, in meters, to buffer the SCS lines and their associated NHD polygons
    """
 
    # Set up variables
@@ -2361,29 +2362,29 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    # Clip input layers to catchments
    # Also need to fill any holes in polygons to avoid aberrant results
    printMsg("Clipping StreamRiver polygons...")
-   CleanClip("StreamRiver_Poly", in_Catch, clipRiverPoly)
+   CleanClip(in_StreamRiver, in_Catch, clipRiverPoly)
    arcpy.EliminatePolygonPart_management (clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
    
    printMsg("Clipping LakePond polygons...")
-   CleanClip("LakePond_Poly", in_Catch, clipLakePoly)
+   CleanClip(in_LakePond, in_Catch, clipLakePoly)
    arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
    
-   # Select clipped NHD polygons intersecting SCU lines
+   # Select clipped NHD polygons intersecting SCS lines
    ### Is this step necessary? Yes. Otherwise little off-network ponds influence result.
-   printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
+   printMsg("Selecting by location the clipped NHD polygons intersecting SCS lines...")
    arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    
-   # Buffer SCU lines and selected NHD polygons
+   # Buffer SCS lines and selected NHD polygons
    printMsg("Buffering StreamRiver polygons...")
    arcpy.Buffer_analysis("StreamRivers", StreamRiverBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering LakePond polygons...")
    arcpy.Buffer_analysis("LakePonds", LakePondBuff, buffDist, "", "ROUND", "NONE")
    
-   printMsg("Buffering SCU lines...")
+   printMsg("Buffering SCS lines...")
    arcpy.Buffer_analysis(in_Lines, LineBuff, buffDist, "", "ROUND", "NONE")
    
    # Merge buffers and dissolve
@@ -2404,7 +2405,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    
    Parameters:
    - in_PF = Input Procedural Features
-   - in_Lines: Input SCU lines, generated as output from CreateLines_scu function
+   - in_Lines: Input SCS lines, generated as output from CreateLines_scs function
    - in_Catch: Input catchments from NHDPlus
    - in_hydroNet: Input hydrological network dataset
    - in_ConSites: feature class representing current Stream Conservation Sites (or, a template feature class)
@@ -2441,7 +2442,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       ### Variables used repeatedly in loop
       dissCatch = out_Scratch + os.sep + "dissCatch"
       clipBuff = out_Scratch + os.sep + "clipBuff"
-      clipFlow = out_Scratch + os.sep + "clipFlow"
+      # clipFlow = out_Scratch + os.sep + "clipFlow"
       flowPoly = out_Scratch + os.sep + "flowPoly"
             
       # Make feature layers
@@ -2470,8 +2471,8 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                lineID = line[1]
                arcpy.env.extent = "MAXOF"
                         
-               # Select catchments intersecting scuLine
-               printMsg("Selecting catchments containing SCU line...")
+               # Select catchments intersecting SCS Line
+               printMsg("Selecting catchments containing SCS line...")
                arcpy.SelectLayerByLocation_management (catch, "INTERSECT", lineShp)
    
                # Dissolve catchments
@@ -2502,15 +2503,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       print(count)
       if count > 0:
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
-         fullCatch = out_Scratch + os.sep + "fullCatchments"
+         # fullCatch = out_Scratch + os.sep + "fullCatchments"
          printMsg("Appending full catchments for selected features...")
          arcpy.Append_management (catch, flowBuff, "NO_TEST")
          
       in_Polys = flowBuff
    
    else: 
-      # Select catchments intersecting scuLines
-      printMsg("Selecting catchments containing SCU lines...")
+      # Select catchments intersecting SCS Lines
+      printMsg("Selecting catchments containing SCS lines...")
       catch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
       arcpy.SelectLayerByLocation_management (catch, "INTERSECT", in_Lines)
       in_Polys = catch
@@ -2538,4 +2539,4 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    ds = GetElapsedTime (t0, t1)
    printMsg("Completed function. Time elapsed: %s" % ds)
    
-   return fillPolys
+   return out_ConSites
