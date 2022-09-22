@@ -9,7 +9,7 @@
 # Suite of functions to delineate and review Natural Heritage Conservation Sites.
 # Includes functionality to produce:
 # - Terrestrial Conservation Sites (TCS)
-# - Anthopogenic Habitat Zones (AHZ)
+# - Anthropogenic Habitat Zones (AHZ)
 # - Stream Conservation Sites (SCS) or Stream Conservation Units (SCU)
 
 # Dependencies:
@@ -1901,6 +1901,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Cull site fragments
                   printMsg('Culling site fragments...')
                   ssBnd = scratchGDB + os.sep + 'ssBnd' + str(counter2)
+                  # CullFrags(siteFrags, pfRtn, searchDist, ssBnd)
                   CullFrags(siteFrags, pf2, searchDist, ssBnd)
                   
                   # Final smoothing operation. Yes this is necessary!
@@ -2425,7 +2426,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    path, filename = os.path.split(path)
    myWorkspace = drive + path
    Output_CS_fname = filename
-   
+
+   # Smoothing switch. Used to smooth raster-based boundaries of catchments and flow buffers.
+   if buffDist <= 10 and trim == "true":
+      # For small flow buffers (e.g. SCU), smooth the catchments only. This means smoothing will not be applied to buffers of flowlines or NHDArea/Waterbody polygons
+      smthCatchOnly = True
+   else:
+      # For larger buffers or un-trimmed catchment-only SCS, this will smooth the entire SCS polygon
+      smthCatchOnly = False
+
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
    arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
@@ -2494,7 +2503,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
             except:
                printMsg("Process failure for feature %s. Passing..." %lineID)
                tback()
-      
+
       arcpy.env.extent = "MAXOF"
       # Burn in full catchments for alternate-process PFs
       qry = "%s = 'SCS2'"%fld_Rule
@@ -2503,10 +2512,18 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       print(count)
       if count > 0:
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
-         # fullCatch = out_Scratch + os.sep + "fullCatchments"
          printMsg("Appending full catchments for selected features...")
-         arcpy.Append_management (catch, flowBuff, "NO_TEST")
-         
+         if smthCatchOnly:
+            # Note: have to dissolve catchments before smoothing, otherwise you'll get weird incisions/slivers
+            fullCatch = out_Scratch + os.sep + "fullCatch"
+            arcpy.PairwiseDissolve_analysis(catch, fullCatch, multi_part="SINGLE_PART")
+            fullCatchSmth = out_Scratch + os.sep + "fullCatchSmth"
+            arcpy.cartography.SmoothPolygon(fullCatch, fullCatchSmth, "PAEK", "50 METERS")
+            arcpy.Append_management (fullCatchSmth, flowBuff, "NO_TEST")
+         else:
+            # headsup: In this case, smoothing happens after the buffers and catchments are merged/dissolved
+            arcpy.Append_management (catch, flowBuff, "NO_TEST")
+
       in_Polys = flowBuff
    
    else: 
@@ -2520,17 +2537,25 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
    arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
-   
+
+   # Smooth polygons
+   # This also has the benefit of filling in 1-cell holes at edges, when `error_option="NO_CHECK"` (the default option)
+   if not smthCatchOnly:
+      printMsg("Smoothing polygons...")
+      dissPolysSmth = out_Scratch + os.sep + "dissPolysSmth"
+      arcpy.cartography.SmoothPolygon(dissPolys, dissPolysSmth, "PAEK", "50 METERS")
+      selPolys = arcpy.MakeFeatureLayer_management(dissPolysSmth, "selPolys")
+   else:
+      selPolys = arcpy.MakeFeatureLayer_management(dissPolys, "selPolys")
+
    printMsg("Eliminating fragments...")
-   arcpy.MakeFeatureLayer_management (dissPolys, "dissPolys")
-   arcpy.SelectLayerByLocation_management("dissPolys", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management(selPolys, "INTERSECT", in_Lines, "", "NEW_SELECTION")
 
    printMsg("Filling in holes...")
-   # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    fillPolys = out_Scratch + os.sep + "fillPolys"
-   # arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
-      
+   # arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
+
    # Append final shapes to template
    arcpy.Append_management (fillPolys, out_ConSites, "NO_TEST")
    
