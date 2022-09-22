@@ -57,32 +57,22 @@ def disableLog():
       arcpy.SetLogMetadata(False)
    return
 
-def removeLayerFromMap(layerName):
+def getMapLayers():
    """
-   Removes layer(s) or table(s) from the active map matching the provided layerName. Will extract basename from the
-   layer name, making it suitable to pass the path to the layer.
-   :param layerName: name of layer or table to remove from active map
-   :return: active map
+   Returns active map and a list layer long names in the map.
+   Long names include the group layer name in the layer name, helping avoid issues when using group layers in your map.
+   :return: map, list of layer names
    """
-   ln = os.path.basename(layerName)
-   try:
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      l = map.listLayers(ln)
-      if len(l) >= 1:
-         for i in l:
-            map.removeLayer(i)
-      l = map.listTables(ln)
-      if len(l) >= 1:
-         for i in l:
-            map.removeTable(i)
-   except:
-      pass
-   return map
+   aprx = arcpy.mp.ArcGISProject("CURRENT")
+   map = aprx.activeMap
+   lyrs = map.listLayers()
+   # Use longName instead of name, since it includes the group layer name
+   lnames = [l.longName for l in lyrs]
+   return map, lnames
 
 def replaceLayer(dataPath, layerName=None):
-   """
-   Remove current layer(s) or table(s) matching layerName from the active map, and add the data from dataPath to the map
+   """Remove current layer(s) or table(s) matching layerName from the active map, and add the data from dataPath to
+   the map. This is used when to avoid having multiple layers with the same name in a map.
    :param dataPath: Path to new dataset to add to map
    :param layerName: Layer name - if not given, will use the file name from dataPath
    :return:
@@ -90,7 +80,16 @@ def replaceLayer(dataPath, layerName=None):
    if layerName is None:
       layerName = os.path.basename(dataPath)
    try:
-      map = removeLayerFromMap(layerName)
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      map = aprx.activeMap
+      l = map.listLayers(layerName)
+      if len(l) >= 1:
+         for i in l:
+            map.removeLayer(i)
+      l = map.listTables(layerName)
+      if len(l) >= 1:
+         for i in l:
+            map.removeTable(i)
       map.addDataFromPath(dataPath).name = layerName
    except:
       print("Could not add data `" + dataPath + "` to current map.")

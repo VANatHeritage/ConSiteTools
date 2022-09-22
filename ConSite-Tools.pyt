@@ -211,10 +211,7 @@ class extract_biotics(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam('BioticsPF', "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
       if "BIOTICS_DLINK.ProcFeats" in lnames:
@@ -283,10 +280,7 @@ class parse_siteTypes(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
       if "Biotics ProcFeats" in lnames:
@@ -364,10 +358,7 @@ class copy_layers(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_Layers", "Layers to Copy", "GPValueTable", "Required", "Input")
       parm0.columns = [["GPFeatureLayer","Layers"]]
@@ -424,10 +415,7 @@ class review_consite(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm00 = defineParam("auto_CS", "Input NEW Conservation Sites", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "consites_tcs" in lnames:
@@ -730,10 +718,7 @@ class expand_selection(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("inPF_lyr", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "pfTerrestrial" in lnames:
@@ -797,10 +782,7 @@ class create_sbb(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam('in_PF', "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "pfTerrestrial" in lnames:
@@ -863,7 +845,6 @@ class create_sbb(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_SBB)
 
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
@@ -891,10 +872,7 @@ class expand_sbb(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam('in_Cores', "Input Cores", "GPFeatureLayer", "Required", "Input")
       if "Cores123" in lnames:
@@ -946,7 +924,6 @@ class expand_sbb(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_SBB)
 
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
@@ -974,10 +951,7 @@ class create_consite(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm00 = defineParam("in_SBB", "Input Site Building Blocks (SBBs)", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "expanded_sbb_tcs" in lnames:
@@ -1098,7 +1072,7 @@ class create_consite(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_ConSites)
+
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB 
       else:
@@ -1133,10 +1107,7 @@ class servLyrs_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_hydroNet", "Input Hydro Network Dataset", "GPNetworkDatasetLayer", "Required", "Input")
       if "HydroNet_ND" in lnames:
@@ -1201,10 +1172,7 @@ class ntwrkPts_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
       if "pfStream" in lnames:
@@ -1265,7 +1233,6 @@ class ntwrkPts_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_Points)
 
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
@@ -1292,10 +1259,7 @@ class lines_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_Points", "Input Network Points", "GPFeatureLayer", "Required", "Input")
       if "scsPoints" in lnames:
@@ -1353,7 +1317,6 @@ class lines_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_Lines)
 
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
@@ -1381,10 +1344,7 @@ class sites_scs(object):
 
    def getParameterInfo(self):
       """Define parameters"""
-      aprx = arcpy.mp.ArcGISProject("CURRENT")
-      map = aprx.activeMap
-      lyrs = map.listLayers()
-      lnames = [l.name for l in lyrs]
+      map, lnames = getMapLayers()
       
       parm0 = defineParam("in_PF", "Input Procedural Features (PFs)", "GPFeatureLayer", "Required", "Input")
       if "pfStream" in lnames:
@@ -1465,7 +1425,6 @@ class sites_scs(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      removeLayerFromMap(out_ConSites)
 
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
