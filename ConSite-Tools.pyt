@@ -47,15 +47,22 @@ def declareParams(params):
    disableLog()
    return 
 
-def getViewExtent():
-   '''Gets the extent of the active view.
+def getViewExtent(set=True):
+   '''Gets the extent of the active view, optionally applying it as the processing extent (set=True).
    I'm using this to set the processing extent for every tool function that is using feature services as inputs. This way, processing is limited to only the features in the active view. This can save TONS of processing time!!! But the user needs to be careful that the view is big enough to encompass everything needed.
    Will work on the active map. If something other than a map is active (e.g. a table), this will not work.
    '''
-   aprx = arcpy.mp.ArcGISProject("CURRENT")
-   mv = aprx.activeView
-   ext = mv.camera.getExtent()
-   viewExtent = "{}, {}, {}, {}".format(ext.XMin, ext.YMin, ext.XMax, ext.YMax)
+   try:
+      aprx = arcpy.mp.ArcGISProject("CURRENT")
+      mv = aprx.activeView
+      ext = mv.camera.getExtent()
+      viewExtent = "{} {} {} {}".format(ext.XMin, ext.YMin, ext.XMax, ext.YMax)
+      if set:
+         arcpy.env.extent = viewExtent
+         printMsg("Set processing extent to current view extent.")
+   except:
+      printMsg("Could not set processing extent.")
+      pass
    return viewExtent
 
 def setViewExtent(lyrName, zoomBuffer=0, selected=True):
@@ -854,10 +861,7 @@ class create_sbb(object):
          scratchParm = "in_memory" 
 
       # Run the function
-      try:
-         arcpy.env.extent = getViewExtent()
-      except:
-         pass
+      getViewExtent()
       CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
       arcpy.env.extent = "MAXOF"
@@ -933,10 +937,7 @@ class expand_sbb(object):
          scratchParm = "in_memory" 
 
       # Run the function
-      try:
-         arcpy.env.extent = getViewExtent()
-      except:
-         pass
+      getViewExtent()
       ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchParm)
       arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
       arcpy.env.extent = "MAXOF"
@@ -1089,10 +1090,7 @@ class create_consite(object):
          Trans = None
       
       # Run the function
-      try:
-         arcpy.env.extent = getViewExtent()
-      except:
-         pass
+      getViewExtent()
       CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, Trans, in_Exclude, scratchParm)
       arcpy.env.extent = "MAXOF"
 
@@ -1242,10 +1240,7 @@ class ntwrkPts_scs(object):
          scratchParm = "in_memory" 
       
       # Run the function
-      try:
-         arcpy.env.extent = getViewExtent()
-      except:
-         pass
+      getViewExtent()
       scsPoints = MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID, fld_Tidal, scratchParm)
       arcpy.env.extent = "MAXOF"
       parameters[1].value = out_Points
@@ -1436,10 +1431,7 @@ class sites_scs(object):
          scratchParm = "in_memory"
 
       # Run the function
-      try:
-         arcpy.env.extent = getViewExtent()
-      except:
-         pass
+      getViewExtent()
       if siteType == "SCU":
          buffDist = 5
       else:
