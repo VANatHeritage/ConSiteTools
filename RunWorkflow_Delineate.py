@@ -2,7 +2,7 @@
 # RunWorkflow_Delineate.py
 # Version:  ArcGIS Pro 2.9.x / Python 3.x
 # Creation Date: 2020-06-03
-# Last Edit: 2022-08-19
+# Last Edit: 2022-09-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -12,7 +12,6 @@
 # ---------------------------------------------------------------------------
 
 # Import function libraries and settings
-import CreateConSites
 from CreateConSites import *
 
 # Use the main function below to run functions directly from Python IDE or command line with hard-coded variables.
@@ -22,45 +21,48 @@ def main():
    
    # Specify which site type to run. 
    # Choices are: TCS, AHZ, SCU, SCS, or COMBO (for all site types)
-   siteType = "TCS"
+   siteType = "SCU"
    
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
-   ysnQC = "Y" 
+   ysnQC = "N"
    
    # Specify the cutoff percentage area difference, used to flag significantly changed site boundaries
    cutVal = 5  
    
    # Geodatabase containing parsed Biotics data 
-   bioticsGDB = r"E:\ProProjects\ConSites\BioticsData.gdb"
+   bioticsGDB = r"D:\projects\ConSites\arc\Biotics_data.gdb"
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   outGDB = r"E:\ProProjects\ConSites\statewideTCS_20220819.gdb" 
+   outGDB = r'D:\projects\ConSites\arc\statewide\statewideSCS_dev21B_20220914.gdb'
    
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
-   scratchGDB = "in_memory"
-   # scratchGDB = r"E:\ProProjects\ConSites\scratch_20220816.gdb"
+   scratchGDB = "in_memory"  # "in_memory" | r"D:\projects\ConSites\arc\statewide\scratch_statewide.gdb"
    
    # Exported feature service data used to create sites
    # Datasets marked "highly dynamic" are often edited by users and require regular fresh downloads
    # Datasets marked "somewhat dynamic" may be edited by users but in practice are infrequently edited
    # Datasets marked "relatively static" only need to be refreshed when full dataset overhaul is done
-   # Recommendation: Export data from services within ArcGIS Pro project set up for site delineation, rather than downloading from ArcGIS Online, so that all can be directly saved to a single geodatabase. Otherwise you'll have to change paths below. 
-   modsGDB = r"E:\ProProjects\ConSites\ServiceDownloads\ServiceDownloads.gdb" 
-   in_Exclude = modsGDB + os.sep + "ExclusionFeatures" # highly dynamic
-   in_Hydro = modsGDB + os.sep + "HydrographicFeatures" # highly dynamic
-   in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces" # somewhat dynamic
-   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces" # somewhat dynamic 
-   in_Dams = modsGDB + os.sep + "NID_damsVA" # somewhat dynamic
-   in_Cores = modsGDB + os.sep + "Cores123" # relatively static
-   in_NWI = modsGDB + os.sep + "VA_Wetlands" # relatively static
-   in_FlowBuff = modsGDB + os.sep + "FlowBuff150" # relatively static
+   # Recommendation: Export data from services within ArcGIS Pro project set up for site delineation, rather than downloading from ArcGIS Online, so that all can be directly saved to a single geodatabase. Otherwise you'll have to change paths below.
+   modsGDB = r"D:\projects\ConSites\arc\ConSiteTools_refData.gdb"
+   in_Exclude = modsGDB + os.sep + "ExclusionFeatures_local" # highly dynamic
+   in_Hydro = modsGDB + os.sep + "HydrographicFeatures_local" # highly dynamic
+   in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces_local" # somewhat dynamic
+   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces_local" # somewhat dynamic
+   in_Dams = modsGDB + os.sep + "NID_damsVA_local" # somewhat dynamic
+   in_Cores = modsGDB + os.sep + "Cores123_local" # relatively static
+   in_NWI = modsGDB + os.sep + "VA_Wetlands_local" # relatively static
+   in_FlowBuff = modsGDB + os.sep + "FlowBuff150_local" # relatively static
    
    # Ancillary Data for SCS sites - set it and forget it until you are notified of an update
-   in_hydroNet = r"E:\ProProjects\ConSites\VA_HydroNetHR\VA_HydroNetHR.gdb"
-   in_Catch = in_hydroNet + os.sep + "NHDPlusCatchment"
+   in_netGDB = r"D:\projects\ConSites\arc\data\VA_HydroNetHR.gdb"
+   in_hydroNet = os.path.join(in_netGDB, "HydroNet", "HydroNet_ND")
+   in_Catch = os.path.join(in_netGDB, "NHDPlusCatchment")
+
+   # SCU/SCS trim setting
+   trim = "true"
    
    ### End of user input ###
    
@@ -187,7 +189,7 @@ def main():
             printMsg("Reviewing AHZ ConSites...")
             tStart = datetime.now()
             printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-            ReviewConSites(out_AHZ, csAHZ, cutVal, out_AHZqc, fld_SiteID, scratchGDB)
+            ReviewConSites(ahz_sites, csAHZ, cutVal, ahz_sites_qc, fld_SiteID, scratchGDB)
             tEnd = datetime.now()
             printMsg("AHZ Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
             deltaString = GetElapsedTime (tStart, tEnd)
@@ -260,7 +262,7 @@ def main():
             printMsg("Creating Stream Conservation Sites...")
             tStart = datetime.now()
             printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-            DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scuPolys, in_FlowBuff, fld_Rule, trim, 150, scratchGDB)
+            DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scsPolys, in_FlowBuff, fld_Rule, trim, 150, scratchGDB)
             tEnd = datetime.now()
             printMsg("SCS creation ended at %s" %tEnd.strftime("%H:%M:%S"))
             deltaString = GetElapsedTime (tStart, tEnd)

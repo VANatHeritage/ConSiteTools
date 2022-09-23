@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-08-23
+# Last Edit: 2022-09-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -841,7 +841,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    # Clip flowlines to selected catchments
    printMsg("Clipping flowlines to selected catchments...")
    streamLines = scratchGDB + os.sep + "streamLines"
-   arcpy.Clip_analysis (lyrFlowlines, lyrCatch, streamLines)
+   arcpy.PairwiseClip_analysis (lyrFlowlines, lyrCatch, streamLines)
    
    ## River process
    # Select StreamRiver and LakePond polys intersecting input features
@@ -861,13 +861,13 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    # Clip widewater to selected catchments
    printMsg("Clipping widewaters to selected catchments...")
    clipWideWater = scratchGDB + os.sep + "clipWideWater"
-   arcpy.Clip_analysis (wideWater, lyrCatch, clipWideWater)
+   arcpy.PairwiseClip_analysis (wideWater, lyrCatch, clipWideWater)
    
    # Clip flowlines to clipped widewater
    printMsg("Clipping flowlines to clipped widewater features...")
    riverLines = scratchGDB + os.sep + "riverLines"
-   arcpy.Clip_analysis (lyrFlowlines, clipWideWater, riverLines)
-      
+   arcpy.PairwiseClip_analysis (lyrFlowlines, clipWideWater, riverLines)
+
    # Run alignment separately for stream and river features
    streamParms = [streamFeats, streamLines, "_stream"]
    riverParms = [riverFeats, riverLines, "_river"]
@@ -875,10 +875,26 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
       inFeats = parms[0]
       inFlowlines = parms[1]
       nameTag = parms[2]
+      printMsg("Aligning " + os.path.basename(inFeats) + "...")
+
+      # Note: Especially for large polygons, it was noticed that shifting could have undesirable results, particularly
+      #  when the centroid is generated in a location not close to a flowline.
+      #  The section below counts number and length of intersections of PF polygon features with flowlines.
+      #  Only PFs with (total flowline intersection shape_length < PF shape_length / 4) OR (<3 unique flowline intersections)
+      #  will be subject to the shifting procedure. PFs that do not meet those criteria will not be shifted.
+      flowInt = scratchGDB + os.sep + "flowInt" + nameTag
+      arcpy.PairwiseIntersect_analysis([inFeats, inFlowlines], flowInt)
+      arcpy.CalculateField_management(flowInt, "intLength", "!Shape.Length@Meters!", field_type="FLOAT")
+      flowIntCt = scratchGDB + os.sep + "flowIntCt" + nameTag
+      arcpy.Statistics_analysis(flowInt, flowIntCt, [[fldID, "COUNT"], ["intLength", "SUM"]], fldID)
+      arcpy.JoinField_management(inFeats, fldID, flowIntCt, fldID, ["COUNT_" + fldID, "SUM_intLength"])
+      # Layer of PFs to be shifted
+      where_clause = "SUM_intLength < SHAPE_Length/4 OR COUNT_%s < 3 OR COUNT_%s IS NULL" % (fldID, fldID)
+      lyrToShift = arcpy.MakeFeatureLayer_management(inFeats, "lyrToShift", where_clause)
       
       # Get (pseudo-)centroid of features to be shifted
       centroids = scratchGDB + os.sep + "centroids%s"%nameTag
-      arcpy.FeatureToPoint_management(inFeats, centroids, "INSIDE")
+      arcpy.FeatureToPoint_management(lyrToShift, centroids, "INSIDE")
       
       # Get near table: distance from centroids to 3 nearest flowlines, including location info
       # Note: This output cannot be written to memory or it doesn't produce the location info, which is needed. Why, Arc, why???
@@ -911,17 +927,17 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
       arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
       
       # Join from/to x,y fields from near table to the input features
-      arcpy.JoinField_management(inFeats, fldID, nearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
+      arcpy.JoinField_management(lyrToShift, fldID, nearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
       
       # Calculate shift in x/y directions
-      arcpy.AddField_management(inFeats, "DIFF_X", "DOUBLE")
-      arcpy.AddField_management(inFeats, "DIFF_Y", "DOUBLE")
-      arcpy.CalculateField_management(inFeats, "DIFF_X", "!NEAR_X!- !FROM_X!", "PYTHON")
-      arcpy.CalculateField_management(inFeats, "DIFF_Y", "!NEAR_Y!- !FROM_Y!", "PYTHON")
+      arcpy.AddField_management(lyrToShift, "DIFF_X", "DOUBLE")
+      arcpy.AddField_management(lyrToShift, "DIFF_Y", "DOUBLE")
+      arcpy.CalculateField_management(lyrToShift, "DIFF_X", "!NEAR_X!- !FROM_X!", "PYTHON")
+      arcpy.CalculateField_management(lyrToShift, "DIFF_Y", "!NEAR_Y!- !FROM_Y!", "PYTHON")
       
       # Calculate new position, and shift polygon
       # Note that (FROM_X, FROM_Y) is not necessarily the same as SHAPE@XY, because the former is a pseudo-centroid forced to be contained by the input feature. If the shape of the feature is strongly curved, the true centroid may not be contained. I'm guessing (but am not 100% sure) that SHAPE@XY is the true centroid. This is why I calculated the shift rather than simply moving SHAPE@XY to (NEAR_X, NEAR_Y).
-      with arcpy.da.UpdateCursor(inFeats, ["SHAPE@XY", "DIFF_X", "DIFF_Y"]) as cursor:
+      with arcpy.da.UpdateCursor(lyrToShift, ["SHAPE@XY", "DIFF_X", "DIFF_Y"]) as cursor:
          for row in cursor:
             x_shift = row[1]
             y_shift = row[2]

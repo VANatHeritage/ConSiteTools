@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-08-23
+# Last Edit: 2022-09-14
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -677,7 +677,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       printMsg("There are %s single sites (no splits or merges)"%str(c))
       arcpy.management.CalculateField("ssLyr", "ModType", '"B"')
       qry = "ModType = 'B'"
-      arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
+      bLyr = arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
       # Get the old site IDs to attach to SingleSites.  
       # Single Sites provide the output geometry
       printMsg("Attaching site IDs...")
@@ -687,13 +687,17 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
    else:
       arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
+      bLyr = None
    
    # Get the subset of single sites that are identical to old sites
-   arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   c = countSelectedFeatures("ssLyr")
-   if c > 0:
-      printMsg("%s sites are identical to the old ones..."%str(c))
-      arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
+   if bLyr: 
+      arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+      c = countSelectedFeatures("ssLyr")
+      if c > 0:
+         printMsg("%s sites are identical to the old ones..."%str(c))
+         arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
+   else:
+      pass
    
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
@@ -1019,6 +1023,22 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - searchDist: search distance used to cluster fragments back together
    - smthDist: dilation distance for smoothing  (NOTE THIS IS NOT CURRENTLY USED - distances are entered directly).
    '''
+   # Use in_EraseFeats to chop out sections of PFs
+   # printMsg('Chopping polygons...')
+   firstChopPF = scratchGDB + os.sep + 'firstChopPF'
+   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
+
+   # NOTE: in rare cases, all PFs in a ProtoSite get erased (e.g. small island PFs covered by a hydrographic features).
+   #  This will result in an empty feature class for out_Clusters in this function and for the consite as a result.
+   #  Could do a workaround here, but decided to just add a warning to the CreateConSites function when this happens,
+   #  so that the user can deal with it by editing the modification features and/or PFs.
+
+   # Eliminate parts comprising less than 5% of total original feature size
+   # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
+   # printMsg('Eliminating insignificant fragments...')
+   rtnPartsPF = scratchGDB + os.sep + 'rtnPartsPF'
+   arcpy.management.EliminatePolygonPart(firstChopPF, rtnPartsPF, 'PERCENT', '', 5, 'ANY')
+   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
 
    # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
@@ -1035,28 +1055,30 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # In some rare situations, the above code block removes SBB portion containing the PF!
    # Gotta deal with that crap. This is why I'm still here after 6 pm on my last day.
    # Have to do it in a loop so you don't pick up SBB fragments from other PFs.
-   # This is a real pain in my ass. Hi David! Enjoy...
+   # Also, had to reverse order of chopping PFs and SBBs, so you're only dealing with relevant part of PF.
    explChop = scratchGDB + os.sep + 'explChop'
    arcpy.management.MultipartToSinglepart(firstChop, explChop)
    pfList = unique_values(in_PF, fld_ID)
    for id in pfList:
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
+      # arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
+      arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
       arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
       arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
    
-   # Use in_EraseFeats to chop out sections of PFs
-   # printMsg('Chopping polygons...')
-   firstChop2 = scratchGDB + os.sep + 'firstChop2'
-   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
+   # # Use in_EraseFeats to chop out sections of PFs
+   # # printMsg('Chopping polygons...')
+   # firstChop2 = scratchGDB + os.sep + 'firstChop2'
+   # arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
 
-   # Eliminate parts comprising less than 5% of total original feature size
-   # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
-   # printMsg('Eliminating insignificant fragments...')
-   rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
-   arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
-   arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   # # Eliminate parts comprising less than 5% of total original feature size
+   # # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
+   # # printMsg('Eliminating insignificant fragments...')
+   # rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
+   # arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
+   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
    
    # Shrinkwrap retained parts to fill in gaps narrower than search distance
    # Need to do this in a loop to avoid stitching together unrelated fragments
@@ -1068,26 +1090,28 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    for id in idList:
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
       lyr = arcpy.management.MakeFeatureLayer(rtnParts, "tmpLyr", qry)
-      ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist = "20 METERS")
+      ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
       arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
-   # Do it again for PFs
-   idList = unique_values(rtnParts2, fld_ID)
-   for id in idList:
-      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
-      ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist = "20 METERS")
-      arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
+   # # Do it again for PFs
+   # idList = unique_values(rtnParts2, fld_ID)
+   # for id in idList:
+      # qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
+      # lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
+      # ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
+      # arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
       
-   # Remove any fragments without procedural features, then dissolve
+   # Remove any fragments without procedural features
    printMsg('Culling fragments and dissolving...')
    initClusters2 = scratchGDB + os.sep + 'initClusters2'
-   CullFrags(initClusters, in_PF, 0, initClusters2)
-   dissClust = scratchGDB + os.sep + 'dissClust'
-   arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
+   # CullFrags(initClusters, in_PF, 0, initClusters2)
+   CullFrags(initClusters, rtnPartsPF, 0, initClusters2)
+   # dissClust = scratchGDB + os.sep + 'dissClust'
+   # arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
    
    # Shrinkwrap again to fill in gaps narrower than search distance
    printMsg('Clustering clusters...')
-   ShrinkWrap(dissClust, searchDist, out_Clusters, smthDist = "20 METERS")
+   # ShrinkWrap(dissClust, searchDist, out_Clusters, smthDist)
+   ShrinkWrap(initClusters2, searchDist, out_Clusters, smthDist)
    
    # # Rejoin clusters near each other for long stretches
    # printMsg('Patching some gaps...')
@@ -1795,7 +1819,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             printMsg('Chopping SBBs and modifying erase features...')
             sbbClusters = scratchGDB + os.sep + 'sbbClusters'
             sbbErase = scratchGDB + os.sep + 'sbbErase'
-            ChopMod(tmpPF, tmpSBB, "SFID", coalErase, sbbClusters, sbbErase, coalDist, "10 METERS", scratchParm)
+            ChopMod(tmpPF, tmpSBB, "SFID", coalErase, sbbClusters, sbbErase, coalDist, "20 METERS", scratchParm)
             arcpy.management.MakeFeatureLayer(sbbClusters, "sbbClust") 
             
             # Stitch sbb clusters together and modify erase features some more? NOPE.
@@ -1816,7 +1840,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             pfRtn = scratchGDB + os.sep + 'pfRtn'
             arcpy.analysis.PairwiseClip(tmpPF, sbbClusters, pfRtn)
             # # Need to make a new feature layer, also
-            # pf2 = arcpy.management.MakeFeatureLayer(pfRtn, "PF_lyr2") 
+            pf2 = arcpy.management.MakeFeatureLayer(pfRtn, "PF_lyr2")
             
             # Use erase features to chop out areas of ProtoSites
             printMsg('Erasing portions of ProtoSites...')
@@ -1830,9 +1854,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             numPSfrags = countFeatures(psRtn)
             if numPSfrags > 1:
                printMsg("ProtoSite has been split into %s fragments" %str(numPSfrags))
-            else:
+            elif numPSfrags == 1:
                printMsg("ProtoSite has only one fragment to process.")
-            
+            else:
+               printWrng("ProtoSite %s has no fragments remaining! You may need to edit modification features if they completely cover the PFs." %str(counter))
+               continue
             # Loop through the retained ProtoSite fragments (aka "Split Sites")
             counter2 = 1
             with arcpy.da.SearchCursor(psRtn, ["SHAPE@"]) as mySplitSites:
@@ -1856,6 +1882,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   
                   # Get SBB clusters within split site
                   arcpy.management.SelectLayerByLocation("sbbClust", "INTERSECT", tmpSS)
+                  # Get retained PFs within split site (used for culling)
+                  arcpy.management.SelectLayerByLocation(pf2, "INTERSECT", tmpSS)
                   
                   # Shrinkwrap SBB clusters
                   # Don't even think about doing a simple coalesce here to save time! 
@@ -1872,7 +1900,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Cull site fragments
                   printMsg('Culling site fragments...')
                   ssBnd = scratchGDB + os.sep + 'ssBnd' + str(counter2)
-                  CullFrags(siteFrags, tmpPF, searchDist, ssBnd)
+                  # CullFrags(siteFrags, pfRtn, searchDist, ssBnd)
+                  CullFrags(siteFrags, pf2, searchDist, ssBnd)
                   
                   # Final smoothing operation. Yes this is necessary!
                   printMsg('Smoothing boundaries...')
@@ -1886,17 +1915,24 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   
                   counter2 +=1
                   del mySS
-           
+            # NOTE: In rare cases, the above loop creates overlapping split sites. Overlapping split sites cause issues
+            #  with the subsequent re-join procedure. This happens when the same sbbCluster polygons intersect more
+            #  than one split site.
+            # Fix: Dissolve tmpSS_grp to single-part polygons in tmpSS_grp2
+            tmpSS_grp2 = scratchGDB + os.sep + 'tmpSS_grp2'
+            fldDiss = [a.name for a in arcpy.ListFields(tmpSS_grp) if a.type != "OID" and not a.name.lower().startswith('shape')]
+            arcpy.management.Dissolve(tmpSS_grp, tmpSS_grp2, fldDiss, multi_part="SINGLE_PART")
+
             # Rejoin split sites very near each other for substantial stretches
             # This routine is time-costly but greatly improves results in certain situations.
             # Only needed if Proto-Site has been split into more than 1 site.
-            c = countFeatures(tmpSS_grp)
+            c = countFeatures(tmpSS_grp2)
             if c > 1:            
                printMsg('Checking if we should patch some gaps...')
-               # Intersect thin outer buffers; keep those above size threshold
+               # Intersect thin outer buffers
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
-               # arcpy.analysis.Buffer(tmpSS_grp, outerBuff, coalDist, "OUTSIDE_ONLY")
-               arcpy.analysis.Buffer(tmpSS_grp, outerBuff, "50 METERS", "OUTSIDE_ONLY")
+               # arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, coalDist, "OUTSIDE_ONLY")
+               arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, "50 METERS", "OUTSIDE_ONLY")
                # Went wider than coalDist hoping to avoid some weirdness
                intBuff = scratchGDB + os.sep + "intBuff%s"%str(counter)
                arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
@@ -1906,7 +1942,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # intBuff is multipart but that's okay, want full length of it
                   arcpy.management.CalculateGeometryAttributes(intBuff, "LENGTH PERIMETER_LENGTH", "METERS") 
                   # Calculation necessary b/c shape_length doesn't persist in_memory
-                  qry = "LENGTH > 500" # May want to experiment with different lengths here
+                  qry = "LENGTH > 1000" # Size threshold; may want to experiment with different lengths here
                   patchFrags = scratchGDB + os.sep + "patchFrags%s"%str(counter)
                   arcpy.analysis.Select(intBuff, patchFrags, qry)
                   
@@ -1917,32 +1953,39 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                      CleanFeatures(patchFrags, cleanFrags)
                      # Only keep fragments actually touching original layers
                      arcpy.management.MakeFeatureLayer(cleanFrags, "patch_lyr") 
-                     arcpy.management.SelectLayerByLocation("patch_lyr", "INTERSECT", tmpSS_grp)
+                     arcpy.management.SelectLayerByLocation("patch_lyr", "INTERSECT", tmpSS_grp2)
                      
                      selPatches = countSelectedFeatures("patch_lyr")
                      if selPatches > 0:
                         printMsg("There are %s interstitial patches retained. Patching..."%str(selPatches))
-                        # Buffer to make a smoother patch
+                        # Make a smoother patch
                         buffFrags = scratchGDB + os.sep + "buffFrags%s"%str(counter)
-                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "50 METERS")
+                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "100 METERS")  
+                        circFrags = scratchGDB + os.sep + "circFrags%s"%str(counter)   
+                        arcpy.management.MinimumBoundingGeometry("patch_lyr", circFrags, "CIRCLE")
+                        buffCirc = scratchGDB + os.sep + "buffCirc%s"%str(counter)
+                        arcpy.analysis.Buffer(circFrags, buffCirc, "-50 METERS")  
+                        clipFrags = scratchGDB + os.sep + "clipFrags%s"%str(counter) 
+                        arcpy.analysis.PairwiseClip(buffCirc, buffFrags, clipFrags)
                         # Merge and dissolve with adjacent split sites
                         mergeFrags = scratchGDB + os.sep + "mergeFrags%s"%str(counter)
-                        arcpy.management.Merge([buffFrags, tmpSS_grp], mergeFrags)
+                        # arcpy.management.Merge([buffFrags, tmpSS_grp2], mergeFrags)
+                        arcpy.management.Merge([clipFrags, tmpSS_grp2], mergeFrags)
                         dissFrags = scratchGDB + os.sep + "dissFrags%s"%str(counter)
                         arcpy.management.Dissolve(mergeFrags, dissFrags, "", "", "SINGLE_PART")
                      else:
-                        dissFrags = tmpSS_grp
+                        dissFrags = tmpSS_grp2
                   else:
-                     dissFrags = tmpSS_grp
+                     dissFrags = tmpSS_grp2
                else:
-                  dissFrags = tmpSS_grp
+                  dissFrags = tmpSS_grp2
             else:
-               dissFrags = tmpSS_grp
+               dissFrags = tmpSS_grp2
                
             # Final smoothing operation. Yes this is necessary!
             printMsg('Smoothing boundaries...')
-            smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter)
-            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, smthDist = 10)
+            smoothBnd = scratchGDB + os.sep + "smoothFin%s"%str(counter)
+            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, smthDist = "10 METERS")
             
             # Chop out the exclusion features once more
             if site_Type == 'TERRESTRIAL':  
@@ -1993,8 +2036,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
 def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
-   """Creates three Network Analyst service layers needed for SCU delineation. 
-   This tool only needs to be run the first time you run the suite of SCU delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCU delineation sequence.
+   """Creates three Network Analyst service layers needed for SCS delineation.
+   This tool only needs to be run the first time you run the suite of SCS delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCS delineation sequence.
    
    NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually). If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
    
@@ -2074,7 +2117,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
 
 def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFID = "SFID", fld_Tidal = "Tidal", out_Scratch = "in_memory"):
-   """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCU-worthy."
+   """Given a set of procedural features, creates points along the hydrological network. The user must ensure that the procedural features are "SCS-worthy."
    
    Parameters:
    - in_PF = Input Procedural Features
@@ -2193,7 +2236,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    return out_Points
    
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): 
-   """Loads SCU points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCUs.
+   """Loads SCS points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCS.
    
    Parameters:
    
@@ -2258,7 +2301,15 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
             simplification_tolerance = "", 
             overrides = "")
 
-         inLines = inLyr + "\Lines"
+         # Get lines layer
+         if inLyr.endswith(".lyrx"):
+            # This is used when the layer file (lyrx) is passed to the function
+            na_lyr = arcpy.mp.LayerFile(inLyr)
+            inLines = na_lyr.listLayers("Lines")[0]
+         else:
+            # This is used when the map layer is passed to the function (in ArcPro GUI)
+            inLines = inLyr + "\Lines"
+
          printMsg("Saving out lines...")
          arcpy.CopyFeatures_management(inLines, outLines)
          arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
@@ -2285,16 +2336,16 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    return (out_Lines, in_downTrace, in_upTrace, in_tidalTrace)
 
 def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
-   """Buffers streams and rivers associated with SCU-lines within catchments. This function is called by the DelinSite_scs function, within a loop. 
+   """Buffers streams and rivers associated with SCS-lines within catchments. This function is called by the DelinSite_scs function, within a loop.
    
    Parameters:
-   in_Lines = Input SCU lines, generated as output from CreateLines_scu function
+   in_Lines = Input SCS lines, generated as output from CreateLines_scs function
    in_StreamRiver = Input StreamRiver polygons from NHD
    in_LakePond = Input LakePond polygons from NHD
    in_Catch = Input catchments from NHDPlus
-   out_Buffers = Output buffered SCU lines
+   out_Buffers = Output buffered SCS lines
    out_Scratch = Geodatabase to contain output products 
-   buffDist = Distance, in meters, to buffer the SCU lines and their associated NHD polygons
+   buffDist = Distance, in meters, to buffer the SCS lines and their associated NHD polygons
    """
 
    # Set up variables
@@ -2311,29 +2362,29 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    # Clip input layers to catchments
    # Also need to fill any holes in polygons to avoid aberrant results
    printMsg("Clipping StreamRiver polygons...")
-   CleanClip("StreamRiver_Poly", in_Catch, clipRiverPoly)
+   CleanClip(in_StreamRiver, in_Catch, clipRiverPoly)
    arcpy.EliminatePolygonPart_management (clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
    
    printMsg("Clipping LakePond polygons...")
-   CleanClip("LakePond_Poly", in_Catch, clipLakePoly)
+   CleanClip(in_LakePond, in_Catch, clipLakePoly)
    arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
    
-   # Select clipped NHD polygons intersecting SCU lines
+   # Select clipped NHD polygons intersecting SCS lines
    ### Is this step necessary? Yes. Otherwise little off-network ponds influence result.
-   printMsg("Selecting by location the clipped NHD polygons intersecting SCU lines...")
+   printMsg("Selecting by location the clipped NHD polygons intersecting SCS lines...")
    arcpy.SelectLayerByLocation_management("StreamRivers", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    arcpy.SelectLayerByLocation_management("LakePonds", "INTERSECT", in_Lines, "", "NEW_SELECTION")
    
-   # Buffer SCU lines and selected NHD polygons
+   # Buffer SCS lines and selected NHD polygons
    printMsg("Buffering StreamRiver polygons...")
    arcpy.Buffer_analysis("StreamRivers", StreamRiverBuff, buffDist, "", "ROUND", "NONE")
    
    printMsg("Buffering LakePond polygons...")
    arcpy.Buffer_analysis("LakePonds", LakePondBuff, buffDist, "", "ROUND", "NONE")
    
-   printMsg("Buffering SCU lines...")
+   printMsg("Buffering SCS lines...")
    arcpy.Buffer_analysis(in_Lines, LineBuff, buffDist, "", "ROUND", "NONE")
    
    # Merge buffers and dissolve
@@ -2354,7 +2405,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    
    Parameters:
    - in_PF = Input Procedural Features
-   - in_Lines: Input SCU lines, generated as output from CreateLines_scu function
+   - in_Lines: Input SCS lines, generated as output from CreateLines_scs function
    - in_Catch: Input catchments from NHDPlus
    - in_hydroNet: Input hydrological network dataset
    - in_ConSites: feature class representing current Stream Conservation Sites (or, a template feature class)
@@ -2374,7 +2425,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    path, filename = os.path.split(path)
    myWorkspace = drive + path
    Output_CS_fname = filename
-   
+
+   # Smoothing switch. Used to smooth raster-based boundaries of catchments and flow buffers.
+   if buffDist <= 10 and trim == "true":
+      # For small flow buffers (e.g. SCU), smooth the catchments only. This means smoothing will not be applied to buffers of flowlines or NHDArea/Waterbody polygons
+      smthCatchOnly = True
+   else:
+      # For larger buffers or un-trimmed catchment-only SCS, this will smooth the entire SCS polygon
+      smthCatchOnly = False
+
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
    arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
@@ -2391,7 +2450,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       ### Variables used repeatedly in loop
       dissCatch = out_Scratch + os.sep + "dissCatch"
       clipBuff = out_Scratch + os.sep + "clipBuff"
-      clipFlow = out_Scratch + os.sep + "clipFlow"
+      # clipFlow = out_Scratch + os.sep + "clipFlow"
       flowPoly = out_Scratch + os.sep + "flowPoly"
             
       # Make feature layers
@@ -2420,8 +2479,8 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                lineID = line[1]
                arcpy.env.extent = "MAXOF"
                         
-               # Select catchments intersecting scuLine
-               printMsg("Selecting catchments containing SCU line...")
+               # Select catchments intersecting SCS Line
+               printMsg("Selecting catchments containing SCS line...")
                arcpy.SelectLayerByLocation_management (catch, "INTERSECT", lineShp)
    
                # Dissolve catchments
@@ -2443,7 +2502,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
             except:
                printMsg("Process failure for feature %s. Passing..." %lineID)
                tback()
-      
+
       arcpy.env.extent = "MAXOF"
       # Burn in full catchments for alternate-process PFs
       qry = "%s = 'SCS2'"%fld_Rule
@@ -2452,15 +2511,23 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       print(count)
       if count > 0:
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
-         fullCatch = out_Scratch + os.sep + "fullCatchments"
          printMsg("Appending full catchments for selected features...")
-         arcpy.Append_management (catch, flowBuff, "NO_TEST")
-         
+         if smthCatchOnly:
+            # Note: have to dissolve catchments before smoothing, otherwise you'll get weird incisions/slivers
+            fullCatch = out_Scratch + os.sep + "fullCatch"
+            arcpy.PairwiseDissolve_analysis(catch, fullCatch, multi_part="SINGLE_PART")
+            fullCatchSmth = out_Scratch + os.sep + "fullCatchSmth"
+            arcpy.cartography.SmoothPolygon(fullCatch, fullCatchSmth, "PAEK", "50 METERS")
+            arcpy.Append_management (fullCatchSmth, flowBuff, "NO_TEST")
+         else:
+            # headsup: In this case, smoothing happens after the buffers and catchments are merged/dissolved
+            arcpy.Append_management (catch, flowBuff, "NO_TEST")
+
       in_Polys = flowBuff
    
    else: 
-      # Select catchments intersecting scuLines
-      printMsg("Selecting catchments containing SCU lines...")
+      # Select catchments intersecting SCS Lines
+      printMsg("Selecting catchments containing SCS lines...")
       catch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
       arcpy.SelectLayerByLocation_management (catch, "INTERSECT", in_Lines)
       in_Polys = catch
@@ -2469,17 +2536,25 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
    arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
-   
+
+   # Smooth polygons
+   # This also has the benefit of filling in 1-cell holes at edges, when `error_option="NO_CHECK"` (the default option)
+   if not smthCatchOnly:
+      printMsg("Smoothing polygons...")
+      dissPolysSmth = out_Scratch + os.sep + "dissPolysSmth"
+      arcpy.cartography.SmoothPolygon(dissPolys, dissPolysSmth, "PAEK", "50 METERS")
+      selPolys = arcpy.MakeFeatureLayer_management(dissPolysSmth, "selPolys")
+   else:
+      selPolys = arcpy.MakeFeatureLayer_management(dissPolys, "selPolys")
+
    printMsg("Eliminating fragments...")
-   arcpy.MakeFeatureLayer_management (dissPolys, "dissPolys")
-   arcpy.SelectLayerByLocation_management("dissPolys", "INTERSECT", in_Lines, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management(selPolys, "INTERSECT", in_Lines, "", "NEW_SELECTION")
 
    printMsg("Filling in holes...")
-   # Unfortunately this does not fill the 1-pixel holes at edges of shapes
    fillPolys = out_Scratch + os.sep + "fillPolys"
-   # arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy. EliminatePolygonPart_management ("dissPolys", fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
-      
+   # arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
+
    # Append final shapes to template
    arcpy.Append_management (fillPolys, out_ConSites, "NO_TEST")
    
@@ -2488,4 +2563,4 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    ds = GetElapsedTime (t0, t1)
    printMsg("Completed function. Time elapsed: %s" % ds)
    
-   return fillPolys
+   return out_ConSites
