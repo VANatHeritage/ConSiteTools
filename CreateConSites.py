@@ -1922,6 +1922,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             tmpSS_grp2 = scratchGDB + os.sep + 'tmpSS_grp2'
             fldDiss = [a.name for a in arcpy.ListFields(tmpSS_grp) if a.type != "OID" and not a.name.lower().startswith('shape')]
             arcpy.management.Dissolve(tmpSS_grp, tmpSS_grp2, fldDiss, multi_part="SINGLE_PART")
+            arcpy.management.CalculateField(tmpSS_grp2, 'ss_length', '!shape.length@meters!', field_type="FLOAT")
 
             # Rejoin split sites very near each other for substantial stretches
             # This routine is time-costly but greatly improves results in certain situations.
@@ -1936,15 +1937,19 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                # Went wider than coalDist hoping to avoid some weirdness
                intBuff = scratchGDB + os.sep + "intBuff%s"%str(counter)
                arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
-               
-               c = countFeatures(intBuff)
+               # Intersect returns two identical polygons for each intersect. Remove duplicates, retaining the polygon associated with the smaller-perimeter source polygon.
+               intBuffS = scratchGDB + os.sep + "intBuffS%s"%str(counter)
+               arcpy.management.Sort(intBuff, intBuffS, [["ss_length", "ASCENDING"]])
+               arcpy.management.DeleteIdentical(intBuffS, ["Shape"])
+
+               c = countFeatures(intBuffS)
                if c > 0:
-                  # intBuff is multipart but that's okay, want full length of it
-                  arcpy.management.CalculateGeometryAttributes(intBuff, "LENGTH PERIMETER_LENGTH", "METERS") 
+                  # intBuffS is multipart but that's okay, want full length of it
+                  arcpy.management.CalculateGeometryAttributes(intBuffS, "LENGTH PERIMETER_LENGTH", "METERS")
                   # Calculation necessary b/c shape_length doesn't persist in_memory
-                  qry = "LENGTH > 1000" # Size threshold; may want to experiment with different lengths here
+                  qry = "LENGTH > 1000 OR LENGTH > ss_length / 4"  # Perimeter threshold criteria: absolute or relative to perimeter of the smaller split site polygon
                   patchFrags = scratchGDB + os.sep + "patchFrags%s"%str(counter)
-                  arcpy.analysis.Select(intBuff, patchFrags, qry)
+                  arcpy.analysis.Select(intBuffS, patchFrags, qry)
                   
                   patches = countFeatures(patchFrags)
                   if patches > 0:                     
@@ -1960,17 +1965,16 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                         printMsg("There are %s interstitial patches retained. Patching..."%str(selPatches))
                         # Make a smoother patch
                         buffFrags = scratchGDB + os.sep + "buffFrags%s"%str(counter)
-                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "100 METERS")  
-                        circFrags = scratchGDB + os.sep + "circFrags%s"%str(counter)   
-                        arcpy.management.MinimumBoundingGeometry("patch_lyr", circFrags, "CIRCLE")
-                        buffCirc = scratchGDB + os.sep + "buffCirc%s"%str(counter)
-                        arcpy.analysis.Buffer(circFrags, buffCirc, "-50 METERS")  
+                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "51 METERS")
                         clipFrags = scratchGDB + os.sep + "clipFrags%s"%str(counter) 
-                        arcpy.analysis.PairwiseClip(buffCirc, buffFrags, clipFrags)
+                        arcpy.analysis.Clip(buffFrags, tmpSS_grp2, clipFrags)
+                        chullPatch = scratchGDB + os.sep + "chullPatch%s" % str(counter)
+                        arcpy.management.MinimumBoundingGeometry(clipFrags, chullPatch, "CONVEX_HULL")
+                        finalPatch = scratchGDB + os.sep + "finalPatch%s" % str(counter)
+                        arcpy.analysis.Clip(buffFrags, chullPatch, finalPatch)
                         # Merge and dissolve with adjacent split sites
                         mergeFrags = scratchGDB + os.sep + "mergeFrags%s"%str(counter)
-                        # arcpy.management.Merge([buffFrags, tmpSS_grp2], mergeFrags)
-                        arcpy.management.Merge([clipFrags, tmpSS_grp2], mergeFrags)
+                        arcpy.management.Merge([finalPatch, tmpSS_grp2], mergeFrags)
                         dissFrags = scratchGDB + os.sep + "dissFrags%s"%str(counter)
                         arcpy.management.Dissolve(mergeFrags, dissFrags, "", "", "SINGLE_PART")
                      else:
