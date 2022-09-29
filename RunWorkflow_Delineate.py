@@ -1,8 +1,8 @@
 # ---------------------------------------------------------------------------
 # RunWorkflow_Delineate.py
-# Version:  ArcGIS Pro 2.9.x / Python 3.x
+# Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2020-06-03
-# Last Edit: 2022-09-14
+# Last Edit: 2022-09-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -19,10 +19,10 @@ from CreateConSites import *
 def main():
    ### User-provided variables ###
    
-   # Specify which site type to run. 
-   # Choices are: TCS, AHZ, SCU, SCS, or COMBO (for all site types)
-   siteType = "SCU"
-   
+   # Specify which site type(s) to run.
+   # Choices are: "TCS", "AHZ", "SCU", "SCS"
+   siteTypes = ("TCS")
+
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
    ysnQC = "N"
@@ -35,8 +35,8 @@ def main():
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   outGDB = r'D:\projects\ConSites\arc\statewide\statewideSCS_dev21B_20220914.gdb'
-   
+   outGDB = r'D:\projects\ConSites\arc\statewide\statewideTCS_dev21_' + datetime.now().strftime("%Y%m%d") + '.gdb'
+
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
    scratchGDB = "in_memory"  # "in_memory" | r"D:\projects\ConSites\arc\statewide\scratch_statewide.gdb"
@@ -54,12 +54,12 @@ def main():
    in_Dams = modsGDB + os.sep + "NID_damsVA_local" # somewhat dynamic
    in_Cores = modsGDB + os.sep + "Cores123_local" # relatively static
    in_NWI = modsGDB + os.sep + "VA_Wetlands_local" # relatively static
-   in_FlowBuff = modsGDB + os.sep + "FlowBuff150_local" # relatively static
-   
+
    # Ancillary Data for SCS sites - set it and forget it until you are notified of an update
-   in_netGDB = r"D:\projects\ConSites\arc\data\VA_HydroNetHR.gdb"
+   in_netGDB = r"D:\projects\NHD\network_datasets\VA_HydroNet\VA_HydroNetHR.gdb"
    in_hydroNet = os.path.join(in_netGDB, "HydroNet", "HydroNet_ND")
    in_Catch = os.path.join(in_netGDB, "NHDPlusCatchment")
+   in_FlowBuff = os.path.join(in_netGDB, "FlowBuff150")
 
    # SCU/SCS trim setting
    trim = "true"
@@ -114,7 +114,7 @@ def main():
    else:
       createFGDB(scratchGDB)
    
-   if siteType in ("TCS", "COMBO"):
+   if "TCS" in siteTypes:
       if countFeatures(pfTCS) > 0:
          printMsg("Creating terrestrial SBBs...")
          tStart = datetime.now()
@@ -159,7 +159,7 @@ def main():
    else:
       pass
    
-   if siteType in ("AHZ", "COMBO"):
+   if "AHZ" in siteTypes:
       if countFeatures(pfAHZ) > 0:
          printMsg("Working on Anthropogenic Habitat Zones...")
          
@@ -201,7 +201,7 @@ def main():
    else:
       pass
    
-   if siteType in ("SCU", "SCS", "COMBO"):
+   if any(("SCU" in siteTypes, "SCS" in siteTypes)):
       if countFeatures(pfSCS) > 0:
          printMsg("Working on Stream Conservation Units and/or Sites...")
          
@@ -235,7 +235,7 @@ def main():
          deltaString = GetElapsedTime (tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
-         if siteType in ("SCU", "COMBO"):
+         if "SCU" in siteTypes:
             # Delineate Stream Conservation Units
             printMsg("Creating Stream Conservation Units...")
             tStart = datetime.now()
@@ -257,7 +257,7 @@ def main():
                deltaString = GetElapsedTime (tStart, tEnd)
                printMsg("Elapsed time: %s" %deltaString)
          
-         if siteType in ("SCS", "COMBO"):
+         if "SCS" in siteTypes:
             # Delineate Stream Conservation Sites
             printMsg("Creating Stream Conservation Sites...")
             tStart = datetime.now()
