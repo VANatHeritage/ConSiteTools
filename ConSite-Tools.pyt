@@ -61,7 +61,9 @@ def getViewExtent(set=True):
          arcpy.env.extent = viewExtent
          printMsg("Set processing extent to current view extent.")
    except:
-      printMsg("Could not set processing extent.")
+      if set:
+         printMsg("Could not set processing extent. For better performance, make sure your map is open and set to appropriate view extent when you run this tool.")
+      viewExtent = None
       pass
    return viewExtent
 
