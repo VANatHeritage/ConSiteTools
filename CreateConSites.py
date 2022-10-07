@@ -1568,13 +1568,16 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
          
          del core
    
-   # Merge, dissolve original SBBs with buffered SBBs, and smooth to get final shapes
-   # printMsg('Merging all SBBs...')
+   # Merge and smooth to get final shapes
+   # headsup: Removed the dissolve here, to retain the original SBB polygons in out_SBB. This allows the ChopMod procedure to
+   #  work on both the original and expanded SBBs, making for consistent delineation regardless if SBB was expanded to core.
    sbbAll = scratchGDB + os.sep + "sbbAll"
-   arcpy.Merge_management ([SBB_sub, sbbExpand], sbbAll)
-   dissSBB = scratchGDB + os.sep + "dissSBB"
-   arcpy.Dissolve_management (sbbAll, dissSBB, [fld_SFID, "intRule"], "")
-   arcpy.cartography.SmoothPolygon(dissSBB, out_SBB, "PAEK", "120 METERS")
+   fms = BuildFieldMappings([SBB_sub, sbbExpand], [fld_SFID, "intRule"])
+   arcpy.Merge_management([SBB_sub, sbbExpand], sbbAll, fms, "ADD_SOURCE_INFO")
+   # arcpy.Merge_management ([SBB_sub, sbbExpand], sbbAll)
+   # dissSBB = scratchGDB + os.sep + "dissSBB"
+   # arcpy.Dissolve_management (sbbAll, dissSBB, [fld_SFID, "intRule"], "")
+   arcpy.cartography.SmoothPolygon(sbbAll, out_SBB, "PAEK", "120 METERS")
    
    printMsg('SBB expansion complete')
    

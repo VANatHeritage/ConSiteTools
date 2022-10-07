@@ -983,3 +983,19 @@ def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
    arcpy.Dissolve_management(joinLines, outLines, "grpID", "", "MULTI_PART", "DISSOLVE_LINES")
    
    return outLines
+
+def BuildFieldMappings(in_FCs, in_Flds):
+   """
+   Build a field mappings object for one or more feature classes. Useful for reducing the amount of fields in a copied
+   or merged feature class.
+   :param in_FCs: feature class(es). Must be a list.
+   :param in_Flds: field names. Must be a list.
+   :return: field mappings string to pass as a parameter value for GP functions (e.g. Merge).
+   """
+   fms = arcpy.FieldMappings()
+   for f in in_Flds:
+      fm = arcpy.FieldMap()
+      for fc in in_FCs:
+         fm.addInputField(fc, f)
+      fms.addFieldMap(fm)
+   return fms.exportToString()
