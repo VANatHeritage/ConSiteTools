@@ -1021,10 +1021,10 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - out_Clusters: output clusters
    - out_subErase: output modified erase features
    - searchDist: search distance used to cluster fragments back together
-   - smthDist: dilation distance for smoothing  (NOTE THIS IS NOT CURRENTLY USED - distances are entered directly).
+   - smthDist: dilation distance for smoothing
    '''
    # Use in_EraseFeats to chop out sections of PFs
-   # printMsg('Chopping polygons...')
+   printMsg('Running ChopMod...')
    firstChopPF = scratchGDB + os.sep + 'firstChopPF'
    arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
 
@@ -1033,11 +1033,11 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    #  Could do a workaround here, but decided to just add a warning to the CreateConSites function when this happens,
    #  so that the user can deal with it by editing the modification features and/or PFs.
 
-   # Eliminate parts comprising less than 5% of total original feature size
-   # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
-   # printMsg('Eliminating insignificant fragments...')
+   # Eliminate parts comprising less than 1% of total original feature size
+   # Originally considered 5%, but that appeared too high, especially for large delineated PFs. Will use 1%, but may decide to remove this altogether.
+   # You want to err on the side of caution for throwing out parts of PF.
    rtnPartsPF = scratchGDB + os.sep + 'rtnPartsPF'
-   arcpy.management.EliminatePolygonPart(firstChopPF, rtnPartsPF, 'PERCENT', '', 5, 'ANY')
+   arcpy.management.EliminatePolygonPart(firstChopPF, rtnPartsPF, 'PERCENT', '', 1, 'ANY')
    # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
 
    # Use in_EraseFeats to chop out sections of input features
@@ -1066,18 +1066,8 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
       arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
       arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
-   
-   # # Use in_EraseFeats to chop out sections of PFs
-   # # printMsg('Chopping polygons...')
-   # firstChop2 = scratchGDB + os.sep + 'firstChop2'
-   # arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChop2)
 
-   # # Eliminate parts comprising less than 5% of total original feature size
-   # # I think 5% is good for PFs but haven't thoroughly evaluated. You want to err on the side of caution for throwing out parts of PF.
-   # # printMsg('Eliminating insignificant fragments...')
-   # rtnParts2 = scratchGDB + os.sep + 'rtnParts2'
-   # arcpy.management.EliminatePolygonPart(firstChop2, rtnParts2, 'PERCENT', '', 5, 'ANY')
-   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
    
    # Shrinkwrap retained parts to fill in gaps narrower than search distance
