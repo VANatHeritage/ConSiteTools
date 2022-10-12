@@ -1607,7 +1607,9 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    exclQry = "NH_IGNORE = 0 OR NH_IGNORE IS NULL"
    buffDist = "50 METERS" # Distance used to buffer ProtoSites to establish the area for further processing. Essential to add a little extra!
    searchDist = "0 METERS" # Distance from PFs used to determine whether to cull SBB and ConSite fragments after ProtoSites have been split.
-   coalDist = "20 METERS" # Distance for stitching split fragments and sites back together.
+   siteSearchDist = "20 METERS"  # Distance for stitching split fragments and sites back together.
+   siteSmthDist = "20 METERS"  # Smoothing distance applied to ShrinkWrap and Coalesce for SBB-fragment and site-level procedures.
+      # Will smooth gaps up to 2x this distance. Note that the final smoothing distance is 1.25x this value.
    
    if not scratchGDB:
       scratchGDB = "in_memory"
@@ -1812,7 +1814,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             printMsg('Chopping SBBs and modifying erase features...')
             sbbClusters = scratchGDB + os.sep + 'sbbClusters'
             sbbErase = scratchGDB + os.sep + 'sbbErase'
-            ChopMod(tmpPF, tmpSBB, "SFID", coalErase, sbbClusters, sbbErase, coalDist, "20 METERS", scratchParm)
+            ChopMod(tmpPF, tmpSBB, "SFID", coalErase, sbbClusters, sbbErase, siteSearchDist, siteSmthDist, scratchParm)
             arcpy.management.MakeFeatureLayer(sbbClusters, "sbbClust") 
             
             # Stitch sbb clusters together and modify erase features some more? NOPE.
@@ -1899,7 +1901,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Final smoothing operation. Yes this is necessary!
                   printMsg('Smoothing boundaries...')
                   smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter2)
-                  Coalesce(ssBnd, "10 METERS", smoothBnd, scratchParm)
+                  Coalesce(ssBnd, multiMeasure(siteSearchDist, 0.5)[2], smoothBnd, scratchParm)
 
                   # Append the final geometry to the split sites group feature class.
                   printMsg("Appending features...")
@@ -1925,9 +1927,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                printMsg('Checking if we should patch some gaps...')
                # Intersect thin outer buffers
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
-               # arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, coalDist, "OUTSIDE_ONLY")
-               arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, "50 METERS", "OUTSIDE_ONLY")
-               # Went wider than coalDist hoping to avoid some weirdness
+               patchDist = multiMeasure(siteSearchDist, 2.5)[2]  # Went wider than siteSearchDist hoping to avoid some weirdness
+               arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, patchDist, "OUTSIDE_ONLY")
                intBuff = scratchGDB + os.sep + "intBuff%s"%str(counter)
                arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
                # Intersect returns two identical polygons for each intersect. Remove duplicates, retaining the polygon associated with the smaller-perimeter source polygon.
@@ -1958,7 +1959,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                         printMsg("There are %s interstitial patches retained. Patching..."%str(selPatches))
                         # Make a smoother patch
                         buffFrags = scratchGDB + os.sep + "buffFrags%s"%str(counter)
-                        arcpy.analysis.Buffer("patch_lyr", buffFrags, "51 METERS")
+                        patchDist2 = multiMeasure(patchDist, 1.02)[2]
+                        arcpy.analysis.Buffer("patch_lyr", buffFrags, patchDist2)
                         clipFrags = scratchGDB + os.sep + "clipFrags%s"%str(counter) 
                         arcpy.analysis.Clip(buffFrags, tmpSS_grp2, clipFrags)
                         chullPatch = scratchGDB + os.sep + "chullPatch%s" % str(counter)
@@ -1982,7 +1984,9 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Final smoothing operation. Yes this is necessary!
             printMsg('Smoothing boundaries...')
             smoothBnd = scratchGDB + os.sep + "smoothFin%s"%str(counter)
-            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, smthDist = "10 METERS")
+            # Using a slightly larger smooth distance here, to reduce number of slivers/cuts related to erase
+            # features having width slightly +/- the siteSmthDist width.
+            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, multiMeasure(siteSmthDist, 1.25)[2])
             
             # Chop out the exclusion features once more
             if site_Type == 'TERRESTRIAL':  
@@ -2192,6 +2196,8 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    printMsg("Generating points along network...")
    arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
    # arcpy.analysis.PairwiseIntersect([mergeLines, shift_PF], out_Points, "", "", "POINT")
+   printMsg("Removing duplicate points...")
+   arcpy.management.DeleteIdentical(tmpPts, "Shape")
    
    # Clip wetlands to shifted PF
    printMsg("Clipping wetlands...")
