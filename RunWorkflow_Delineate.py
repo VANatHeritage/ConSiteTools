@@ -21,7 +21,7 @@ def main():
    
    # Specify which site type(s) to run.
    # Choices are: "TCS", "AHZ", "SCU", "SCS"
-   siteTypes = ("TCS")
+   siteTypes = ("SCS")
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
@@ -35,7 +35,8 @@ def main():
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   outGDB = r'D:\projects\ConSites\arc\statewide\statewideTCS_dev21_' + datetime.now().strftime("%Y%m%d") + '.gdb'
+   runName = 'statewideSCS'
+   outGDB = os.path.join(r'D:\projects\ConSites\arc', 'statewide', runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
 
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
@@ -50,7 +51,7 @@ def main():
    in_Exclude = modsGDB + os.sep + "ExclusionFeatures_local" # highly dynamic
    in_Hydro = modsGDB + os.sep + "HydrographicFeatures_local" # highly dynamic
    in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces_local" # somewhat dynamic
-   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces_local" # somewhat dynamic
+   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces" # somewhat dynamic
    in_Dams = modsGDB + os.sep + "NID_damsVA_local" # somewhat dynamic
    in_Cores = modsGDB + os.sep + "Cores123_local" # relatively static
    in_NWI = modsGDB + os.sep + "VA_Wetlands_local" # relatively static
