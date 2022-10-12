@@ -4,9 +4,8 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 ### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-09-29):
 
 #### Version 2.1 (*in development*)
-- Terrestrial Conservation Sites updates:
+- TCS/AHZ updates:
   - implemented numerous algorithmic changes to improve site boundaries
-  - tweaked the "patching" procedure, so that smaller sites will also merge when meeting the distance criteria
 
 - SCS/SCU updates:
   - Updated PF alignment criteria, so that larger polygons with high overlap with the hydrological network are *not* shifted (previously all PFs were shifted)
@@ -26,9 +25,9 @@ Updated toolbox to work with ArcGIS Pro, and implemented some algorithmic change
 
 - The delineation process for Stream Conservation Sites has been finalized (most likely). Changes include:
    - No more support for the intermediate SCU output
-   - Tidal areas are treated differently than non-tidal areas. For tidal points, the stream network is traversed 3 km both up- and down-stream. For other points, the stream network is traversed 3 km upstream and 500 m downstream. 
+   - Tidal areas are treated differently than non-tidal areas. For tidal points, the stream network is traversed 3 km both up- and down-stream. For other points, the stream network is traversed 3 km upstream and 500 m downstream.
    - The process requires a 150-m flow buffer input (polygon shapefile derived from a raster) which determines the amount of area to include on either side of streams and rivers.
-   - For procedural features, the process requires that the "SCU" rule is replaced with either "SCU1" (regular features) or "SCU2" (for features that use the terrestrial resources and are mapped relatively far from water). For the latter type, full catchments are burned in. 
+   - For procedural features, the process requires that the "SCU" rule is replaced with either "SCU1" (regular features) or "SCU2" (for features that use the terrestrial resources and are mapped relatively far from water). For the latter type, full catchments are burned in.
 
 
 #### Version 1.2 

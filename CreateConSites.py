@@ -1608,8 +1608,8 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    buffDist = "50 METERS" # Distance used to buffer ProtoSites to establish the area for further processing. Essential to add a little extra!
    searchDist = "0 METERS" # Distance from PFs used to determine whether to cull SBB and ConSite fragments after ProtoSites have been split.
    siteSearchDist = "20 METERS"  # Distance for stitching split fragments and sites back together.
-   siteSmthDist = "20 METERS"  # Smoothing distance applied to ShrinkWrap and Coalesce for SBB-fragment and site-level procedures.
-      # Will smooth gaps up to 2x this distance. Note that the final smoothing distance is 1.25x this value.
+   siteSmthDist = "10 METERS"  # Smoothing distance applied to ShrinkWrap and Coalesce for SBB-fragment and site-level procedures.
+      # Will smooth gaps up to 2x this distance. The final smoothing distance is 2.5x this value, which helps fill in incisions.
    
    if not scratchGDB:
       scratchGDB = "in_memory"
@@ -1901,7 +1901,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Final smoothing operation. Yes this is necessary!
                   printMsg('Smoothing boundaries...')
                   smoothBnd = scratchGDB + os.sep + "smooth%s"%str(counter2)
-                  Coalesce(ssBnd, multiMeasure(siteSearchDist, 0.5)[2], smoothBnd, scratchParm)
+                  Coalesce(ssBnd, siteSmthDist, smoothBnd, scratchParm)
 
                   # Append the final geometry to the split sites group feature class.
                   printMsg("Appending features...")
@@ -1927,7 +1927,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                printMsg('Checking if we should patch some gaps...')
                # Intersect thin outer buffers
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
-               patchDist = multiMeasure(siteSearchDist, 2.5)[2]  # Went wider than siteSearchDist hoping to avoid some weirdness
+               patchDist = multiMeasure(siteSearchDist, 2.5)[2]  # Went a bit wider than 2x siteSearchDist, hoping to avoid some weirdness
                arcpy.analysis.Buffer(tmpSS_grp2, outerBuff, patchDist, "OUTSIDE_ONLY")
                intBuff = scratchGDB + os.sep + "intBuff%s"%str(counter)
                arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
@@ -1984,9 +1984,9 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Final smoothing operation. Yes this is necessary!
             printMsg('Smoothing boundaries...')
             smoothBnd = scratchGDB + os.sep + "smoothFin%s"%str(counter)
-            # Using a slightly larger smooth distance here, to reduce number of slivers/cuts related to erase
-            # features having width slightly +/- the siteSmthDist width.
-            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, multiMeasure(siteSmthDist, 1.25)[2])
+            # Using a 2.5x multiple of the siteSmthDist here, to reduce number of slivers/cuts related to erase features
+            # having widths similar to the siteSmthDist distance.
+            ShrinkWrap(dissFrags, "1 METERS", smoothBnd, multiMeasure(siteSmthDist, 2.5)[2])
             
             # Chop out the exclusion features once more
             if site_Type == 'TERRESTRIAL':  
