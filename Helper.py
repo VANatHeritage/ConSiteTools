@@ -129,7 +129,7 @@ def CleanFeatures(inFeats, outFeats):
    
    # Process: Repair Geometry
    # printMsg("Repairing geometry...")
-   arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
+   # arcpy.management.RepairGeometry(inFeats, "DELETE_NULL")
 
    # Have to add the while/try/except below b/c polygon explosion sometimes fails inexplicably.
    # This gives it 10 tries to overcome the problem with repeated geometry repairs, then gives up.
@@ -194,8 +194,8 @@ def CleanClip(inFeats, clipFeats, outFeats, scratchGDB = "in_memory"):
    CleanFeatures(tmpClip, outFeats)
    
    # Cleanup
-   if scratchGDB == "in_memory":
-      garbagePickup([tmpClip])
+   # if scratchGDB == "in_memory":
+   #    garbagePickup([tmpClip])
    
    return outFeats
    
@@ -213,8 +213,8 @@ def CleanErase(inFeats, eraseFeats, outFeats, scratchGDB = "in_memory"):
    CleanFeatures(tmpErased, outFeats)
    
    # Cleanup
-   if scratchGDB == "in_memory":
-      garbagePickup([tmpErased])
+   # if scratchGDB == "in_memory":
+   #    garbagePickup([tmpErased])
    
    return outFeats
    
@@ -418,8 +418,8 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
    CleanFeatures(Buff2, outFeats)
       
    # Cleanup
-   if scratchGDB == "in_memory":
-      garbagePickup([Buff1, Clean_Buff1, Buff2])
+   # if scratchGDB == "in_memory":
+   #    garbagePickup([Buff1, Clean_Buff1, Buff2])
       
    return outFeats
 
@@ -517,8 +517,8 @@ def ShrinkWrap_OBSOLETE(inFeats, searchDist, outFeats, smthMulti = 8, scratchGDB
          del Feat
 
    # Cleanup
-   if scratchGDB == "in_memory":
-      garbagePickup(trashList)
+   # if scratchGDB == "in_memory":
+   #    garbagePickup(trashList)
       
    return outFeats
    
@@ -613,8 +613,8 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
          del Feat
 
    # Cleanup
-   if scratchGDB == "in_memory":
-      garbagePickup(trashList)
+   # if scratchGDB == "in_memory":
+   #    garbagePickup(trashList)
 
    return outFeats
    
@@ -723,8 +723,8 @@ def clipRasterToPoly(in_Rast, in_Poly, out_Rast):
    
    return out_Rast
    
-def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel = "StreamLeve", scratchGDB = "in_memory"):
-   '''Shifts features to align with flowlines, with preference for primary flowlines over tributaries.
+def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB = "in_memory"):
+   '''Shifts features to align with flowlines.
    Incorporates variation on code found here: https://arcpy.wordpress.com/2012/11/15/shifting-features/
    
    Parameters:
@@ -733,7 +733,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    - fldID: Field in inFeats, containing uniques IDs
    - in_hydroNet = Input hydrological network dataset
    - in_Catch = Input catchments from NHDPlus, assumed to correspond with data in in_hydroNet
-   - fldLevel: Field in inFlowlines indicating the stream level; lower values indicate it is the mainstem (assumed "StreamLeve" by default)
+   - REMOVED fldLevel: Field in inFlowlines indicating the stream level; lower values indicate it is the mainstem (assumed "StreamLeve" by default)
    - scratchGDB: Geodatabase for storing intermediate outputs (assumed in_memory by default
    '''
    
@@ -744,17 +744,13 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    nhdFlowline = catPath + os.sep + "NHDFlowline"
    nhdArea = catPath + os.sep + "NHDArea"
    nhdWaterbody = catPath + os.sep + "NHDWaterbody"
-   minFld = "MIN_%s"%fldLevel
+   # minFld = "MIN_%s"%fldLevel
    
    # Make a copy of input features, and add a field to store alignment type
    tmpFeats = scratchGDB + os.sep + "tmpFeats"
    arcpy.CopyFeatures_management (inFeats, tmpFeats)
    inFeats = tmpFeats
    arcpy.AddField_management (inFeats, "AlignType", "TEXT", "", "", 1)
-   
-   # # Get (pseudo-)centroid of features to be shifted
-   # centroids = scratchGDB + os.sep + "centroids"
-   # arcpy.FeatureToPoint_management(inFeats, centroids, "INSIDE")
    
    # Make feature layers  
    lyrFeats = arcpy.MakeFeatureLayer_management (inFeats, "lyr_inFeats")
@@ -766,15 +762,6 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    
    qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
    lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
-
-   ### Assign features to stream or river (wide-water) alignment processes
-   # # Select the input features intersecting StreamRiver polys: new selection
-   # printMsg("Selecting features intersecting StreamRiver...")
-   # lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrStreamRiver, "", "NEW_SELECTION", "NOT_INVERT")
-   
-   # # Select the features intersecting LakePond or Reservoir polys: add to existing selection
-   # printMsg("Selecting features intersecting LakePond or Reservoir...")
-   # lyrFeats = arcpy.SelectLayerByLocation_management (lyrFeats, "INTERSECT", lyrLakePond, "", "ADD_TO_SELECTION", "NOT_INVERT")
    
    # Calculate percentage of PF covered by widewater features
    printMsg("Calculating percentages of PFs covered by widewater features...")
@@ -800,23 +787,6 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    expression = "procType(!SUM_PERCENTAGE!)"
    arcpy.CalculateField_management(lyrFeats, "AlignType", expression, "PYTHON", codeblock)
    
-   # # Assign selected features to river process
-   # count = countSelectedFeatures(lyrFeats)
-   # if count > 0:
-      # printMsg("Assigning %s features to river (wide-water) process"%str(count))
-      # arcpy.CalculateField_management (lyrFeats, "AlignType", "R", "PYTHON")
-   # else:
-      # pass
-      
-   # # Switch selection and assign to stream process
-   # lyrFeats = arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
-   # count = countSelectedFeatures(lyrFeats)
-   # if count > 0:
-      # printMsg("Assigning %s features to stream process"%str(count))
-      # arcpy.CalculateField_management (lyrFeats, "AlignType", "S", "PYTHON")
-   # else:
-      # pass
-   
    # Save out features getting the river (wide-water) process
    printMsg("Saving out the features for river (wide-water) process")
    riverFeats = scratchGDB + os.sep + "riverFeats"
@@ -826,7 +796,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    
    # Save out features getting the stream process
    printMsg("Switching selection and saving out the PFs for stream process")
-   lyrFeats = arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
+   arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
    streamFeats = scratchGDB + os.sep + "streamFeats"
    # arcpy.CopyFeatures_management (lyrFeats, streamFeats)
    where_clause = '"AlignType" = \'S\''
@@ -836,7 +806,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    ## Stream process
    # Select catchments intersecting stream features
    printMsg("Selecting catchments intersecting stream features...")
-   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats, "", "NEW_SELECTION")
    
    # Clip flowlines to selected catchments
    printMsg("Clipping flowlines to selected catchments...")
@@ -846,8 +816,8 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    ## River process
    # Select StreamRiver and LakePond polys intersecting input features
    printMsg("Selecting open water polygons intersecting input features...")
-   lyrStreamRiver = arcpy.SelectLayerByLocation_management (lyrStreamRiver, "INTERSECT", riverFeats)
-   lyrLakePond = arcpy.SelectLayerByLocation_management (lyrLakePond, "INTERSECT", riverFeats)
+   arcpy.SelectLayerByLocation_management (lyrStreamRiver, "INTERSECT", riverFeats)
+   arcpy.SelectLayerByLocation_management (lyrLakePond, "INTERSECT", riverFeats)
    
    # Merge selected polygons into single layer
    printMsg("Merging widewater features...")
@@ -856,7 +826,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
    
    # Select catchments intersecting river features
    printMsg("Selecting catchments intersecting river features...")
-   lyrCatch = arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", riverFeats, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", riverFeats, "", "NEW_SELECTION")
    
    # Clip widewater to selected catchments
    printMsg("Clipping widewaters to selected catchments...")
@@ -877,11 +847,10 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
       nameTag = parms[2]
       printMsg("Aligning " + os.path.basename(inFeats) + "...")
 
-      # Note: Especially for large polygons, it was noticed that shifting could have undesirable results, particularly
-      #  when the centroid is generated in a location not close to a flowline.
-      #  The section below counts number and length of intersections of PF polygon features with flowlines.
-      #  Only PFs with (total flowline intersection shape_length < PF shape_length / 4) OR (<3 unique flowline intersections)
-      #  will be subject to the shifting procedure. PFs that do not meet those criteria will not be shifted.
+      # The section below counts number and length of intersections of PF polygon features with flowlines. Only PFs
+      # with (total flowline intersection shape_length < PF shape_length / 4) OR (<3 unique flowline intersections)
+      # will be subject to the shifting procedure. PFs that do not meet those criteria are expected to be fairly well
+      # aligned and will not be shifted.
       flowInt = scratchGDB + os.sep + "flowInt" + nameTag
       arcpy.PairwiseIntersect_analysis([inFeats, inFlowlines], flowInt)
       arcpy.CalculateField_management(flowInt, "intLength", "!Shape.Length@Meters!", field_type="FLOAT")
@@ -896,38 +865,57 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, fldLevel =
       centroids = scratchGDB + os.sep + "centroids%s"%nameTag
       arcpy.FeatureToPoint_management(lyrToShift, centroids, "INSIDE")
       
-      # Get near table: distance from centroids to 3 nearest flowlines, including location info
+      # Get near table: distance from centroids to nearest flowlines, including location info
       # Note: This output cannot be written to memory or it doesn't produce the location info, which is needed. Why, Arc, why???
       nearTab = arcpy.env.scratchGDB + os.sep + "nearTab%s"%nameTag
-      arcpy.GenerateNearTable_analysis(centroids, inFlowlines, nearTab, "", "LOCATION", "ANGLE", "ALL", "3", "PLANAR")
+      arcpy.GenerateNearTable_analysis(centroids, inFlowlines, nearTab, "", "LOCATION", "ANGLE", "ALL", "1", "PLANAR")
       
       # Join centroid IDs to near table
       arcpy.JoinField_management(nearTab, "IN_FID", centroids, "OBJECTID", fldID)
-      
-      # Join StreamLevel from flowlines to near table
-      arcpy.JoinField_management(nearTab, "NEAR_FID", inFlowlines, "OBJECTID", fldLevel)
-      
-      # Get summary statistics to determine lowest StreamLevel value for each centroid; attach to near table
-      sumTab = scratchGDB + os.sep + "sumTab%s"%nameTag
-      stats = "%s MIN"%fldLevel
-      arcpy.Statistics_analysis(nearTab, sumTab, stats, "IN_FID")
-      arcpy.JoinField_management(nearTab, "IN_FID", sumTab, "IN_FID", minFld)
-      
-      # Keep only records with lowest StreamLevel values
-      where_clause = "StreamLeve = %s"%minFld
-      arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
-      
-      # Get summary statistics to determine shortest distance among remaining records; attach to near table
-      sumTab2 = scratchGDB + os.sep + "sumTab2%s"%nameTag
-      arcpy.Statistics_analysis("nearTab_View", sumTab2, "NEAR_DIST MIN", "IN_FID")
-      arcpy.JoinField_management(nearTab, "IN_FID", sumTab2, "IN_FID", "MIN_NEAR_DIST")
-      
-      # Get final record set
-      where_clause = "StreamLeve = %s AND NEAR_DIST = MIN_NEAR_DIST"%minFld
-      arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
-      
+
       # Join from/to x,y fields from near table to the input features
       arcpy.JoinField_management(lyrToShift, fldID, nearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
+
+      # headsup: As it was previously coded, StreamLeve (SL) did not have any effect on the result; the shift was always being made to the nearest flowline.
+      #  The commented-out code below fixes that, but I decided not to use, because it produced poor results, since the
+      #  lowest-SL flowline was often very far from the original PF position. This is made even worse in large-extent analyses.
+
+      # Coulddo: To incorporate SL in picking between multiple near flowlines, would need to either do some combination of:
+      #   - do the near comparison to the full flowlines layer, instead of (clipped) streamLines/riverLines
+      #     - OR ensure that 3+ flowlines near each feature are included in (streamLines/riverLines)
+      #   - limit the Near search distance
+      #   - limit it to certain situations only (i.e. widewater)
+
+      # # Join StreamLevel from flowlines to near table
+      # arcpy.JoinField_management(nearTab, "NEAR_FID", inFlowlines, "OBJECTID", fldLevel)
+      #
+      # # Get summary statistics to determine lowest StreamLevel value for each centroid; attach to near table
+      # sumTab = scratchGDB + os.sep + "sumTab%s"%nameTag
+      # stats = "%s MIN"%fldLevel
+      # arcpy.Statistics_analysis(nearTab, sumTab, stats, "IN_FID")
+      # arcpy.JoinField_management(nearTab, "IN_FID", sumTab, "IN_FID", minFld)
+      #
+      # # Keep only records with lowest StreamLevel values
+      # where_clause = "StreamLeve = %s"%minFld
+      # arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+      #
+      # # Get summary statistics to determine shortest distance among remaining records by fldID; attach to near table
+      # # NOTE: this is only necessary if there is more than one point per fldID.
+      # sumTab2 = scratchGDB + os.sep + "sumTab2%s"%nameTag
+      # arcpy.Statistics_analysis(nearTab, sumTab2, "NEAR_DIST MIN", fldID)
+      # arcpy.JoinField_management(nearTab, fldID, sumTab2, fldID, "MIN_NEAR_DIST")
+      #
+      # # Get final record set
+      # where_clause = "StreamLeve = %s AND NEAR_DIST = MIN_NEAR_DIST"%minFld
+      # arcpy.MakeTableView_management(nearTab, "nearTab_View", where_clause)
+      #
+      # # Get final record set as new table
+      # where_clause = "NEAR_DIST = MIN_NEAR_DIST"
+      # finalNearTab = scratchGDB + os.sep + "finalNearTab%s" % nameTag
+      # arcpy.TableSelect_analysis(nearTab, finalNearTab, where_clause)
+      #
+      # # Join from/to x,y fields from near table to the input features
+      # arcpy.JoinField_management(lyrToShift, fldID, finalNearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
       
       # Calculate shift in x/y directions
       arcpy.AddField_management(lyrToShift, "DIFF_X", "DOUBLE")
@@ -996,6 +984,9 @@ def BuildFieldMappings(in_FCs, in_Flds):
    for f in in_Flds:
       fm = arcpy.FieldMap()
       for fc in in_FCs:
-         fm.addInputField(fc, f)
+         try:
+            fm.addInputField(fc, f)
+         except:
+            print("Couldn't add field " + f + " from feature class " + fc + ".")
       fms.addFieldMap(fm)
    return fms.exportToString()

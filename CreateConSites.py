@@ -711,7 +711,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
 
    # Process:  Add Fields; Calculate Fields
    printMsg("Calculating fields...")
-   for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 250)]:
+   for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 1000)]:
       arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2]) 
    CodeBlock = """def Flag(ModType):
       if ModType in ("N", "M", "C", "S", "B"):
@@ -2041,6 +2041,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    This tool only needs to be run the first time you run the suite of SCS delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCS delineation sequence.
    
    NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually). If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
+      - UPDATE: Restrictions are set in Travel Modes now, which are defined in the Network Dataset.
    
    Parameters:
    - in_hydroNet = Input hydrological network dataset
@@ -2163,8 +2164,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    # Shift PFs to align with primary flowline
    printMsg("Starting shiftAlign function...")
    shift_PF = out_Scratch + os.sep + "shift_PF"
-   #(shiftFeats, clipWideWater, nhdFlowline) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
-   (shiftFeats, clipWideWater, mergeLines) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, "StreamLeve", out_Scratch)
+   (shiftFeats, clipWideWater, mergeLines) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, out_Scratch)
    printMsg("PF alignment complete")
    
    # # Select catchments intersecting shifted PFs
