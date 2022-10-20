@@ -28,19 +28,20 @@ def main():
    ysnQC = "N"
    
    # Specify the cutoff percentage area difference, used to flag significantly changed site boundaries
-   cutVal = 5  
+   cutVal = 5
    
    # Geodatabase containing parsed Biotics data 
    bioticsGDB = r"D:\projects\ConSites\arc\Biotics_data.gdb"
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   runName = 'statewideSCS'
+   runName = 'statewideSCS_2_1dev'
    outGDB = os.path.join(r'D:\projects\ConSites\arc', 'statewide', runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
 
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
-   scratchGDB = "in_memory"  # "in_memory" | r"D:\projects\ConSites\arc\statewide\scratch_statewide.gdb"
+   scratchGDB = "in_memory"
+   # OPTIONS: "in_memory" | os.path.join(r"D:\projects\ConSites\arc\statewide", "scratch_" + runName + ".gdb")
    
    # Exported feature service data used to create sites
    # Datasets marked "highly dynamic" are often edited by users and require regular fresh downloads
@@ -48,13 +49,13 @@ def main():
    # Datasets marked "relatively static" only need to be refreshed when full dataset overhaul is done
    # Recommendation: Export data from services within ArcGIS Pro project set up for site delineation, rather than downloading from ArcGIS Online, so that all can be directly saved to a single geodatabase. Otherwise you'll have to change paths below.
    modsGDB = r"D:\projects\ConSites\arc\ConSiteTools_refData.gdb"
-   in_Exclude = modsGDB + os.sep + "ExclusionFeatures_local" # highly dynamic
-   in_Hydro = modsGDB + os.sep + "HydrographicFeatures_local" # highly dynamic
-   in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces_local" # somewhat dynamic
-   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces" # somewhat dynamic
-   in_Dams = modsGDB + os.sep + "NID_damsVA_local" # somewhat dynamic
-   in_Cores = modsGDB + os.sep + "Cores123_local" # relatively static
-   in_NWI = modsGDB + os.sep + "VA_Wetlands_local" # relatively static
+   in_Exclude = modsGDB + os.sep + "ExclusionFeatures"  # highly dynamic
+   in_Hydro = modsGDB + os.sep + "HydrographicFeatures"  # highly dynamic
+   in_Rail = modsGDB + os.sep + "VirginiaRailSurfaces"  # somewhat dynamic
+   in_Roads = modsGDB + os.sep + "VirginiaRoadSurfaces"  # somewhat dynamic
+   in_Dams = modsGDB + os.sep + "NID_damsVA"  # somewhat dynamic
+   in_Cores = modsGDB + os.sep + "Cores123"  # relatively static
+   in_NWI = modsGDB + os.sep + "VA_Wetlands"  # relatively static
 
    # Ancillary Data for SCS sites - set it and forget it until you are notified of an update
    in_netGDB = r"D:\projects\NHD\network_datasets\VA_HydroNet\VA_HydroNetHR.gdb"
@@ -117,6 +118,11 @@ def main():
    
    if "TCS" in siteTypes:
       if countFeatures(pfTCS) > 0:
+         printMsg("Working on Terrestrial Conservation Sites...")
+         printMsg("Copying original PFs/sites to output geodatabase...")
+         arcpy.CopyFeatures_management(pfTCS, outGDB + os.sep + os.path.basename(pfTCS))
+         arcpy.CopyFeatures_management(csTCS, outGDB + os.sep + os.path.basename(csTCS))
+
          printMsg("Creating terrestrial SBBs...")
          tStart = datetime.now()
          printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
@@ -163,6 +169,9 @@ def main():
    if "AHZ" in siteTypes:
       if countFeatures(pfAHZ) > 0:
          printMsg("Working on Anthropogenic Habitat Zones...")
+         printMsg("Copying original PFs/sites to output geodatabase...")
+         arcpy.CopyFeatures_management(pfAHZ, outGDB + os.sep + os.path.basename(pfAHZ))
+         arcpy.CopyFeatures_management(csAHZ, outGDB + os.sep + os.path.basename(csAHZ))
          
          # Create SBBs
          printMsg("Creating AHZ SBBs...")
@@ -205,6 +214,9 @@ def main():
    if any(("SCU" in siteTypes, "SCS" in siteTypes)):
       if countFeatures(pfSCS) > 0:
          printMsg("Working on Stream Conservation Units and/or Sites...")
+         printMsg("Copying original PFs/sites to output geodatabase...")
+         arcpy.CopyFeatures_management(pfSCS, outGDB + os.sep + os.path.basename(pfSCS))
+         arcpy.CopyFeatures_management(csSCS, outGDB + os.sep + os.path.basename(csSCS))
          
          # Create service layers
          printMsg("Creating service layers...")
