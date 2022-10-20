@@ -1361,7 +1361,7 @@ class sites_scs(object):
          
       parm2 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
       
-      parm3 = defineParam("in_Lines", "Input SCU lines", "GPFeatureLayer", "Required", "Input")
+      parm3 = defineParam("in_Lines", "Input SCS lines", "GPFeatureLayer", "Required", "Input")
       if "scsLines" in lnames:
          parm3.value = "scsLines"
       else: 

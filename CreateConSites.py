@@ -2430,12 +2430,12 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    Output_CS_fname = filename
 
    # Smoothing switch. Used to smooth raster-based boundaries of catchments and flow buffers.
-   if buffDist <= 10 and trim == "true":
+   if buffDist < 150 and trim == "true":
       # For small flow buffers (e.g. SCU), smooth the catchments only. This means smoothing will not be applied to buffers of flowlines or NHDArea/Waterbody polygons
-      smthCatchOnly = True
+      scuSwitch = True
    else:
       # For larger buffers or un-trimmed catchment-only SCS, this will smooth the entire SCS polygon
-      smthCatchOnly = False
+      scuSwitch = False
 
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
@@ -2499,6 +2499,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                arcpy.env.extent = clipBuff
                arcpy.Clip_analysis (in_FlowBuff, clipBuff, flowPoly)
                
+               # For SCUs, Eliminate any dangling pieces which may have resulted from clip. These can result becuase the flow buffers/catchments do not always perfectly align with flowlines
+               if scuSwitch:
+                  printMsg("Eliminating fragments...")
+                  dissFlow = out_Scratch + os.sep + "dissFlow"
+                  arcpy.management.Dissolve(flowPoly, dissFlow)
+                  flowPoly2 = out_Scratch + os.sep + "flowPoly2"
+                  arcpy.EliminatePolygonPart_management(dissFlow, flowPoly2, "AREA", part_area="500 SQUAREMETERS", part_option="ANY")
+                  flowPoly = flowPoly2
+               
                printMsg("Appending feature %s..." %lineID)
                arcpy.Append_management (flowPoly, flowBuff, "NO_TEST")
 
@@ -2511,11 +2520,10 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       qry = "%s = 'SCS2'"%fld_Rule
       altPF = arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
       count = countFeatures(altPF)
-      print(count)
       if count > 0:
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
          printMsg("Appending full catchments for selected features...")
-         if smthCatchOnly:
+         if scuSwitch:
             # Note: have to dissolve catchments before smoothing, otherwise you'll get weird incisions/slivers
             fullCatch = out_Scratch + os.sep + "fullCatch"
             arcpy.PairwiseDissolve_analysis(catch, fullCatch, multi_part="SINGLE_PART")
@@ -2540,17 +2548,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    dissPolys = out_Scratch + os.sep + "dissPolys"
    arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
 
-   # Smooth polygons
-   # This also has the benefit of filling in 1-cell holes at edges, when `error_option="NO_CHECK"` (the default option)
-   if not smthCatchOnly:
+   if not scuSwitch:
+      # Smooth SCS polygons
+      # This also has the benefit of filling in 1-cell holes at edges, when `error_option="NO_CHECK"` (the default option)
       printMsg("Smoothing polygons...")
       dissPolysSmth = out_Scratch + os.sep + "dissPolysSmth"
       arcpy.cartography.SmoothPolygon(dissPolys, dissPolysSmth, "PAEK", "50 METERS")
       selPolys = arcpy.MakeFeatureLayer_management(dissPolysSmth, "selPolys")
    else:
       selPolys = arcpy.MakeFeatureLayer_management(dissPolys, "selPolys")
-
-   printMsg("Eliminating fragments...")
    arcpy.SelectLayerByLocation_management(selPolys, "INTERSECT", in_Lines, "", "NEW_SELECTION")
 
    printMsg("Filling in holes...")
