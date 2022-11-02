@@ -344,18 +344,18 @@ class parse_siteTypes(object):
          printMsg("Cannot add layers; no current map.")
       return
       
-      try:
-         mxd = arcpy.mapping.MapDocument("CURRENT")
-         df = mxd.activeDataFrame
-         printMsg('Adding layers to map...')
-         for fc in fcList:
-            layer = arcpy.mapping.Layer(fc)
-            arcpy.mapping.AddLayer(df, layer, "TOP")
-         return 
-      except:
-         printMsg('Cannot add layers; no current map.')
-         
-      return
+      # This is ArcMap-specific code
+      # try:
+      #    mxd = arcpy.mapping.MapDocument("CURRENT")
+      #    df = mxd.activeDataFrame
+      #    printMsg('Adding layers to map...')
+      #    for fc in fcList:
+      #       layer = arcpy.mapping.Layer(fc)
+      #       arcpy.mapping.AddLayer(df, layer, "TOP")
+      #    return 
+      # except:
+      #    printMsg('Cannot add layers; no current map.')
+      # return
  
       
 # Preparation and Review Tools
@@ -739,7 +739,7 @@ class expand_selection(object):
       else:
          pass
 
-      parm1 = defineParam("inCS_lyr", "Input ConSites", "GPFeatureLayer", "Required", "Input")
+      parm1 = defineParam("inCS_lyr", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "csTerrestrial" in lnames:
          parm1.value = "csTerrestrial"
       elif map.name == "AHZ" and "csAnthro" in lnames:

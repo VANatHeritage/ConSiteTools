@@ -47,7 +47,7 @@ def main():
    ### Set up input variables ###
    # Paths to input and output geodatabases and directories - change these every time
 
-   # ECS output directory for this quarter. This does not need to exist (it is created in MakeECSDir).
+   # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Aug2022'
 
    # Fairly static data; keep using the same until specified otherwise
@@ -57,7 +57,7 @@ def main():
    # multiple tables can be provided, in which case they are merged into one table.
    src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\ElementExclusions']
 
-   # These will need updates for every run. Updates paths as needed.
+   # headsup: These will need updates for every run. Updates paths as needed.
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam220830\conslands_lam.shp'
    src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20220830_174348'
    src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20220830_174348'
@@ -87,7 +87,7 @@ def main():
 
    # Input cutoff years
    # This should change every calendar year
-   yyyy = int(time.strftime('%Y'))
+   yyyy = int(datetime.now().strftime('%Y'))
    cutYear = yyyy - 25  # yyyy - 25 for TCS and SCU
    flagYear = yyyy - 20  # yyyy - 20 for TCS and SCU
    # cutYear_kcs = yyyy - 40  # yyyy - 40 for KCS

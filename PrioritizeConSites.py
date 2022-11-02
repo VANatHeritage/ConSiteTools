@@ -502,8 +502,8 @@ def getBRANK(in_PF, in_ConSites):
 
    if len(failList) > 0:
       printMsg("Processing incomplete for some sites %s"%failList)
-   return (in_ConSites)
    printMsg('Finished.')
+   return (in_ConSites)
 
 def MakeExclusionList(in_Tabs, out_Tab):
    '''Creates a list of elements to exclude from ECS processing, from a set of input spreadsheets which have standardized fields and have been converted to CSV format. 

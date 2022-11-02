@@ -11,16 +11,10 @@
 # ----------------------------------------------------------------------------------------
 
 # Import modules
-import os, sys, traceback, numpy
-try:
-   arcpy
-   print("Arcpy is already loaded")
-except:
-   print("Initiating arcpy, which takes longer than it should...")
-   import arcpy   
+print("Initiating arcpy, which takes longer than it should...")
+import arcpy, os, sys, traceback, numpy
+from datetime import datetime as datetime
 
-from datetime import datetime as datetime   
-   
 # Set overwrite option so that existing data may be overwritten
 arcpy.env.overwriteOutput = True
 

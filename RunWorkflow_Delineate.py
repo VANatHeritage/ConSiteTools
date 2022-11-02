@@ -8,7 +8,7 @@
 # Summary:
 # Workflow for all steps needed to delineate Conservation Sites using a script rather than the toolbox. This script is intended for statewide creation of Terrestrial Conservation Sites (TCS), Anthropogenic Habitat Zones (AHZ), Stream Conservation Units (SCU) and Stream Conservation Sites (SCS), but can also be used for subsets as desired. The user must update the script with user-specific file paths and options. 
 
-# Data sources that are stored as online feature services must be downloaded to your local drive. Biotics data must be extracted and parsed from from within ArcGIS, while on the COV network, using the ConSite Toolbox.
+# Data sources that are stored as online feature services must be downloaded to your local drive. Biotics data must be extracted and parsed from within ArcGIS, while on the COV network, using the ConSite Toolbox.
 # ---------------------------------------------------------------------------
 
 # Import function libraries and settings

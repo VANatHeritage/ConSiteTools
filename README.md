@@ -1,19 +1,22 @@
 # ConSite Toolbox
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-09-29):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-02):
 
-#### Version 2.1 (*in development*)
-- TCS/AHZ updates:
+#### Version 2.1
+
+First version built for use with ArcGIS Pro version 3.x.
+
+- TCS updates:
+  - updated the `2: Expand SBBs with Core Area` tool to include both the original (un-expanded) and expanded SBBs in the output feature class
   - implemented numerous algorithmic changes to improve site boundaries
 
 - SCS/SCU updates:
-  - Updated PF alignment criteria, so that larger polygons with high overlap with the hydrological network are *not* shifted (previously all PFs were shifted)
-  - Added cartographic smoothing to final SCS polygons and full catchments used in SCUs (for "SCS2" features)
+  - Improved PF alignment criteria for creating points on hydrological network
+  - Added cartographic smoothing to final SCS polygons and for full catchments used in SCUs
 
 - Conservation Portfolio Tools:
-  - Added the tool `0: Prepare Conservation Portfolio Inputs`, to assist in setup of inputs for an Essential Conservation Site analysis
-  - `Create Element Exclusion List` tool moved to the `Preparation and Review Tools` section
+  - Added a new tool `0: Prepare Conservation Portfolio Inputs`, to assist in setup of inputs for an Essential Conservation Site analysis
 
 #### Version 2.0
 Updated toolbox to work with ArcGIS Pro, and implemented some algorithmic changes in an attempt to improve site boundary shapes.
