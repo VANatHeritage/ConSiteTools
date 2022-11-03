@@ -1038,100 +1038,67 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # You want to err on the side of caution for throwing out parts of PF.
    rtnPartsPF = scratchGDB + os.sep + 'rtnPartsPF'
    arcpy.management.EliminatePolygonPart(firstChopPF, rtnPartsPF, 'PERCENT', '', 1, 'ANY')
-   # arcpy.management.Append(rtnParts2, rtnParts, "NO_TEST")
+   arcpy.CalculateField_management(rtnPartsPF, "keep", 1, field_type="SHORT")
 
    # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
-   # printMsg('Chopping polygons...')
    firstChop = scratchGDB + os.sep + 'firstChop'
    arcpy.analysis.Erase(in_Feats, in_EraseFeats, firstChop)
 
    # Eliminate parts comprising less than 25% of total original feature size
    # Previously had this set to 5% but that threshold was too low 
-   # printMsg('Eliminating insignificant fragments...')
+   printMsg('Eliminating insignificant fragments...')
+   rtnParts0 = scratchGDB + os.sep + 'rtnParts0'
+   arcpy.management.EliminatePolygonPart(firstChop, rtnParts0, 'PERCENT', '', 25, 'ANY')
    rtnParts = scratchGDB + os.sep + 'rtnParts'
-   arcpy.management.EliminatePolygonPart(firstChop, rtnParts, 'PERCENT', '', 25, 'ANY')
+   arcpy.MultipartToSinglepart_management(rtnParts0, rtnParts)
+   arcpy.CalculateField_management(rtnParts, "keep", 0, field_type="SHORT")
    
-   # In some rare situations, the above code block removes SBB portion containing the PF!
-   # Gotta deal with that crap. This is why I'm still here after 6 pm on my last day.
-   # Have to do it in a loop so you don't pick up SBB fragments from other PFs.
-   # Also, had to reverse order of chopping PFs and SBBs, so you're only dealing with relevant part of PF.
+   # This loop adds back parts of SBBs intersecting retained PFs, then uses searchDist to mark fragments to keep.
    explChop = scratchGDB + os.sep + 'explChop'
    arcpy.management.MultipartToSinglepart(firstChop, explChop)
    pfList = unique_values(in_PF, fld_ID)
    for id in pfList:
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      # arcpy.management.MakeFeatureLayer(in_PF, "pfLyr", qry)
       arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
       arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
       arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
+      # Once the parts to retain are included (based on size and intersection with retained PFs), 
+      #  procedure below will mark fragments to keep, based on intersection with PFs and searchDist. 
+      #  This will remove the need for  for the looping Shrinkwrap and subsequent CullFrags, improving processing time.
+      rtnPartsLyr = arcpy.management.MakeFeatureLayer(rtnParts, "rtnPartsLyr", qry)
+      arcpy.management.SelectLayerByLocation(rtnPartsLyr, "INTERSECT", "pfLyr")
+      ExpandSelection(rtnPartsLyr, searchDist)
+      arcpy.CalculateField_management(rtnPartsLyr, "keep", 1)
 
    # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
    
    # Shrinkwrap retained parts to fill in gaps narrower than search distance
    # Need to do this in a loop to avoid stitching together unrelated fragments
-   printMsg('Clustering fragments in a loop. This is sloooow...')
-   initClusters = scratchGDB + os.sep + 'initClusters'
-   arcpy.management.CreateFeatureclass (scratchGDB, 'initClusters', "POLYGON", "", "", "", in_Feats) 
-   idList = unique_values(rtnParts, fld_ID)
-   tmpCluster = "in_memory" + os.sep + "tmpCluster"
-   for id in idList:
-      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      lyr = arcpy.management.MakeFeatureLayer(rtnParts, "tmpLyr", qry)
-      ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
-      arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
-   # # Do it again for PFs
-   # idList = unique_values(rtnParts2, fld_ID)
+   # printMsg('Clustering fragments in a loop. This is sloooow...')
+   # initClusters = scratchGDB + os.sep + 'initClusters'
+   # arcpy.management.CreateFeatureclass (scratchGDB, 'initClusters', "POLYGON", "", "", "", in_Feats) 
+   # idList = unique_values(rtnParts, fld_ID)
+   # tmpCluster = "in_memory" + os.sep + "tmpCluster"
    # for id in idList:
-      # qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      # lyr = arcpy.management.MakeFeatureLayer(rtnParts2, "tmpLyr", qry)
-      # ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
-      # arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
-      
+   #    qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
+   #    lyr = arcpy.management.MakeFeatureLayer(rtnParts, "tmpLyr", qry)
+   #    ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
+   #    arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
+   
    # Remove any fragments without procedural features
-   printMsg('Culling fragments and dissolving...')
-   initClusters2 = scratchGDB + os.sep + 'initClusters2'
-   # CullFrags(initClusters, in_PF, 0, initClusters2)
-   CullFrags(initClusters, rtnPartsPF, 0, initClusters2)
-   # dissClust = scratchGDB + os.sep + 'dissClust'
-   # arcpy.management.Dissolve(initClusters2, dissClust, "", "", "SINGLE_PART")
+   # printMsg('Culling fragments and dissolving...')
+   # initClusters2 = scratchGDB + os.sep + 'initClusters2'
+   # CullFrags(initClusters, rtnPartsPF, 0, initClusters2)
    
-   # Shrinkwrap again to fill in gaps narrower than search distance
-   printMsg('Clustering clusters...')
-   # ShrinkWrap(dissClust, searchDist, out_Clusters, smthDist)
-   ShrinkWrap(initClusters2, searchDist, out_Clusters, smthDist)
-   
-   # # Rejoin clusters near each other for long stretches
-   # printMsg('Patching some gaps...')
-   # # Intersect thin outer buffers; keep those above size threshold
-   # outerBuff = scratchGDB + os.sep + "outBuff"
-   # arcpy.analysis.Buffer(dissClust, outerBuff, searchDist, "OUTSIDE_ONLY")
-   # intBuff = scratchGDB + os.sep + "intBuff"
-   # arcpy.analysis.PairwiseIntersect(outerBuff, intBuff)
-   # arcpy.management.CalculateGeometryAttributes(intBuff, "LENGTH PERIMETER_LENGTH", "METERS") 
-   # # Calculation necessary I think b/c shape_length doesn't persist in_memory
-   # qry = "LENGTH > 500"
-   # patchFrags = scratchGDB + os.sep + "patchFrags"
-   # arcpy.analysis.Select(intBuff, patchFrags, qry)
-   # c = countFeatures(patchFrags)
-   # printMsg("There are %s interstitial patches retained. Processing..."%str(c))
-   
-   # # Merge and dissolve intersected buffers with adjacent split clusters
-   # mergeFrags = scratchGDB + os.sep + "mergeFrags"
-   # arcpy.management.Merge([patchFrags, dissClust], mergeFrags)
-   # cleanFrags = scratchGDB + os.sep + "cleanFrags"
-   # CleanFeatures(mergeFrags, cleanFrags)
-   # dissFrags = scratchGDB + os.sep + "dissFrags"
-   # arcpy.management.Dissolve(cleanFrags, dissFrags, "", "", "SINGLE_PART")
-   
-   # # # Final smoothing operation. Yes this is necessary!
-   # printMsg('Smoothing clusters...')
-   # ShrinkWrap(dissFrags, "1 METERS", out_Clusters, smthMulti = 10)
+   # Shrinkwrap to fill in gaps narrower than search distance
+   printMsg('Clustering fragments...')
+   keepFrags = arcpy.MakeFeatureLayer_management(rtnParts, where_clause="keep = 1")
+   ShrinkWrap(keepFrags, searchDist, out_Clusters, smthDist)
    
    # Use fragment clusters to chop out sections of Erase Features
-   # printMsg('Eliminating irrelevant Erase Features')
    CleanErase(in_EraseFeats, out_Clusters, out_subErase)
    
    outTuple = (out_Clusters, out_subErase)

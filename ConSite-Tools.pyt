@@ -475,7 +475,7 @@ class review_consite(object):
       has been changed."""
       if parameters[1].altered:
          fc = parameters[1].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = [f.name for f in arcpy.ListFields(fc) if f.type != 'OID']  # Does not work with OBJECTID, so don't allow it.
          parameters[4].filter.list = field_names
       return
 

@@ -417,105 +417,6 @@ def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
       
    return outFeats
 
-def ShrinkWrap_OBSOLETE(inFeats, searchDist, outFeats, smthMulti = 8, scratchGDB = "in_memory"):
-   '''Like Coalesce, but with a smoothing routine
-   OBSOLETE! This function was slooooowwww! New version is much improved.
-   '''
-   # Parse dilation distance, and increase it to get smoothing distance
-   smthMulti = float(smthMulti)
-   origDist, units, meas = multiMeasure(dilDist, 1)
-   smthDist, units, smthMeas = multiMeasure(dilDist, smthMulti)
-
-   # Parameter check
-   if origDist <= 0:
-      arcpy.AddError("You need to enter a positive, non-zero value for the dilation distance")
-      raise arcpy.ExecuteError   
-   
-   # Set up empty trashList for later garbage collection
-   trashList = []
-
-   # Declare path/name of output data and workspace
-   drive, path = os.path.splitdrive(outFeats) 
-   path, filename = os.path.split(path)
-   myWorkspace = drive + path
-   Output_fname = filename
-
-   # Process:  Create Feature Class (to store output)
-   arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
-
-   # Process:  Clean Features
-   cleanFeats = scratchGDB + os.sep + "cleanFeats"
-   CleanFeatures(inFeats, cleanFeats)
-   trashList.append(cleanFeats)
-
-   # Process:  Dissolve Features
-   dissFeats = scratchGDB + os.sep + "dissFeats"
-   arcpy.analysis.PairwiseDissolve(cleanFeats, dissFeats, "", "", "SINGLE_PART")
-   trashList.append(dissFeats)
-   
-   # Process:  Make Feature Layer
-   arcpy.management.MakeFeatureLayer(dissFeats, "dissFeatsLyr")
-   trashList.append("dissFeatsLyr")
-
-   # Process:  Generalize Features
-   # This should prevent random processing failures on features with many vertices, and also speed processing in general
-   arcpy.edit.Generalize(dissFeats, "0.1 Meters")
-
-   # Process:  Buffer Features
-   #arcpy.AddMessage("Buffering features...")
-   buffFeats = scratchGDB + os.sep + "buffFeats"
-   arcpy.analysis.PairwiseBuffer (dissFeats, buffFeats, meas, "ALL")
-   trashList.append(buffFeats)
-
-   # Process:  Explode Multiparts
-   explFeats = scratchGDB + os.sep + "explFeats"
-   arcpy.management.MultipartToSinglepart(buffFeats, explFeats)
-   trashList.append(explFeats)
-
-   # Process:  Get Count
-   numWraps = (arcpy.GetCount_management(explFeats)).getOutput(0)
-   arcpy.AddMessage('Shrinkwrapping: There are %s features after consolidation' %numWraps)
-
-   # Loop through the exploded buffer features
-   counter = 1
-   with arcpy.da.SearchCursor(explFeats, ["SHAPE@"]) as myFeats:
-      for Feat in myFeats:
-         arcpy.AddMessage('Working on shrink feature %s' % str(counter))
-         featSHP = Feat[0]
-
-         arcpy.management.RepairGeometry(featSHP, "DELETE_NULL")
-
-         # Process: Get dissolved features within each exploded buffer feature
-         arcpy.management.SelectLayerByLocation("dissFeatsLyr", "INTERSECT", featSHP, "", "NEW_SELECTION")
-         
-         # Process:  Coalesce features (expand)
-         coalFeats = scratchGDB + os.sep + 'coalFeats'
-         Coalesce("dissFeatsLyr", smthMeas, coalFeats, scratchGDB)
-         # Increasing the dilation distance improves smoothing and reduces the "dumbbell" effect. However, it can also cause some wonkiness which needs to be corrected in the next steps.
-         trashList.append(coalFeats)
-         
-         # Merge coalesced feature with original features, and coalesce again.
-         mergeFeats = scratchGDB + os.sep + 'mergeFeats'
-         arcpy.management.Merge([coalFeats, "dissFeatsLyr"], mergeFeats, "")
-         Coalesce(mergeFeats, "5 METERS", coalFeats, scratchGDB)
-         
-         # Eliminate gaps
-         noGapFeats = scratchGDB + os.sep + "noGapFeats"
-         arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
-         
-         # Process:  Append the final geometry to the ShrinkWrap feature class
-         arcpy.AddMessage("Appending feature...")
-         arcpy.management.Append(noGapFeats, outFeats, "NO_TEST", "", "")
-         
-         counter +=1
-         del Feat
-
-   # Cleanup
-   # if scratchGDB == "in_memory":
-   #    garbagePickup(trashList)
-      
-   return outFeats
-   
 def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory", report = 0):
    '''Groups features first, then coalesces them into smooth shapes
    Parameters:
@@ -540,13 +441,15 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
    trashList = []
 
    # Declare path/name of output data and workspace
-   drive, path = os.path.splitdrive(outFeats) 
-   path, filename = os.path.split(path)
-   myWorkspace = drive + path
-   Output_fname = filename
-
+   # drive, path = os.path.splitdrive(outFeats) 
+   # path, filename = os.path.split(path)
+   # myWorkspace = drive + path
+   # Output_fname = filename
    # Process:  Create Feature Class (to store output)
-   arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
+   # arcpy.management.CreateFeatureclass(myWorkspace, Output_fname, "POLYGON", "", "", "", inFeats) 
+   
+   # Create list to store intermediate shapes in loop
+   mList = []
    
    # Prep features
    # printMsg("Dissolving and cleaning features...")
@@ -595,16 +498,22 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
          # Coalesce(mergeFeats, "5 METERS", coalFeats, scratchGDB)
          
          # Eliminate gaps
-         noGapFeats = scratchGDB + os.sep + "noGapFeats"
+         noGapFeats = scratchGDB + os.sep + "noGapFeats" + str(counter)
          arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
          trashList.append(noGapFeats)
          
          # Process:  Append the final geometry to the ShrinkWrap feature class
          # printMsg("Appending feature %s..." %str(counter))
-         arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
+         # arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
+         
+         # Add final shape to running list
+         mList.append(noGapFeats)
          
          counter +=1
          del Feat
+   
+   # Merge all shapes in list
+   arcpy.management.Merge(mList, outFeats)
 
    # Cleanup
    # if scratchGDB == "in_memory":
