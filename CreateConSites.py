@@ -1066,7 +1066,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
       # Once the parts to retain are included (based on size and intersection with retained PFs), 
       #  procedure below will mark fragments to keep, based on intersection with PFs and searchDist. 
-      #  This will remove the need for  for the looping Shrinkwrap and subsequent CullFrags, improving processing time.
+      #  This will remove the need for the Shrinkwrap loop and subsequent CullFrags, improving processing time.
       rtnPartsLyr = arcpy.management.MakeFeatureLayer(rtnParts, "rtnPartsLyr", qry)
       arcpy.management.SelectLayerByLocation(rtnPartsLyr, "INTERSECT", "pfLyr")
       ExpandSelection(rtnPartsLyr, searchDist)
@@ -1074,24 +1074,6 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
 
    # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
-   
-   # Shrinkwrap retained parts to fill in gaps narrower than search distance
-   # Need to do this in a loop to avoid stitching together unrelated fragments
-   # printMsg('Clustering fragments in a loop. This is sloooow...')
-   # initClusters = scratchGDB + os.sep + 'initClusters'
-   # arcpy.management.CreateFeatureclass (scratchGDB, 'initClusters', "POLYGON", "", "", "", in_Feats) 
-   # idList = unique_values(rtnParts, fld_ID)
-   # tmpCluster = "in_memory" + os.sep + "tmpCluster"
-   # for id in idList:
-   #    qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-   #    lyr = arcpy.management.MakeFeatureLayer(rtnParts, "tmpLyr", qry)
-   #    ShrinkWrap("tmpLyr", searchDist, tmpCluster, smthDist)
-   #    arcpy.management.Append(tmpCluster, initClusters, "NO_TEST")
-   
-   # Remove any fragments without procedural features
-   # printMsg('Culling fragments and dissolving...')
-   # initClusters2 = scratchGDB + os.sep + 'initClusters2'
-   # CullFrags(initClusters, rtnPartsPF, 0, initClusters2)
    
    # Shrinkwrap to fill in gaps narrower than search distance
    printMsg('Clustering fragments...')
@@ -1237,7 +1219,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                myBuff = myPF[2]
 
                # Add a progress message
-               printMsg("\nWorking on feature %s, with SFID = %s" %(str(myIndex), myID))
+               printMsg("Working on feature %s, with SFID = %s" %(str(myIndex), myID))
 
                # Step 1: Create a minimum buffer around the Procedural Feature [or not if zero override]
                if myBuff==0:
@@ -1486,11 +1468,10 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    PF_sub = scratchGDB + os.sep + 'PF_sub'
    
    # Subset PFs and SBBs
-   # printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
+   printMsg('Using the current SBB selection and making copies of the SBBs and PFs...')
    SubsetSBBandPF(in_SBB, in_PF, "PF", fld_SFID, SBB_sub, PF_sub)
    
    # Process: Select Layer By Location (Get Cores intersecting PFs)
-   # printMsg('Selecting cores that intersect procedural features')
    arcpy.MakeFeatureLayer_management(in_Cores, "Cores_lyr")
    arcpy.MakeFeatureLayer_management(PF_sub, "PF_lyr") 
    arcpy.SelectLayerByLocation_management("Cores_lyr", "INTERSECT", "PF_lyr", "", "NEW_SELECTION", "NOT_INVERT")
@@ -1505,13 +1486,12 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    printMsg('There are %s cores to process.' %str(numCores))
    
    # Create Feature Class to store expanded SBBs
-   # printMsg("Creating feature class to store buffered SBBs...")
    arcpy.CreateFeatureclass_management (scratchGDB, 'sbbExpand', "POLYGON", SBB_sub, "", "", SBB_sub) 
    sbbExpand = scratchGDB + os.sep + 'sbbExpand'
    
    # Loop through Cores and add core buffers to SBBs
    counter = 1
-   with  arcpy.da.SearchCursor(selCores, ["SHAPE@", "CoreID"]) as myCores:
+   with arcpy.da.SearchCursor(selCores, ["SHAPE@", "CoreID"]) as myCores:
       for core in myCores:
          # Add extra buffer for SBBs of PFs located in cores. Extra buffer needs to be snipped to core in question.
          coreShp = core[0]
@@ -1658,7 +1638,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
    ShrinkWrap("SBB_lyr", clusterDist, outPS, smthDist, scratchGDB = scratchGDB, report = 1)
 
    # Generalize Features in hopes of speeding processing and preventing random processing failures 
-   # arcpy.AddMessage("Simplifying features...")
    arcpy.Generalize_edit(outPS, "0.1 Meters")
    
    # Get info on ProtoSite generation
@@ -1682,7 +1661,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             arcpy.management.CreateFeatureclass(scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites) 
             
             # Buffer around the ProtoSite and set extent
-            # printMsg('Buffering ProtoSite to get processing area...')
             tmpBuff = scratchGDB + os.sep + 'tmpBuff'
             arcpy.analysis.PairwiseBuffer(tmpPS, tmpBuff, buffDist, "", "", "", "")  
             arcpy.env.extent = tmpBuff
@@ -1705,68 +1683,44 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   in_TranSurf = mergeTrans
             
             # Get SBBs within the ProtoSite
-            # printMsg('Selecting SBBs within ProtoSite...')
             arcpy.management.SelectLayerByLocation("SBB_lyr", "INTERSECT", tmpPS)
             
             # Copy the selected SBB features to tmpSBB
             tmpSBB = scratchGDB + os.sep + 'tmpSBB'
             arcpy.CopyFeatures_management ("SBB_lyr", tmpSBB)
-            # printMsg('Selected SBBs copied.')
             
             # Get PFs within the ProtoSite
-            # printMsg('Selecting PFs within ProtoSite...')
             arcpy.SelectLayerByLocation_management("PF_lyr", "INTERSECT", tmpPS)
             
             # Copy the selected PF features to tmpPF
             tmpPF = scratchGDB + os.sep + 'tmpPF'
             arcpy.CopyFeatures_management ("PF_lyr", tmpPF)
-            # printMsg('Selected PFs copied.')
             
             # Clip modification features to ProtoSite
             printMsg("Clipping modification features to ProtoSite...")
             if site_Type == 'TERRESTRIAL':
-               # printMsg('Clipping transportation features to ProtoSite buffer...')
                tranClp = scratchGDB + os.sep + 'tranClp'
                CleanClip(in_TranSurf, tmpBuff, tranClp, scratchParm)
-               # printMsg('Clipping exclusion features to ProtoSite buffer...')
                efClp = scratchGDB + os.sep + 'efClp'
                CleanClip(excl, tmpBuff, efClp, scratchParm)
             # printMsg('Clipping hydro features to ProtoSite buffer...')
             hydroClp = scratchGDB + os.sep + 'hydroClp'
             CleanClip(water, tmpBuff, hydroClp, scratchParm)
-                        
-            # Process modification features
-            # if site_Type == 'TERRESTRIAL':    
-               # # Get Transportation Surface Erase Features
-               # # printMsg('Subsetting transportation features')
-               # # transErase = scratchGDB + os.sep + 'transErase'
-               # # arcpy.analysis.Select(tranClp, transErase, transQry)
-               # transErase = tranClp
-               
-               # # Get Exclusion Erase Features
-               # # printMsg('Subsetting exclusion features')
-               # exclErase = scratchGDB + os.sep + 'exclErase'
-               # arcpy.analysis.Select(efClp, exclErase, exclQry)
-               # efClp = exclErase
             
             # Dissolve Hydro Erase Features
-            # printMsg('Processing hydro features...')
             hydroDiss = scratchGDB + os.sep + 'hydroDiss'
             arcpy.Dissolve_management(hydroClp, hydroDiss, "Hydro", "", "SINGLE_PART", "")
             
             # Cull Hydro Erase Features
-            # printMsg('Culling hydro erase features based on prevalence in SBBs...')
             hydroRtn = scratchGDB + os.sep + 'hydroRtn'
             CullEraseFeats (hydroDiss, tmpSBB, fld_SFID, hydroPerCov, hydroRtn, scratchParm)
             
             # Remove narrow hydro from erase features; also punch out PFs
-            # printMsg('Eliminating some hydro features from erase features...')
             hydroErase = scratchGDB + os.sep + 'hydroErase'
             GetEraseFeats (hydroRtn, hydroQry, hydroElimDist, hydroErase, tmpPF, scratchParm)
             
             # Merge Erase Features (Exclusions, hydro, and transportation)
             if site_Type == 'TERRESTRIAL':
-               # printMsg('Merging erase features...')
                tmpErase = scratchGDB + os.sep + 'tmpErase'
                arcpy.management.Merge([efClp, tranClp, hydroErase], tmpErase)
             else:
@@ -1792,11 +1746,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                arcpy.management.Merge([sbbErase, efClp], finErase)
             else:
                finErase = sbbErase
-               
-            # Clip SBBs and PFs to the SBB clusters created with the ChopMod function
-            # printMsg('Clipping SBBs to clusters...')
-            # sbbRtn = scratchGDB + os.sep + 'sbbRtn'
-            # arcpy.analysis.PairwiseClip(tmpSBB, sbbClusters, sbbRtn)
             
             printMsg('Clipping PFs to chopped SBB clusters... yeah this is kinda radical!')
             pfRtn = scratchGDB + os.sep + 'pfRtn'
@@ -1828,19 +1777,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   printMsg('Working on ProtoSite fragment %s' % str(counter2))
 
                   tmpSS = mySS[0]
-                           
-                  # # Get PFs within split site
-                  # arcpy.management.SelectLayerByLocation("PF_lyr2", "INTERSECT", tmpSS, "", "NEW_SELECTION", "NOT_INVERT")
-                  
-                  # # Select retained SBB fragments corresponding to selected PFs
-                  # tmpSBB2 = scratchGDB + os.sep + 'tmpSBB' + str(counter2)
-                  # tmpPF2 = scratchGDB + os.sep + 'tmpPF' + str(counter2)
-                  # SubsetSBBandPF(sbbRtn, "PF_lyr2", "SBB", fld_SFID, tmpSBB2, tmpPF2)
-                  
-                  # # ShrinkWrap retained SBB fragments
-                  # printMsg('Shrinkwrapping SBB fragments...')
-                  # csShrink = scratchGDB + os.sep + 'csShrink' + str(counter2)
-                  # ShrinkWrap(tmpSBB2, clusterDist, csShrink, 4, scratchGDB)
                   
                   # Get SBB clusters within split site
                   arcpy.management.SelectLayerByLocation("sbbClust", "INTERSECT", tmpSS)
@@ -1872,7 +1808,6 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
 
                   # Append the final geometry to the split sites group feature class.
                   printMsg("Appending features...")
-                  # arcpy.management.Append(ssBnd, tmpSS_grp, "NO_TEST", "", "")
                   arcpy.management.Append(smoothBnd, tmpSS_grp, "NO_TEST", "", "")
                   
                   counter2 +=1
