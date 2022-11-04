@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-09-14
+# Last Edit: 2022-11-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -231,7 +231,7 @@ def SelectCopy(in_FeatLyr, selFeats, selDist, out_Feats):
    Input features to be selected must be a layer, not a feature class.
    NOTE: This does not seem to work with feature services. ESRI FAIL.'''
    # Select input features within distance of selection features
-   arcpy.SelectLayerByLocation_management (in_FeatLyr, "WITHIN_A_DISTANCE", selFeats, selDist, "NEW_SELECTION", "NOT_INVERT")
+   arcpy.SelectLayerByLocation_management(in_FeatLyr, "WITHIN_A_DISTANCE", selFeats, selDist, "NEW_SELECTION", "NOT_INVERT")
    
    # Get the number of SELECTED features
    numSelected = countSelectedFeatures(in_FeatLyr)
@@ -242,9 +242,9 @@ def SelectCopy(in_FeatLyr, selFeats, selDist, out_Feats):
       fc = os.path.basename(out_Feats)
       gdb = os.path.dirname(out_Feats)
       geom = arcpy.Describe(in_FeatLyr).shapeType
-      arcpy.CreateFeatureclass_management (gdb, fc, geom, in_FeatLyr)
+      arcpy.CreateFeatureclass_management(gdb, fc, geom, in_FeatLyr)
    else:
-      arcpy.CopyFeatures_management (in_FeatLyr, out_Feats)
+      arcpy.CopyFeatures_management(in_FeatLyr, out_Feats)
       
    return out_Feats
 
@@ -294,7 +294,7 @@ def TabToDict(inTab, fldKey, fldValue):
          codeDict[key] = val
    return codeDict 
    
-def GetElapsedTime (t1, t2):
+def GetElapsedTime(t1, t2):
    """Gets the time elapsed between the start time (t1) and the finish time (t2)."""
    delta = t2 - t1
    (d, m, s) = (delta.days, delta.seconds//60, delta.seconds%60)
@@ -359,7 +359,7 @@ def tback():
 def clearSelection(fc):
    typeFC = (arcpy.Describe(fc)).dataType
    if typeFC == 'FeatureLayer':
-      arcpy.SelectLayerByAttribute_management (fc, "CLEAR_SELECTION")
+      arcpy.SelectLayerByAttribute_management(fc, "CLEAR_SELECTION")
       
 def Coalesce(inFeats, dilDist, outFeats, scratchGDB = "in_memory"):
    '''If a positive number is entered for the dilation distance, features are expanded outward by the specified distance, then shrunk back in by the same distance. This causes nearby features to coalesce. If a negative number is entered for the dilation distance, features are first shrunk, then expanded. This eliminates narrow portions of existing features, thereby simplifying them. It can also break narrow "bridges" between features that were formerly coalesced.'''
@@ -492,19 +492,10 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
          # Increasing the dilation distance improves smoothing and reduces the "dumbbell" effect. However, it can also cause some wonkiness which needs to be corrected in the next steps.
          trashList.append(coalFeats)
          
-         # # Merge coalesced feature with original features, and coalesce again.
-         # mergeFeats = scratchGDB + os.sep + 'mergeFeats'
-         # arcpy.management.Merge([coalFeats, "dissFeatsLyr"], mergeFeats, "")
-         # Coalesce(mergeFeats, "5 METERS", coalFeats, scratchGDB)
-         
          # Eliminate gaps
          noGapFeats = scratchGDB + os.sep + "noGapFeats" + str(counter)
          arcpy.management.EliminatePolygonPart(coalFeats, noGapFeats, "PERCENT", "", 99, "CONTAINED_ONLY")
          trashList.append(noGapFeats)
-         
-         # Process:  Append the final geometry to the ShrinkWrap feature class
-         # printMsg("Appending feature %s..." %str(counter))
-         # arcpy.management.Append(noGapFeats, outFeats, "NO_TEST")
          
          # Add final shape to running list
          mList.append(noGapFeats)
@@ -567,9 +558,9 @@ def ProjectToMatch_vec(in_Data, in_Template, out_Data, copy = 1):
    
    if reproject == 0:
       printMsg('Coordinate systems for features and template data are the same.')
-      if copy == 1: 
+      if copy == 1:
          printMsg('Copying...')
-         arcpy.CopyFeatures_management (in_Data, out_Data)
+         arcpy.CopyFeatures_management(in_Data, out_Data)
       else:
          printMsg('Returning original data unchanged.')
          out_Data = in_Data
@@ -579,7 +570,7 @@ def ProjectToMatch_vec(in_Data, in_Template, out_Data, copy = 1):
          printMsg('No geographic transformation needed...')
       else:
          printMsg('Applying an appropriate geographic transformation...')
-      arcpy.Project_management (in_Data, out_Data, sr_Out, geoTrans)
+      arcpy.Project_management(in_Data, out_Data, sr_Out, geoTrans)
    return out_Data
    
 def ProjectToMatch_ras(in_Data, in_Template, out_Data, resampleType = "NEAREST"):
@@ -605,7 +596,7 @@ def ProjectToMatch_ras(in_Data, in_Template, out_Data, resampleType = "NEAREST")
          printMsg('No geographic transformation needed...')
       else:
          printMsg('Applying an appropriate geographic transformation...')
-      arcpy.ProjectRaster_management (in_Data, out_Data, sr_Out, resampleType, "", geoTrans)
+      arcpy.ProjectRaster_management(in_Data, out_Data, sr_Out, resampleType, "", geoTrans)
       return out_Data
       
 def clipRasterToPoly(in_Rast, in_Poly, out_Rast):
@@ -622,7 +613,7 @@ def clipRasterToPoly(in_Rast, in_Poly, out_Rast):
    except:
       # This should work if input is a geometry object
       myExtent = str(in_Poly.extent).replace(" NaN", "")
-   arcpy.Clip_management (in_Rast, myExtent, out_Rast, in_Poly, "", "ClippingGeometry")
+   arcpy.Clip_management(in_Rast, myExtent, out_Rast, in_Poly, "", "ClippingGeometry")
    
    return out_Rast
    
@@ -651,32 +642,32 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
    
    # Make a copy of input features, and add a field to store alignment type
    tmpFeats = scratchGDB + os.sep + "tmpFeats"
-   arcpy.CopyFeatures_management (inFeats, tmpFeats)
+   arcpy.CopyFeatures_management(inFeats, tmpFeats)
    inFeats = tmpFeats
-   arcpy.AddField_management (inFeats, "AlignType", "TEXT", "", "", 1)
+   arcpy.AddField_management(inFeats, "AlignType", "TEXT", "", "", 1)
    
    # Make feature layers  
-   lyrFeats = arcpy.MakeFeatureLayer_management (inFeats, "lyr_inFeats")
-   lyrFlowlines = arcpy.MakeFeatureLayer_management (nhdFlowline, "lyr_Flowlines")
-   lyrCatch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+   lyrFeats = arcpy.MakeFeatureLayer_management(inFeats, "lyr_inFeats")
+   lyrFlowlines = arcpy.MakeFeatureLayer_management(nhdFlowline, "lyr_Flowlines")
+   lyrCatch = arcpy.MakeFeatureLayer_management(in_Catch, "lyr_Catchments")
    
    qry = "FType = 460" # StreamRiver only
-   lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
+   lyrStreamRiver = arcpy.MakeFeatureLayer_management(nhdArea, "StreamRiver_Poly", qry)
    
    qry = "FType = 390 OR FType = 436" # LakePond or Reservoir only
-   lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePondRes_Poly", qry)
+   lyrLakePond = arcpy.MakeFeatureLayer_management(nhdWaterbody, "LakePondRes_Poly", qry)
    
    # Calculate percentage of PF covered by widewater features
    printMsg("Calculating percentages of PFs covered by widewater features...")
    tabStreamRiver = scratchGDB + os.sep + "tabStreamRiver"
-   SR = arcpy.TabulateIntersection_analysis (lyrFeats, fldID, lyrStreamRiver, tabStreamRiver)
+   SR = arcpy.TabulateIntersection_analysis(lyrFeats, fldID, lyrStreamRiver, tabStreamRiver)
    tabLakePond = scratchGDB + os.sep + "tabLakePond"
-   LP = arcpy.TabulateIntersection_analysis (lyrFeats, fldID, lyrLakePond, tabLakePond)
+   LP = arcpy.TabulateIntersection_analysis(lyrFeats, fldID, lyrLakePond, tabLakePond)
    percTab = scratchGDB + os.sep + "percTab"
    arcpy.Merge_management([SR, LP], percTab)
    statsTab = scratchGDB + os.sep + "statsTab"
    arcpy.Statistics_analysis(percTab, statsTab, [["PERCENTAGE", "SUM"]], fldID)
-   arcpy.JoinField_management (lyrFeats, fldID, statsTab, fldID, "SUM_PERCENTAGE")
+   arcpy.JoinField_management(lyrFeats, fldID, statsTab, fldID, "SUM_PERCENTAGE")
    
    # Assign features to river (R) or stream (S) process
    codeblock = '''def procType(percent):
@@ -695,51 +686,51 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
    riverFeats = scratchGDB + os.sep + "riverFeats"
    # arcpy.CopyFeatures_management (lyrFeats, riverFeats)
    where_clause = '"AlignType" = \'R\''
-   arcpy.Select_analysis (lyrFeats, riverFeats, where_clause)
+   arcpy.Select_analysis(lyrFeats, riverFeats, where_clause)
    
    # Save out features getting the stream process
    printMsg("Switching selection and saving out the PFs for stream process")
-   arcpy.SelectLayerByAttribute_management (lyrFeats, "SWITCH_SELECTION")
+   arcpy.SelectLayerByAttribute_management(lyrFeats, "SWITCH_SELECTION")
    streamFeats = scratchGDB + os.sep + "streamFeats"
    # arcpy.CopyFeatures_management (lyrFeats, streamFeats)
    where_clause = '"AlignType" = \'S\''
-   arcpy.Select_analysis (lyrFeats, streamFeats, where_clause)
+   arcpy.Select_analysis(lyrFeats, streamFeats, where_clause)
    
    ### Select the appropriate flowline features to be used for stream or river processes
    ## Stream process
    # Select catchments intersecting stream features
    printMsg("Selecting catchments intersecting stream features...")
-   arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", streamFeats, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management(lyrCatch, "INTERSECT", streamFeats, "", "NEW_SELECTION")
    
    # Clip flowlines to selected catchments
    printMsg("Clipping flowlines to selected catchments...")
    streamLines = scratchGDB + os.sep + "streamLines"
-   arcpy.PairwiseClip_analysis (lyrFlowlines, lyrCatch, streamLines)
+   arcpy.PairwiseClip_analysis(lyrFlowlines, lyrCatch, streamLines)
    
    ## River process
    # Select StreamRiver and LakePond polys intersecting input features
    printMsg("Selecting open water polygons intersecting input features...")
-   arcpy.SelectLayerByLocation_management (lyrStreamRiver, "INTERSECT", riverFeats)
-   arcpy.SelectLayerByLocation_management (lyrLakePond, "INTERSECT", riverFeats)
+   arcpy.SelectLayerByLocation_management(lyrStreamRiver, "INTERSECT", riverFeats)
+   arcpy.SelectLayerByLocation_management(lyrLakePond, "INTERSECT", riverFeats)
    
    # Merge selected polygons into single layer
    printMsg("Merging widewater features...")
    wideWater = scratchGDB + os.sep + "wideWater"
-   arcpy.Merge_management ([lyrStreamRiver, lyrLakePond], wideWater)
+   arcpy.Merge_management([lyrStreamRiver, lyrLakePond], wideWater)
    
    # Select catchments intersecting river features
    printMsg("Selecting catchments intersecting river features...")
-   arcpy.SelectLayerByLocation_management (lyrCatch, "INTERSECT", riverFeats, "", "NEW_SELECTION")
+   arcpy.SelectLayerByLocation_management(lyrCatch, "INTERSECT", riverFeats, "", "NEW_SELECTION")
    
    # Clip widewater to selected catchments
    printMsg("Clipping widewaters to selected catchments...")
    clipWideWater = scratchGDB + os.sep + "clipWideWater"
-   arcpy.PairwiseClip_analysis (wideWater, lyrCatch, clipWideWater)
+   arcpy.PairwiseClip_analysis(wideWater, lyrCatch, clipWideWater)
    
    # Clip flowlines to clipped widewater
    printMsg("Clipping flowlines to clipped widewater features...")
    riverLines = scratchGDB + os.sep + "riverLines"
-   arcpy.PairwiseClip_analysis (lyrFlowlines, clipWideWater, riverLines)
+   arcpy.PairwiseClip_analysis(lyrFlowlines, clipWideWater, riverLines)
 
    # Run alignment separately for stream and river features
    streamParms = [streamFeats, streamLines, "_stream"]
@@ -820,6 +811,8 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
       # # Join from/to x,y fields from near table to the input features
       # arcpy.JoinField_management(lyrToShift, fldID, finalNearTab, fldID, ["FROM_X", "FROM_Y", "NEAR_X", "NEAR_Y"])
       
+      # headsup: end of commented-out section
+      
       # Calculate shift in x/y directions
       arcpy.AddField_management(lyrToShift, "DIFF_X", "DOUBLE")
       arcpy.AddField_management(lyrToShift, "DIFF_Y", "DOUBLE")
@@ -840,9 +833,9 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
             cursor.updateRow(row)
    
    # Merge output to a single feature class
-   arcpy.Merge_management ([streamFeats, riverFeats], outFeats)
+   arcpy.Merge_management([streamFeats, riverFeats], outFeats)
    mergeLines = scratchGDB + os.sep + "mergeLines"
-   arcpy.Merge_management ([streamLines, riverLines], mergeLines)
+   arcpy.Merge_management([streamLines, riverLines], mergeLines)
    
    return (outFeats, clipWideWater, mergeLines)
    

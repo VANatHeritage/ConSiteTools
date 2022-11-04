@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-09-14
+# Last Edit: 2022-11-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -101,7 +101,7 @@ def ParseSiteTypes(in_ProcFeats, in_ConSites, out_GDB):
       query = item[1]
       output = item[2]
       printMsg("Creating feature class %s" %output)
-      arcpy.Select_analysis (input, output, query)
+      arcpy.Select_analysis(input, output, query)
       fcList.append(output)
    
    return fcList
@@ -193,7 +193,7 @@ def TabParseNWI(inNWI, outTab):
       FldName = Fld[0]
       FldLen = Fld[1]
       flds.append(FldName)
-      arcpy.AddField_management (outTab, FldName, 'TEXT', '', '', FldLen, '', 'NULLABLE', '', '')
+      arcpy.AddField_management(outTab, FldName, 'TEXT', '', '', FldLen, '', 'NULLABLE', '', '')
    
    printMsg('Setting up some regex patterns and code dictionaries...')
    # Set up some patterns to match
@@ -400,14 +400,14 @@ def RulesToNWI(inTab, inPolys):
    
    Parameters:
    - inTab: Input table of NWI code definitions. (This table will be modified by the addition of binary fields.)
-   - inPolys: Input NWI polygons representing wetlands. (This feature class will be modified by joining the fields from the code table.
+   - inPolys: Input NWI polygons representing wetlands. (This feature class will be modified by joining the fields from the code table).
    '''
    # Create new fields to hold SBB rules and tidal status, and set initial values to 0
    printMsg('Adding and initializing SBB rule and tidal status fields...')
    RuleList = ["Rule5", "Rule6", "Rule7", "Rule9", "Tidal", "Exclude"]
    for Rule in RuleList:
-      arcpy.AddField_management (inTab, Rule, 'SHORT')
-      arcpy.CalculateField_management (inTab, Rule, 0, "PYTHON")
+      arcpy.AddField_management(inTab, Rule, 'SHORT')
+      arcpy.CalculateField_management(inTab, Rule, 0, "PYTHON")
    
    # Create a table view including only the desired fields
    flds = ["ATTRIBUTE", 
@@ -458,13 +458,13 @@ def RulesToNWI(inTab, inPolys):
             continue # Skip all the rest and go on to process the next record
          if wtrReg in ("Saltwater Tidal", "Freshwater Tidal"):
             row[14] = 1 # Set to tidal
-            if syst == 'Marine' or syst == None:
+            if syst == 'Marine' or syst is None:
                pass # No rule assigned
             else:
                if (cls1 in ('Emergent', 'Scrub-Shrub', 'Forested') or
                      cls2 in ('Emergent', 'Scrub-Shrub', 'Forested') or
-                     cls1 == 'Aquatic Bed' and subcls1 == None or
-                     cls2 == 'Aquatic Bed' and subcls2 == None or
+                     cls1 == 'Aquatic Bed' and subcls1 is None or
+                     cls2 == 'Aquatic Bed' and subcls2 is None or
                      subcls1 in ('Rooted Vascular', 'Floating Vascular', 'Vegetated') or
                      subcls2 in ('Rooted Vascular', 'Floating Vascular', 'Vegetated')):
                   row[13] = 1 # Assign Rule 9
@@ -475,8 +475,7 @@ def RulesToNWI(inTab, inPolys):
                row[11] = 1 # Assign Rule 6
                row[12] = 1 # Assign Rule 7
             elif syst == 'Palustrine':
-               if (cls1 in ('Emergent', 'Scrub-Shrub', 'Forested') or
-                   cls2 in ('Emergent', 'Scrub-Shrub', 'Forested')): 
+               if (cls1 in ('Emergent', 'Scrub-Shrub', 'Forested') or cls2 in ('Emergent', 'Scrub-Shrub', 'Forested')):
                   if (cls1 == 'Emergent' or cls2 == 'Emergent'):
                      row[10] = 1 # Assign Rule 5
                      row[11] = 1 # Assign Rule 6
@@ -535,7 +534,7 @@ def prepFlowBuff(in_FlowDist, truncDist, procMask, out_Rast, snapRast = None):
    buffRast = SetNull (FlowDist, 1, where_clause)
    
    # Reproject or save directly
-   if snapRast == None:
+   if snapRast is None:
       printMsg("Saving raster...")
       buffRast.save(out_Rast)
    else:
@@ -650,7 +649,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Process: Remove extraneous fields and make new layers
    for fld in ["Join_Count", "TARGET_FID"]:
       try:
-         arcpy.DeleteField_management (out_Sites, fld)
+         arcpy.DeleteField_management(out_Sites, fld)
       except:
          pass
    qry = "ModType = 'S'"
@@ -796,7 +795,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
 
 
 ### Functions for creating Terrestrial Conservation Sites (TCS) and Anthropogenic Habitat Zones (AHZ) ###
-def GetEraseFeats (inFeats, selQry, elimDist, outEraseFeats, elimFeats = "", scratchGDB = "in_memory"):
+def GetEraseFeats(inFeats, selQry, elimDist, outEraseFeats, elimFeats = "", scratchGDB = "in_memory"):
    ''' For ConSite creation: creates exclusion features from input hydro or transportation surface features'''
    # Process: Make Feature Layer (subset of selected features)
    arcpy.MakeFeatureLayer_management(inFeats, "Selected_lyr", selQry)
@@ -831,11 +830,11 @@ def GetEraseFeats (inFeats, selQry, elimDist, outEraseFeats, elimFeats = "", scr
    
    return outEraseFeats
 
-def CullEraseFeats (inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scratchGDB = "in_memory"):
+def CullEraseFeats(inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scratchGDB = "in_memory"):
    '''For ConSite creation: Culls exclusion features containing a significant percentage of any input feature's (PF or SBB) area'''
    # Process:  Add Field (Erase ID) and Calculate
-   arcpy.AddField_management (inEraseFeats, "eFID", "LONG")
-   arcpy.CalculateField_management (inEraseFeats, "eFID", "!OBJECTID!", "PYTHON")
+   arcpy.AddField_management(inEraseFeats, "eFID", "LONG")
+   arcpy.CalculateField_management(inEraseFeats, "eFID", "!OBJECTID!", "PYTHON")
    
    # Process: Tabulate Intersection
    # This tabulates the percentage of each input feature that is contained within each erase feature
@@ -850,7 +849,7 @@ def CullEraseFeats (inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scr
    # Process: Join Field
    # This joins the summed percentage value back to the original input features
    try:
-      arcpy.DeleteField_management (in_Feats, "SUM_PERCENTAGE")
+      arcpy.DeleteField_management(in_Feats, "SUM_PERCENTAGE")
    except:
       pass
    arcpy.JoinField_management(in_Feats, fld_SFID, TabSum, fld_SFID, "SUM_PERCENTAGE")
@@ -870,7 +869,7 @@ def CullEraseFeats (inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scr
    
    return outEraseFeats
 
-def CullFrags (inFrags, in_PF, searchDist, outFrags):
+def CullFrags(inFrags, in_PF, searchDist, outFrags):
    '''For ConSite creation: Culls SBB or ConSite fragments farther than specified search distance from Procedural Features'''
    
    # Process: Near
@@ -894,18 +893,6 @@ def ExpandPFselection(inPF_lyr, inCS_lyr, SearchDist):
    - SearchDist: distance within which PFs should be added to the selection
    
    '''
-   # # If applicable, clear any selections on the PFs and ConSites inputs
-   # typePF = (arcpy.Describe(inPF)).dataType
-   # typeCS = (arcpy.Describe(inConSites)).dataType
-   # if typePF == 'FeatureLayer':
-      # arcpy.SelectLayerByAttribute_management (inPF, "CLEAR_SELECTION")
-   # if typeCS == 'FeatureLayer':
-      # arcpy.SelectLayerByAttribute_management (inConSites, "CLEAR_SELECTION")
-      
-   # # Make Feature Layers from PFs and ConSites
-   # arcpy.MakeFeatureLayer_management(inPF, "PF_lyr")   
-   # arcpy.MakeFeatureLayer_management(inConSites, "Sites_lyr")
-
    c = countSelectedFeatures(inPF_lyr)
    if c == 0:
       printErr("You need to have an active selection on the PF layer for this function to work.")
@@ -938,25 +925,25 @@ def SubsetSBBandPF(inSBB, inPF, selOption, fld_SFID, outSBB, outPF):
    # If applicable, clear any selections on the Selectee input
    typeSelectee = (arcpy.Describe(inSelectee)).dataType
    if typeSelectee == 'FeatureLayer':
-      arcpy.SelectLayerByAttribute_management (inSelectee, "CLEAR_SELECTION")
+      arcpy.SelectLayerByAttribute_management(inSelectee, "CLEAR_SELECTION")
       
    # Copy the Selector features to the output feature class
-   arcpy.CopyFeatures_management (inSelector, outSelector) 
+   arcpy.CopyFeatures_management(inSelector, outSelector)
 
    # Make Feature Layer from Selectee features
    arcpy.MakeFeatureLayer_management(inSelectee, "Selectee_lyr") 
 
    # Get the Selectees associated with the Selectors, keeping only common records
-   arcpy.AddJoin_management ("Selectee_lyr", fld_SFID, outSelector, fld_SFID, "KEEP_COMMON")
+   arcpy.AddJoin_management("Selectee_lyr", fld_SFID, outSelector, fld_SFID, "KEEP_COMMON")
 
    # Select all Selectees that were joined
-   arcpy.SelectLayerByAttribute_management ("Selectee_lyr", "NEW_SELECTION")
+   arcpy.SelectLayerByAttribute_management("Selectee_lyr", "NEW_SELECTION")
 
    # Remove the join
-   arcpy.RemoveJoin_management ("Selectee_lyr")
+   arcpy.RemoveJoin_management("Selectee_lyr")
 
    # Copy the selected Selectee features to the output feature class
-   arcpy.CopyFeatures_management ("Selectee_lyr", outSelectee)
+   arcpy.CopyFeatures_management("Selectee_lyr", outSelectee)
    
    featTuple = (outPF, outSBB)
    return featTuple
@@ -975,37 +962,30 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    arcpy.MakeFeatureLayer_management(in_PF, "PF_CoreSub", where_clause)
    
    # Get PFs centered in the core
-   # printMsg('Selecting PFs intersecting the core...')
    arcpy.SelectLayerByLocation_management("PF_CoreSub", "INTERSECT", in_Core, "", "NEW_SELECTION", "NOT_INVERT")
    
    # Get SBBs associated with selected PFs
-   # printMsg('Copying selected PFs and their associated SBBs...')
    sbbSub = scratchGDB + os.sep + 'sbb'
    pfSub = scratchGDB + os.sep + 'pf'
    SubsetSBBandPF(in_SBB, "PF_CoreSub", "SBB", fld_SFID, sbbSub, pfSub)
    
    # Buffer SBBs 
-   # printMsg("Buffering SBBs...")
    sbbBuff = scratchGDB + os.sep + "sbbBuff"
    arcpy.Buffer_analysis(sbbSub, sbbBuff, BuffDist, "FULL", "ROUND", "NONE", "", "PLANAR")
    
    # Clip buffers to core
-   # printMsg("Clipping buffered SBBs to core...")
    clpBuff = scratchGDB + os.sep + "clpBuff"
    CleanClip(sbbBuff, in_Core, clpBuff, scratchGDB)
    
    # Remove any SBB fragments not containing a PF
-   # printMsg('Culling SBB fragments...')
    sbbRtn = scratchGDB + os.sep + 'sbbRtn'
    CullFrags(clpBuff, pfSub, "0 METERS", sbbRtn)
    
    # Merge, then dissolve to get final shapes
-   # printMsg('Dissolving original SBBs with buffered SBBs to get final shapes...')
    sbbMerge = scratchGDB + os.sep + "sbbMerge"
-   arcpy.Merge_management ([sbbSub, sbbRtn], sbbMerge)
-   arcpy.Dissolve_management (sbbMerge, out_SBB, [fld_SFID, "intRule"], "")
+   arcpy.Merge_management([sbbSub, sbbRtn], sbbMerge)
+   arcpy.Dissolve_management(sbbMerge, out_SBB, [fld_SFID, "intRule"], "")
    
-   # printMsg('Done.')
    return out_SBB
 
 def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, searchDist, smthDist, scratchGDB = "in_memory"):
@@ -1182,7 +1162,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 #     7.  Clip the merged feature to the maximum buffer.'''
 
    # Prepare data
-   arcpy.management.MakeFeatureLayer (in_NWI, "NWI_lyr")
+   arcpy.management.MakeFeatureLayer(in_NWI, "NWI_lyr")
    tmp_PF = in_PF
    
    # Declare some additional parameters
@@ -1244,13 +1224,13 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
                
                # Step 3: Clip the NWI to the maximum buffer
                # First check if there are any NWI features in range to work with
-               arcpy.management.SelectLayerByLocation ("NWI_lyr", "INTERSECT", "myMaxBuffer")
+               arcpy.management.SelectLayerByLocation("NWI_lyr", "INTERSECT", "myMaxBuffer")
                c = countSelectedFeatures("NWI_lyr")
                
                if c > 0:
                   # printMsg("Clipping NWI features to maximum buffer...")
                   arcpy.analysis.PairwiseClip("NWI_lyr", "myMaxBuffer", "clipNWI")
-                  arcpy.management.MakeFeatureLayer ("clipNWI", "clipNWI_lyr")
+                  arcpy.management.MakeFeatureLayer("clipNWI", "clipNWI_lyr")
 
                   # Step 4: Select clipped NWI features within range
                   # printMsg("Selecting nearby NWI features...")
@@ -1272,11 +1252,11 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 
                      # Dissolve features into a single polygon
                      # printMsg("Dissolving buffered PF and NWI features into a single feature...")
-                     arcpy.management.Dissolve ("tmpMerged", "tmpDissolved", "", "", "", "")
+                     arcpy.management.Dissolve("tmpMerged", "tmpDissolved", "", "", "", "")
 
                      # Step 7: Clip the dissolved feature to the maximum buffer
                      # printMsg("Clipping dissolved feature to maximum buffer...")
-                     arcpy.analysis.PairwiseClip ("tmpDissolved", "myMaxBuffer", "tmpClip")
+                     arcpy.analysis.PairwiseClip("tmpDissolved", "myMaxBuffer", "tmpClip")
 
                      # Use the clipped, combined feature geometry as the final shape
                      myFinalShape = arcpy.SearchCursor("tmpClip").next().Shape
@@ -1368,7 +1348,7 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi = "NA", out_SBB = "sb
    outDir = os.path.dirname(out_SBB)
    outName = os.path.basename(out_SBB)
    printMsg("Creating %s in %s" %(outName, outDir))
-   arcpy.CreateFeatureclass_management (outDir, outName, "POLYGON", tmp_PF, '', '', sr)
+   arcpy.CreateFeatureclass_management(outDir, outName, "POLYGON", tmp_PF, '', '', sr)
 
    # Create simple buffer SBBs
    selQry = "intRule in (-1,1,2,3,4,8,10,11,12,13,14) AND fltBuffer <> 0"
@@ -1478,15 +1458,15 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
 
    # Process:  Copy the selected Cores features to scratch feature class
    selCores = scratchGDB + os.sep + 'selCores'
-   arcpy.CopyFeatures_management ("Cores_lyr", selCores) 
+   arcpy.CopyFeatures_management("Cores_lyr", selCores) 
 
    # Process:  Repair Geometry and get feature count
-   arcpy.RepairGeometry_management (selCores, "DELETE_NULL")
+   arcpy.RepairGeometry_management(selCores, "DELETE_NULL")
    numCores = countFeatures(selCores)
    printMsg('There are %s cores to process.' %str(numCores))
    
    # Create Feature Class to store expanded SBBs
-   arcpy.CreateFeatureclass_management (scratchGDB, 'sbbExpand', "POLYGON", SBB_sub, "", "", SBB_sub) 
+   arcpy.CreateFeatureclass_management(scratchGDB, 'sbbExpand', "POLYGON", SBB_sub, "", "", SBB_sub) 
    sbbExpand = scratchGDB + os.sep + 'sbbExpand'
    
    # Loop through Cores and add core buffers to SBBs
@@ -1501,19 +1481,18 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
          AddCoreAreaToSBBs(PF_sub, SBB_sub, fld_SFID, coreShp, tmpSBB, "1000 METERS", scratchGDB)
          
          # Append expanded SBB features to output
-         arcpy.Append_management (tmpSBB, sbbExpand, "NO_TEST")
+         arcpy.Append_management(tmpSBB, sbbExpand, "NO_TEST")
          
          del core
    
-   # Merge and smooth to get final shapes
-   # headsup: Removed the dissolve here, to retain the original SBB polygons in out_SBB. This allows the ChopMod procedure to
-   #  work on both the original and expanded SBBs, making for consistent delineation regardless if SBB was expanded to core.
+   printMsg("Merging all SBBs and smoothing to get final shapes...")
    sbbAll = scratchGDB + os.sep + "sbbAll"
    fms = BuildFieldMappings([SBB_sub, sbbExpand], [fld_SFID, "intRule"])
    arcpy.Merge_management([SBB_sub, sbbExpand], sbbAll, fms, "ADD_SOURCE_INFO")
-   # arcpy.Merge_management ([SBB_sub, sbbExpand], sbbAll)
+   # headsup: Removed the dissolve here, to retain the original SBB polygons in out_SBB. This allows the ChopMod procedure to
+   #  work on both the original and expanded SBBs, making for consistent delineation regardless if SBB was expanded to core.
    # dissSBB = scratchGDB + os.sep + "dissSBB"
-   # arcpy.Dissolve_management (sbbAll, dissSBB, [fld_SFID, "intRule"], "")
+   # arcpy.Dissolve_management(sbbAll, dissSBB, [fld_SFID, "intRule"], "")
    arcpy.cartography.SmoothPolygon(sbbAll, out_SBB, "PAEK", "120 METERS")
    
    printMsg('SBB expansion complete')
@@ -1622,7 +1601,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
          
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
-   arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
+   arcpy.CreateFeatureclass_management(myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
 
    ### End data prep
    tEndPrep = datetime.now()
@@ -1658,11 +1637,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             tmpPS = myPS[0]
             tmpSS_grp = scratchGDB + os.sep + "tmpSS_grp"
-            arcpy.management.CreateFeatureclass(scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites) 
+            arcpy.management.CreateFeatureclass(scratchGDB, "tmpSS_grp", "POLYGON", in_ConSites, "", "", in_ConSites)
             
             # Buffer around the ProtoSite and set extent
             tmpBuff = scratchGDB + os.sep + 'tmpBuff'
-            arcpy.analysis.PairwiseBuffer(tmpPS, tmpBuff, buffDist, "", "", "", "")  
+            arcpy.analysis.PairwiseBuffer(tmpPS, tmpBuff, buffDist, "", "", "", "")
             arcpy.env.extent = tmpBuff
             
             # Select modification layers by location
@@ -1687,14 +1666,14 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             # Copy the selected SBB features to tmpSBB
             tmpSBB = scratchGDB + os.sep + 'tmpSBB'
-            arcpy.CopyFeatures_management ("SBB_lyr", tmpSBB)
+            arcpy.CopyFeatures_management("SBB_lyr", tmpSBB)
             
             # Get PFs within the ProtoSite
             arcpy.SelectLayerByLocation_management("PF_lyr", "INTERSECT", tmpPS)
             
             # Copy the selected PF features to tmpPF
             tmpPF = scratchGDB + os.sep + 'tmpPF'
-            arcpy.CopyFeatures_management ("PF_lyr", tmpPF)
+            arcpy.CopyFeatures_management("PF_lyr", tmpPF)
             
             # Clip modification features to ProtoSite
             printMsg("Clipping modification features to ProtoSite...")
@@ -1756,7 +1735,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Use erase features to chop out areas of ProtoSites
             printMsg('Erasing portions of ProtoSites...')
             psFrags = scratchGDB + os.sep + 'psFrags'
-            CleanErase (tmpPS, finErase, psFrags, scratchParm) 
+            CleanErase(tmpPS, finErase, psFrags, scratchParm) 
             
             # Remove any ProtoSite fragments too far from a PF
             printMsg('Culling ProtoSite fragments...')
@@ -1793,7 +1772,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   # Use erase features to chop out areas of sites
                   printMsg('Erasing portions of sites...')
                   siteFrags = scratchGDB + os.sep + 'siteFrags' + str(counter2)
-                  CleanErase (csShrink, finErase, siteFrags, scratchParm) 
+                  CleanErase(csShrink, finErase, siteFrags, scratchParm) 
                   
                   # Cull site fragments
                   printMsg('Culling site fragments...')
@@ -1814,8 +1793,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                   del mySS
             # NOTE: In rare cases, the above loop creates overlapping split sites. Overlapping split sites cause issues
             #  with the subsequent re-join procedure. This happens when the same sbbCluster polygons intersect more
-            #  than one split site.
-            # Fix: Dissolve tmpSS_grp to single-part polygons in tmpSS_grp2
+            #  than one split site. Dissolve tmpSS_grp to single-part polygons in tmpSS_grp2
             tmpSS_grp2 = scratchGDB + os.sep + 'tmpSS_grp2'
             fldDiss = [a.name for a in arcpy.ListFields(tmpSS_grp) if a.type != "OID" and not a.name.lower().startswith('shape')]
             arcpy.management.Dissolve(tmpSS_grp, tmpSS_grp2, fldDiss, multi_part="SINGLE_PART")
@@ -1825,7 +1803,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # This routine is time-costly but greatly improves results in certain situations.
             # Only needed if Proto-Site has been split into more than 1 site.
             c = countFeatures(tmpSS_grp2)
-            if c > 1:            
+            if c > 1:
                printMsg('Checking if we should patch some gaps...')
                # Intersect thin outer buffers
                outerBuff = scratchGDB + os.sep + "outBuff%s"%str(counter)
@@ -1894,7 +1872,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             if site_Type == 'TERRESTRIAL':  
                printMsg('Final excision of exclusion features...')
                modBnd = scratchGDB + os.sep + "mod%s"%str(counter)
-               CleanErase (smoothBnd, efClp, modBnd, scratchParm) 
+               CleanErase(smoothBnd, efClp, modBnd, scratchParm) 
             else:
                modBnd = smoothBnd
 
@@ -2013,8 +1991,8 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
       arcpy.management.SelectLayerByAttribute(barriers, "NEW_SELECTION", "Status = 1", None)
       arcpy.management.DeleteFeatures(barriers)
       
-      printMsg("Saving service layer to %s..." %outLyrx)      
-      arcpy.SaveToLayerFile_management(saLyr, outLyrx) 
+      printMsg("Saving service layer to %s..." %outLyrx)
+      arcpy.SaveToLayerFile_management(saLyr, outLyrx)
 
    arcpy.CheckInExtension("Network")
    
@@ -2036,86 +2014,35 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    # timestamp
    t0 = datetime.now()
    
-   # # Buffer PFs by 30-m (standard slop factor) or by 250-m for wood turtles
-   # printMsg("Buffering Procedural Features...")
-   # code_block = """def buff(elcode):
-      # if elcode == "ARAAD02020":
-         # b = 250
-      # else:
-         # b = 30
-      # return b
-      # """
-   # expression = "buff(!ELCODE!)"
-   # arcpy.CalculateField_management (in_PF, "BUFFER", expression, "PYTHON", code_block)
-   # buff_PF = "in_memory" + os.sep + "buff_PF"
-   # arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")
-   # NOTE: Eliminating special buffer for turtles; planning to burn in catchments for this and some other elements as part of the DelinSite_scs function.
-   
-   # # Buffer PFs by 30-m (standard slop factor)
-   # printMsg("Buffering Procedural Features...")
-   # buff_PF = out_Scratch + os.sep + "buff_PF"
-   # arcpy.Buffer_analysis (in_PF, buff_PF, "BUFFER", "", "", "NONE")   
-   
-   # Set up some variables
-   descHydro = arcpy.Describe(in_hydroNet)
-   nwDataset = descHydro.catalogPath
-   catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   nhdArea = catPath + os.sep + "NHDArea"
-   nhdWaterbody = catPath + os.sep + "NHDWaterbody"
-   
    # Shift PFs to align with primary flowline
    printMsg("Starting shiftAlign function...")
    shift_PF = out_Scratch + os.sep + "shift_PF"
    (shiftFeats, clipWideWater, mergeLines) = shiftAlignToFlow(in_PF, shift_PF, fld_SFID, in_hydroNet, in_Catch, out_Scratch)
    printMsg("PF alignment complete")
    
-   # # Select catchments intersecting shifted PFs
-   # printMsg("Selecting catchments intersecting shifted PFs...")
-   # arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
-   # arcpy.SelectLayerByLocation_management ("lyr_Catchments", "INTERSECT", shift_PF)
-   
-   # # Clip widewaters to selected catchments
-   # printMsg("Clipping widewaters...")
-   # clipWideWater = out_Scratch + os.sep + "clipWideWater"
-   # arcpy.Clip_analysis (wideWater, "lyr_Catchments", clipWideWater)
-   
-   # Merge shifted PFs and widewater polygons into single feature class
-   ###WHY???
-   # printMsg("Merging shifted PFs with clipped widewaters...")
-   # mergeFeats = out_Scratch + os.sep + "mergeFeats"
-   # arcpy.Merge_management ([shift_PF, clipWideWater], mergeFeats)
-   
    # Clip flowlines to shifted PF
    printMsg("Clipping flowlines...")
    clipLines = out_Scratch + os.sep + "clipLines"
-   # #arcpy.Clip_analysis (nhdFlowline, mergeFeats, clipLines)
-   # #arcpy.Clip_analysis (mergeLines, shift_PF, clipLines)
-   arcpy.analysis.PairwiseClip (mergeLines, shift_PF, clipLines)
+   arcpy.analysis.PairwiseClip(mergeLines, shift_PF, clipLines)
    
    # Create points from start- and endpoints of clipped flowlines
-   # tmpPts = out_Scratch + os.sep + "tmpPts"
-   tmpPts = out_Points
+   # tmpPts = out_Scratch + os.sep + "tmpPts"  # no longer necessary
    printMsg("Generating points along network...")
-   arcpy.FeatureVerticesToPoints_management (clipLines, tmpPts, "BOTH_ENDS")
+   arcpy.FeatureVerticesToPoints_management(clipLines, out_Points, "BOTH_ENDS")
    # arcpy.analysis.PairwiseIntersect([mergeLines, shift_PF], out_Points, "", "", "POINT")
    printMsg("Removing duplicate points...")
-   arcpy.management.DeleteIdentical(tmpPts, "Shape")
+   arcpy.management.DeleteIdentical(out_Points, "Shape")
    
    # Clip wetlands to shifted PF
    printMsg("Clipping wetlands...")
    clipNWI = out_Scratch + os.sep + "clipWtlnd"
-   arcpy.analysis.PairwiseClip (in_NWI, shift_PF, clipNWI)
+   arcpy.analysis.PairwiseClip(in_NWI, shift_PF, clipNWI)
    
    # Attribute points designating them tidal or not
-   # # First make a layer and select by location to speed up the join
-   # printMsg("Selecting nearby wetlands...")
-   # arcpy.management.MakeFeatureLayer(in_NWI, "lyrNWI")
-   # arcpy.management.SelectLayerByLocation("lyrNWI", "WITHIN_A_DISTANCE", tmpPts, "3 Meters")
-   # c = countSelectedFeatures("lyrNWI")
    c = countFeatures(clipNWI)
    
    if c > 0:
-      # # Spatial join allows for a 3-meter spatial error
+      # # Spatial join would allow for a 3-meter spatial error, not using though
       printMsg("Joining tidal attribute...")
       # arcpy.analysis.SpatialJoin(tmpPts, in_NWI, out_Points, "JOIN_ONE_TO_ONE", "KEEP_ALL", "", "CLOSEST", "3 Meters", "")
       arcpy.ca.JoinAttributesFromPolygon(out_Points, clipNWI, fld_Tidal)
@@ -2164,14 +2091,14 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    tidalLines = out_Scratch + os.sep + "tidalLines"
    tidalPts = out_Scratch + os.sep + "tidalPts"
    nontidalPts = out_Scratch + os.sep + "nontidalPts"
-   outDir = os.path.dirname(out_Lines)
+   # outDir = os.path.dirname(out_Lines)
    
    # Split points into tidal and non-tidal layers
    printMsg("Splitting points into tidal vs non-tidal...")
    qry = "%s = 1"%fld_Tidal
-   arcpy.Select_analysis (in_Points, tidalPts, qry)
+   arcpy.Select_analysis(in_Points, tidalPts, qry)
    qry = "%s = 0"%fld_Tidal
-   arcpy.Select_analysis (in_Points, nontidalPts, qry)
+   arcpy.Select_analysis(in_Points, nontidalPts, qry)
    
    # Load points as facilities into service layers; search distance 500 meters
    # Solve upstream and downstream service layers; save out lines and updated layers
@@ -2217,8 +2144,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
 
          printMsg("Saving out lines...")
          arcpy.CopyFeatures_management(inLines, outLines)
-         arcpy.RepairGeometry_management (outLines, "DELETE_NULL")
-         # printMsg("Saving updated %s service layer to %s..." %(inLyr,outLyr))      
+         arcpy.RepairGeometry_management(outLines, "DELETE_NULL")
          lines.append(outLines)
       else:
          pass
@@ -2226,7 +2152,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Merge and dissolve the segments; ESRI does not make this simple
    printMsg("Merging segments...")
    comboLines = out_Scratch + os.sep + "comboLines"
-   arcpy.Merge_management (lines, comboLines)
+   arcpy.Merge_management(lines, comboLines)
    
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
@@ -2240,7 +2166,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    
    return (out_Lines, in_downTrace, in_upTrace, in_tidalTrace)
 
-def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150 ):
+def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers, out_Scratch = "in_memory", buffDist = 150):
    """Buffers streams and rivers associated with SCS-lines within catchments. This function is called by the DelinSite_scs function, within a loop.
    
    Parameters:
@@ -2268,13 +2194,13 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    # Also need to fill any holes in polygons to avoid aberrant results
    printMsg("Clipping StreamRiver polygons...")
    CleanClip(in_StreamRiver, in_Catch, clipRiverPoly)
-   arcpy.EliminatePolygonPart_management (clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy.MakeFeatureLayer_management (fillRiverPoly, "StreamRivers")
+   arcpy.EliminatePolygonPart_management(clipRiverPoly, fillRiverPoly, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy.MakeFeatureLayer_management(fillRiverPoly, "StreamRivers")
    
    printMsg("Clipping LakePond polygons...")
    CleanClip(in_LakePond, in_Catch, clipLakePoly)
-   arcpy.EliminatePolygonPart_management (clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
-   arcpy.MakeFeatureLayer_management (fillLakePoly, "LakePonds")
+   arcpy.EliminatePolygonPart_management(clipLakePoly, fillLakePoly, "PERCENT", "", 99, "CONTAINED_ONLY")
+   arcpy.MakeFeatureLayer_management(fillLakePoly, "LakePonds")
    
    # Select clipped NHD polygons intersecting SCS lines
    ### Is this step necessary? Yes. Otherwise little off-network ponds influence result.
@@ -2294,10 +2220,10 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    
    # Merge buffers and dissolve
    printMsg("Merging buffer polygons...")
-   arcpy.Merge_management ([StreamRiverBuff, LakePondBuff, LineBuff], mergeBuff)
+   arcpy.Merge_management([StreamRiverBuff, LakePondBuff, LineBuff], mergeBuff)
    
    printMsg("Dissolving...")
-   arcpy.Dissolve_management (mergeBuff, dissBuff, "", "", "SINGLE_PART")
+   arcpy.Dissolve_management(mergeBuff, dissBuff, "", "", "SINGLE_PART")
    
    # Clip buffers to catchment
    printMsg("Clipping buffer zone to catchments...")
@@ -2326,7 +2252,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    t0 = datetime.now()
    
    # Declare path/name of output data and workspace
-   drive, path = os.path.splitdrive(out_ConSites) 
+   drive, path = os.path.splitdrive(out_ConSites)
    path, filename = os.path.split(path)
    myWorkspace = drive + path
    Output_CS_fname = filename
@@ -2341,7 +2267,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
 
    # Process:  Create Feature Class (to store ConSites)
    printMsg("Creating ConSites feature class to store output features...")
-   arcpy.CreateFeatureclass_management (myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites) 
+   arcpy.CreateFeatureclass_management(myWorkspace, Output_CS_fname, "POLYGON", in_ConSites, "", "", in_ConSites)
 
    if trim == "true":
       # In this case you have to run line buffers in a loop to avoid aberrations
@@ -2361,10 +2287,10 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       # Make feature layers
       printMsg("Making feature layers...")
       qry = "FType = 460" # StreamRiver only
-      lyrStreamRiver = arcpy.MakeFeatureLayer_management (nhdArea, "StreamRiver_Poly", qry)
+      lyrStreamRiver = arcpy.MakeFeatureLayer_management(nhdArea, "StreamRiver_Poly", qry)
       qry = "FType = 390" # LakePond only
-      lyrLakePond = arcpy.MakeFeatureLayer_management (nhdWaterbody, "LakePond_Poly", qry)
-      catch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
+      lyrLakePond = arcpy.MakeFeatureLayer_management(nhdWaterbody, "LakePond_Poly", qry)
+      catch = arcpy.MakeFeatureLayer_management(in_Catch, "lyr_Catchments")
       
       # Create empty feature class to store flow buffers
       printMsg("Creating empty feature class for flow buffers")
@@ -2375,7 +2301,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       
       if arcpy.Exists(flowBuff):
          arcpy.Delete_management(flowBuff)
-      arcpy.CreateFeatureclass_management (fpath, fname, "POLYGON", in_Catch, "", "", sr)
+      arcpy.CreateFeatureclass_management(fpath, fname, "POLYGON", in_Catch, "", "", sr)
       
       with arcpy.da.SearchCursor(in_Lines, ["SHAPE@", "OBJECTID"]) as myLines:
          for line in myLines:
@@ -2386,11 +2312,11 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                         
                # Select catchments intersecting SCS Line
                printMsg("Selecting catchments containing SCS line...")
-               arcpy.SelectLayerByLocation_management (catch, "INTERSECT", lineShp)
+               arcpy.SelectLayerByLocation_management(catch, "INTERSECT", lineShp)
    
                # Dissolve catchments
                printMsg("Dissolving catchments...")
-               arcpy.Dissolve_management (catch, dissCatch, "", "", "SINGLE_PART", "")
+               arcpy.Dissolve_management(catch, dissCatch, "", "", "SINGLE_PART", "")
             
                # Create clipping buffer
                printMsg("Creating clipping buffer...")
@@ -2399,7 +2325,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                # Clip the flow buffer to the clipping buffer 
                printMsg("Clipping the flow buffer ...")
                arcpy.env.extent = clipBuff
-               arcpy.Clip_analysis (in_FlowBuff, clipBuff, flowPoly)
+               arcpy.Clip_analysis(in_FlowBuff, clipBuff, flowPoly)
                
                # For SCUs, Eliminate any dangling pieces which may have resulted from clip. These can result becuase the flow buffers/catchments do not always perfectly align with flowlines
                if scuSwitch:
@@ -2411,7 +2337,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                   flowPoly = flowPoly2
                
                printMsg("Appending feature %s..." %lineID)
-               arcpy.Append_management (flowPoly, flowBuff, "NO_TEST")
+               arcpy.Append_management(flowPoly, flowBuff, "NO_TEST")
 
             except:
                printMsg("Process failure for feature %s. Passing..." %lineID)
@@ -2420,7 +2346,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       arcpy.env.extent = "MAXOF"
       # Burn in full catchments for alternate-process PFs
       qry = "%s = 'SCS2'"%fld_Rule
-      altPF = arcpy.MakeFeatureLayer_management (in_PF, "lyr_altPF", qry)
+      altPF = arcpy.MakeFeatureLayer_management(in_PF, "lyr_altPF", qry)
       count = countFeatures(altPF)
       if count > 0:
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
@@ -2431,24 +2357,24 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
             arcpy.PairwiseDissolve_analysis(catch, fullCatch, multi_part="SINGLE_PART")
             fullCatchSmth = out_Scratch + os.sep + "fullCatchSmth"
             arcpy.cartography.SmoothPolygon(fullCatch, fullCatchSmth, "PAEK", "50 METERS")
-            arcpy.Append_management (fullCatchSmth, flowBuff, "NO_TEST")
+            arcpy.Append_management(fullCatchSmth, flowBuff, "NO_TEST")
          else:
             # headsup: In this case, smoothing happens after the buffers and catchments are merged/dissolved
-            arcpy.Append_management (catch, flowBuff, "NO_TEST")
+            arcpy.Append_management(catch, flowBuff, "NO_TEST")
 
       in_Polys = flowBuff
    
-   else: 
+   else:
       # Select catchments intersecting SCS Lines
       printMsg("Selecting catchments containing SCS lines...")
-      catch = arcpy.MakeFeatureLayer_management (in_Catch, "lyr_Catchments")
-      arcpy.SelectLayerByLocation_management (catch, "INTERSECT", in_Lines)
+      catch = arcpy.MakeFeatureLayer_management(in_Catch, "lyr_Catchments")
+      arcpy.SelectLayerByLocation_management(catch, "INTERSECT", in_Lines)
       in_Polys = catch
    
    # Dissolve adjacent/overlapping features and fill in gaps 
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
-   arcpy.Dissolve_management (in_Polys, dissPolys, "", "", "SINGLE_PART")
+   arcpy.Dissolve_management(in_Polys, dissPolys, "", "", "SINGLE_PART")
 
    if not scuSwitch:
       # Smooth SCS polygons
@@ -2467,7 +2393,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
 
    # Append final shapes to template
-   arcpy.Append_management (fillPolys, out_ConSites, "NO_TEST")
+   arcpy.Append_management(fillPolys, out_ConSites, "NO_TEST")
    
    # timestamp
    t1 = datetime.now()

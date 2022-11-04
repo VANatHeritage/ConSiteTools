@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2020-09-15
-# Last Edit: 2022-09-01
+# Last Edit: 2022-11-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -199,7 +199,7 @@ def main():
    # Get timestamp and elapsed time
    tEnd = datetime.now()
    printMsg("Processing ended at %s" %tEnd.strftime("%H:%M:%S"))
-   deltaString = GetElapsedTime (tStart, tEnd)
+   deltaString = GetElapsedTime(tStart, tEnd)
    printMsg("Mission complete. Elapsed time: %s" %deltaString)
    
 if __name__ == '__main__':

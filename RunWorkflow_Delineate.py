@@ -2,7 +2,7 @@
 # RunWorkflow_Delineate.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2020-06-03
-# Last Edit: 2022-09-29
+# Last Edit: 2022-11-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -21,7 +21,7 @@ def main():
    
    # Specify which site type(s) to run.
    # Choices are: "TCS", "AHZ", "SCU", "SCS"
-   siteTypes = ("SCS")
+   siteTypes = ("TCS", "AHZ", "SCU", "SCS")
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
@@ -35,13 +35,13 @@ def main():
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   runName = 'statewideSCS_2_1dev'
-   outGDB = os.path.join(r'D:\projects\ConSites\arc', 'statewide', runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
+   projFolder = r'D:\projects\ConSites\arc\statewide'
+   runName = 'statewideTCS_2_1'
+   outGDB = os.path.join(projFolder, runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
 
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
-   scratchGDB = "in_memory"
-   # OPTIONS: "in_memory" | os.path.join(r"D:\projects\ConSites\arc\statewide", "scratch_" + runName + ".gdb")
+   scratchGDB = "in_memory"  # OPTIONS: "in_memory" | os.path.join(projFolder, "scratch_" + runName + ".gdb")
    
    # Exported feature service data used to create sites
    # Datasets marked "highly dynamic" are often edited by users and require regular fresh downloads
@@ -89,20 +89,20 @@ def main():
    tcs_SBB = outGDB + os.sep + "sbb_tcs"
    tcs_SBB_exp = outGDB + os.sep + "expanded_sbb_tcs"
    tcs_sites = outGDB + os.sep + "consites_tcs"
-   tcs_sites_qc = outGDB + os.sep + "consites_tcs_qc"  
+   tcs_sites_qc = outGDB + os.sep + "consites_tcs_qc"
    
    # AHZ Outputs
    ahz_SBB = outGDB + os.sep + "sbb_ahz"
    ahz_sites = outGDB + os.sep + "consites_ahz"
-   ahz_sites_qc = outGDB + os.sep + "consites_ahz_qc" 
+   ahz_sites_qc = outGDB + os.sep + "consites_ahz_qc"
    
    # SCU/SCS Outputs
-   scsPts = outGDB + os.sep + "scsPts" 
-   scsLines = outGDB + os.sep + "scsLines" 
-   scsPolys = outGDB + os.sep + "scsPolys"  
-   scuPolys = outGDB + os.sep + "scuPolys" 
-   scsPolys_qc = outGDB + os.sep + "scsPolys_qc"  
-   scuPolys_qc = outGDB + os.sep + "scuPolys_qc" 
+   scsPts = outGDB + os.sep + "scsPts"
+   scsLines = outGDB + os.sep + "scsLines"
+   scsPolys = outGDB + os.sep + "scsPolys"
+   scuPolys = outGDB + os.sep + "scuPolys"
+   scsPolys_qc = outGDB + os.sep + "scsPolys_qc"
+   scuPolys_qc = outGDB + os.sep + "scuPolys_qc"
 
 
    ### Functions to run
@@ -129,7 +129,7 @@ def main():
          CreateSBBs(pfTCS, fld_SFID, fld_Rule, fld_Buff, in_NWI, tcs_SBB, scratchGDB)
          tEnd = datetime.now()
          printMsg("TCS SBB creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          printMsg("Expanding terrestrial SBBs...")
@@ -138,7 +138,7 @@ def main():
          ExpandSBBs(in_Cores, tcs_SBB, pfTCS, fld_SFID, tcs_SBB_exp, scratchGDB)
          tEnd = datetime.now()
          printMsg("TCS SBB expansion ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          printMsg("Creating terrestrial ConSites...")
@@ -147,7 +147,7 @@ def main():
          CreateConSites(tcs_SBB_exp, pfTCS, fld_SFID, csTCS, tcs_sites, "TERRESTRIAL", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
          tEnd = datetime.now()
          printMsg("TCS Site creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          if ysnQC == "Y":
@@ -157,7 +157,7 @@ def main():
             ReviewConSites(tcs_sites, csTCS, cutVal, tcs_sites_qc, fld_SiteID, scratchGDB)
             tEnd = datetime.now()
             printMsg("TCS Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
-            deltaString = GetElapsedTime (tStart, tEnd)
+            deltaString = GetElapsedTime(tStart, tEnd)
             printMsg("Elapsed time: %s" %deltaString)
             
          printMsg("Completed Terrestrial Conservation Sites.")
@@ -180,7 +180,7 @@ def main():
          CreateSBBs(pfAHZ, fld_SFID, fld_Rule, fld_Buff, in_NWI, ahz_SBB, scratchGDB)
          tEnd = datetime.now()
          printMsg("AHZ SBB creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          # Create ConSites
@@ -190,7 +190,7 @@ def main():
          CreateConSites(ahz_SBB, pfAHZ, fld_SFID, csAHZ, ahz_sites, "AHZ", in_Hydro, in_TranSurf, in_Exclude, scratchGDB)
          tEnd = datetime.now()
          printMsg("AHZ Site creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          # Review ConSites
@@ -202,7 +202,7 @@ def main():
             ReviewConSites(ahz_sites, csAHZ, cutVal, ahz_sites_qc, fld_SiteID, scratchGDB)
             tEnd = datetime.now()
             printMsg("AHZ Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
-            deltaString = GetElapsedTime (tStart, tEnd)
+            deltaString = GetElapsedTime(tStart, tEnd)
             printMsg("Elapsed time: %s" %deltaString)
             
          printMsg("Completed Anthropogenic Habitat Zones.")
@@ -225,7 +225,7 @@ def main():
          (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet, in_Dams)
          tEnd = datetime.now()
          printMsg("Service layers creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          # Create SCS points
@@ -235,7 +235,7 @@ def main():
          MakeNetworkPts_scs(pfSCS, in_hydroNet, in_Catch, in_NWI, scsPts, fld_SFID, fld_Tidal, scratchGDB)
          tEnd = datetime.now()
          printMsg("SCS points creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          # Create SCS lines
@@ -245,7 +245,7 @@ def main():
          CreateLines_scs(scsPts, lyrDownTrace, lyrUpTrace, lyrTidalTrace, scsLines, fld_Tidal, scratchGDB)
          tEnd = datetime.now()
          printMsg("SCS lines creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-         deltaString = GetElapsedTime (tStart, tEnd)
+         deltaString = GetElapsedTime(tStart, tEnd)
          printMsg("Elapsed time: %s" %deltaString)
          
          if "SCU" in siteTypes:
@@ -256,7 +256,7 @@ def main():
             DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scuPolys, in_FlowBuff, fld_Rule, trim, 5, scratchGDB)
             tEnd = datetime.now()
             printMsg("SCU creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-            deltaString = GetElapsedTime (tStart, tEnd)
+            deltaString = GetElapsedTime(tStart, tEnd)
             printMsg("Elapsed time: %s" %deltaString)
             
             # Review ConSites
@@ -267,7 +267,7 @@ def main():
                ReviewConSites(scuPolys, csSCS, cutVal, scuPolys_qc, fld_SiteID, scratchGDB)
                tEnd = datetime.now()
                printMsg("SCU review ended at %s" %tEnd.strftime("%H:%M:%S"))
-               deltaString = GetElapsedTime (tStart, tEnd)
+               deltaString = GetElapsedTime(tStart, tEnd)
                printMsg("Elapsed time: %s" %deltaString)
          
          if "SCS" in siteTypes:
@@ -278,7 +278,7 @@ def main():
             DelinSite_scs(pfSCS, scsLines, in_Catch, in_hydroNet, csSCS, scsPolys, in_FlowBuff, fld_Rule, trim, 150, scratchGDB)
             tEnd = datetime.now()
             printMsg("SCS creation ended at %s" %tEnd.strftime("%H:%M:%S"))
-            deltaString = GetElapsedTime (tStart, tEnd)
+            deltaString = GetElapsedTime(tStart, tEnd)
             printMsg("Elapsed time: %s" %deltaString)
             
             # Review ConSites
@@ -289,7 +289,7 @@ def main():
                ReviewConSites(scsPolys, csSCS, cutVal, scsPolys_qc, fld_SiteID, scratchGDB)
                tEnd = datetime.now()
                printMsg("SCS review ended at %s" %tEnd.strftime("%H:%M:%S"))
-               deltaString = GetElapsedTime (tStart, tEnd)
+               deltaString = GetElapsedTime(tStart, tEnd)
                printMsg("Elapsed time: %s" %deltaString)
             
          printMsg("Completed Stream Conservation Units and/or Sites.")

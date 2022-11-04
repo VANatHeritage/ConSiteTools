@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-09-14
+# Last Edit: 2022-11-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -414,7 +414,7 @@ class copy_layers(object):
       
       copyLayersToGDB(Lyrs, out_GDB)
 
-      return 
+      return
 
 class review_consite(object):
    def __init__(self):
@@ -453,7 +453,7 @@ class review_consite(object):
       parm02 = defineParam("cutVal", "Cutoff value (percent)", "GPDouble", "Required", "Input", 5)
       
       parm03 = defineParam("out_Sites", "Output new Conservation Sites feature class with QC fields", "GPFeatureLayer", "Required", "Output")
-      if parm00.value == None:
+      if parm00.value is None:
          parm03.value = "consites_QC"
       else:
          parm03.value = "%s_QC"%parm00.value
@@ -495,7 +495,7 @@ class review_consite(object):
          scratchParm = arcpy.env.scratchWorkspace 
 
       ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, scratchParm)
-      arcpy.MakeFeatureLayer_management (out_Sites, "QC_lyr")
+      arcpy.MakeFeatureLayer_management(out_Sites, "QC_lyr")
 
       return out_Sites
  
@@ -586,7 +586,7 @@ class flat_conslands(object):
 
       bmiFlatten(in_CL, out_CL, scratchParm)
       
-      return out_CL  
+      return out_CL
       
 class calc_bmi(object):
    def __init__(self):
@@ -632,7 +632,7 @@ class calc_bmi(object):
       
       ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename)
       
-      return in_Feats  
+      return in_Feats
   
 class rules2nwi(object):
    def __init__(self):
@@ -865,7 +865,7 @@ class create_sbb(object):
       # Run the function
       getViewExtent()
       CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
-      arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
+      arcpy.MakeFeatureLayer_management(out_SBB, "SBB_lyr")
       arcpy.env.extent = "MAXOF"
 
       return out_SBB
@@ -941,7 +941,7 @@ class expand_sbb(object):
       # Run the function
       getViewExtent()
       ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchParm)
-      arcpy.MakeFeatureLayer_management (out_SBB, "SBB_lyr")
+      arcpy.MakeFeatureLayer_management(out_SBB, "SBB_lyr")
       arcpy.env.extent = "MAXOF"
       
       return out_SBB
@@ -1067,9 +1067,9 @@ class create_consite(object):
       """Modify the messages created by internal validation for each tool
       parameter.  This method is called after internal validation."""
       if parameters[4].value == "TERRESTRIAL":
-         if parameters[6].value == None:
+         if parameters[6].value is None:
             parameters[6].SetErrorMessage("Input Transportation Surfaces: Value is required for TERRESTRIAL sites")
-         if parameters[7].value == None:
+         if parameters[7].value is None:
             parameters[7].SetErrorMessage("Input Exclusion Features: Value is required for TERRESTRIAL sites")
       return
 
@@ -1679,7 +1679,7 @@ class build_portfolio(object):
       replaceLayer(out_sumTab)
       replaceLayer(out_ConSites)
       
-      return (out_sortedEOs, out_sumTab, out_ConSites)      
+      return (out_sortedEOs, out_sumTab, out_ConSites)
       
 class build_element_lists(object):
    def __init__(self):

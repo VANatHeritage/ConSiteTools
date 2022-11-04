@@ -1,14 +1,14 @@
 # ConSite Toolbox
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-02):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-04):
 
 #### Version 2.1
 
 First version built for use with ArcGIS Pro version 3.x.
 
 - TCS updates:
-  - updated the `2: Expand SBBs with Core Area` tool to include both the original (un-expanded) and expanded SBBs in the output feature class
+  - updated `2: Expand SBBs with Core Area` tool to include both the original (un-expanded) and expanded SBBs in the output feature class
   - implemented numerous algorithmic changes to improve site boundaries
 
 - SCS/SCU updates:
