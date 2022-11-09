@@ -1401,7 +1401,12 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi = "NA", out_SBB = "sb
          try:
             nwiQry = "Rule%s = 1"%r
             nwi = arcpy.management.MakeFeatureLayer(in_nwi, "tmpNWI", nwiQry)
-            msg = CreateWetlandSBB("tmpLyr", fld_SFID, nwi, out_SBB, scratchGDB)
+            # Create a subset of NWI features within the maximum buffer distance. This helps speed processing in the CreateWetlandSBB function.
+            # Make sure that search_distance is the same as the maxBuff in that function (currently 500-m).
+            arcpy.SelectLayerByLocation_management(nwi, "WITHIN_A_DISTANCE", "tmpLyr", search_distance="500 Meters")
+            nwiSub = scratchGDB + os.sep + "nwiSub"
+            arcpy.CopyFeatures_management(nwi, nwiSub)
+            msg = CreateWetlandSBB("tmpLyr", fld_SFID, nwiSub, out_SBB, scratchGDB)
             warnMsgs = arcpy.GetMessages(1)
             if warnMsgs:
                printWrng("Finished processing Rule %s, but there were some problems."%r)
