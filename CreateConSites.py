@@ -1940,8 +1940,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    descHydro = arcpy.Describe(in_hydroNet)
    nwDataset = descHydro.catalogPath
    catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   hydroDir = os.path.dirname(catPath)
-   hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
+   hydroDir = os.path.dirname(os.path.dirname(catPath)) # This is where output layer files will be saved
    downString = (str(downDist)).replace(".","_")
    upString = (str(upDist)).replace(".","_")
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyrx"%downString
@@ -2072,6 +2071,68 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    printMsg("Network point generation complete.")
    return out_Points
    
+def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scratchGDB ="in_memory"):
+   """
+   Using scsLine features and NHDFlowline, finds and returns flowline 'filler' segments which meet segment/ total length
+   criteria, which can be used to patch the gaps between inLines.
+   
+   The workflow for finding filler segments starts by selecting flowlines from NHDFlowline:
+      - primary: flowlines which overlap inLines. There is no length criteria for these flowlines.
+      - secondary: flowlines which intersect the primary selection and have length <= max_flowline length.
+   The two selections are merged and unsplit to create contiguous potential filler line features.
+   To be included in the output, a filler feature must:
+      - be less than a total length limit, currently set as (max_flowline_length * 3)
+      - intersect 2+ inLines (identified using a spatial join)
+   
+   :param inLines: Input line features, to find gaps between
+   :param outFillLines: Output filler line features which can be used to patch the gaps in inLines
+   :param flowlines: Original flowline layer (e.g. NHDFlowline)
+   :param max_flowline_length: Maximum length for non-intersecting flowlines (flowExtra), given as an integer in 
+      NHDFlowline layer's coordinate system units (assumed meters).
+   :param scratchGDB: geodatabase to hold intermediate products
+   :return: outFillLines
+   """
+   printMsg("Checking if any gaps can be patched...")
+   # First find flowlines overlapping with inLines. These are always considered for filling.
+   flow0 = arcpy.MakeFeatureLayer_management(flowlines)
+   arcpy.SelectLayerByLocation_management(flow0, "SHARE_A_LINE_SEGMENT_WITH", inLines)
+   # Add intersecting flowlines, if they are less than max_flowline_length.
+   flowExtra = arcpy.MakeFeatureLayer_management(flowlines, where_clause="Shape_Length <= " + str(max_flowline_length))
+   arcpy.SelectLayerByLocation_management(flowExtra, "INTERSECT", flow0)
+   arcpy.SelectLayerByLocation_management(flowExtra, "ARE_IDENTICAL_TO", flow0, selection_type="REMOVE_FROM_SELECTION")
+   # Combine the selections
+   flow0b = scratchGDB + os.sep + 'flow0b'
+   arcpy.Merge_management([flow0, flowExtra], flow0b)
+   # Erase inLines, so you are left with only the unincluded lines
+   flow1 = scratchGDB + os.sep + 'flow1'
+   arcpy.PairwiseErase_analysis(flow0b, inLines, flow1)
+   flow1s = scratchGDB + os.sep + 'flow1s'
+   arcpy.MultipartToSinglepart_management(flow1, flow1s)
+   # Merge adjacent lines
+   flow2 = scratchGDB + os.sep + 'flow2'
+   UnsplitLines(flow1s, flow2, scratchGDB)
+   
+   # This section selects only gap segments with total length less than some defined value.
+   # Note this is a total length criteria, including any tributary segments which may have been picked up. That's why I'm using 3x the max flowline length here.
+   flow2b = scratchGDB + os.sep + 'flow2b'
+   fill_max_length = max_flowline_length * 3
+   arcpy.CalculateField_management(flow2, 'total_length', "!shape.length@meters!", field_type="FLOAT")
+   arcpy.Select_analysis(flow2, flow2b, "total_length < " + str(fill_max_length))
+   # Decide whether to use the subset or not
+   filler = flow2b  # flow2 | flow2b
+   
+   # Find lines which intersect more than one of the inLines. These are the filler to include.
+   flow3 = scratchGDB + os.sep + 'flow3'
+   arcpy.analysis.SpatialJoin(filler, inLines, flow3, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
+   fid = [a[0] for a in arcpy.da.SearchCursor(flow3, 'TARGET_FID')]
+   dup = set([x for x in fid if fid.count(x) > 1])
+   dup2 = [str(a) for a in dup] + ['-1']  # note: -1 is not a valid OID, so would select nothing. It is added to make sure the query is still valid when dup is an empty list.
+   oid = GetFlds(filler, oid_only=True)
+   query = oid + " IN (" + ",".join(dup2) + ")"
+   arcpy.Select_analysis(filler, outFillLines, query)
+   
+   return outFillLines
+
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): 
    """Loads SCS points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCS.
    
@@ -2086,6 +2147,12 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    - out_Scratch = Geodatabase to contain intermediate outputs"""
    
    arcpy.CheckOutExtension("Network")
+   
+   # Find path to NHDFlowline (which is used by FillLines_scs)
+   descHydro = arcpy.Describe(in_upTrace)
+   nwDataset = descHydro.network.catalogPath
+   catPath = os.path.dirname(nwDataset)
+   nhdFlow = catPath + os.sep + "NHDFlowline"
    
    # timestamp
    t0 = datetime.now()
@@ -2161,6 +2228,18 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
+   
+   # This section finds small gaps between scsLines. If any are found, it adds them and re-creates out_Lines.
+   if countFeatures(out_Lines) > 1:
+      fillLines = out_Scratch + os.sep + "fillLines"
+      FillLines_scs(out_Lines, fillLines, nhdFlow, 500, out_Scratch)
+      if countFeatures(fillLines) > 0:
+         printMsg("Filling in small gaps...")
+         newLines = out_Scratch + os.sep + 'newLines'
+         arcpy.Merge_management([out_Lines, fillLines], newLines)
+         UnsplitLines(newLines, out_Lines)
+      else:
+         printMsg("No gaps to fill.")
    
    # timestamp
    t1 = datetime.now()
