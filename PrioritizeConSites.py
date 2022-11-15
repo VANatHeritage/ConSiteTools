@@ -406,7 +406,7 @@ def getBRANK(in_PF, in_ConSites):
    
    ### For the ConSites, calculate the B-rank and flag if it conflicts with previous B-rank
    # printMsg('Adding several fields to ConSites...')
-   oldFlds = [f.name for f in arcpy.ListFields(in_ConSites)]
+   oldFlds = GetFlds(in_ConSites)
    for fld in ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK"]:
       if fld in oldFlds:
          arcpy.management.DeleteField(in_ConSites, fld)

@@ -283,6 +283,13 @@ def unique_values(table, field):
    https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
    with arcpy.da.SearchCursor(table, [field]) as cursor:
       return sorted({row[0] for row in cursor})
+
+def GetFlds(table, oid_only=False):
+   if oid_only:
+      flds = [a.name for a in arcpy.ListFields(table) if a.type == 'OID'][0]  # Returns a single string
+   else:
+      flds = [a.name for a in arcpy.ListFields(table)]  # Returns a list
+   return flds
    
 def TabToDict(inTab, fldKey, fldValue):
    '''Converts two fields in a table to a dictionary'''
@@ -839,7 +846,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
    
    return (outFeats, clipWideWater, mergeLines)
    
-def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
+def UnsplitLines(inLines, outLines, scratchGDB = "in_memory"):
    '''Does what it seems the arcpy.UnsplitLine_management function SHOULD do, but doesn't.
    
    Parameters:
@@ -849,15 +856,16 @@ def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
    '''
    printMsg("Buffering segments...")
    buffLines = scratchGDB + os.sep + "buffLines"
-   arcpy.Buffer_analysis(inLines, buffLines, "1 Meters", "FULL", "ROUND", "ALL") 
+   arcpy.PairwiseBuffer_analysis(inLines, buffLines, "1 Meters", dissolve_option="ALL")
    
    printMsg("Exploding buffers...")
    explBuff = scratchGDB + os.sep + "explBuff"
    arcpy.MultipartToSinglepart_management(buffLines, explBuff)
+   oid = GetFlds(explBuff, oid_only=True)
    
    printMsg("Grouping segments...")
    arcpy.AddField_management(explBuff, "grpID", "LONG")
-   arcpy.CalculateField_management(explBuff, "grpID", "!OBJECTID!", "PYTHON")
+   arcpy.CalculateField_management(explBuff, "grpID", "!" + oid + "!", "PYTHON")
    
    joinLines = scratchGDB + os.sep + "joinLines"
    fldMap = 'grpID "grpID" true true false 4 Long 0 0, First, #, %s, grpID, -1, -1' % explBuff

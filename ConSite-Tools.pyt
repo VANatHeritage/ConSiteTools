@@ -616,7 +616,7 @@ class calc_bmi(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[1].filter.list = field_names
       return
 
@@ -842,7 +842,7 @@ class create_sbb(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          for i in [1,2,3]:
             parameters[i].filter.list = field_names
       return
@@ -919,7 +919,7 @@ class expand_sbb(object):
       has been changed."""
       if parameters[1].altered:
          fc = parameters[1].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[3].filter.list = field_names
       return
 
@@ -1043,7 +1043,7 @@ class create_consite(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[2].filter.list = field_names
       
       if parameters[4].altered:
@@ -1157,10 +1157,10 @@ class servLyrs_scs(object):
       (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet, in_dams)
 
       # Update the derived parameters.
-      # This enables layers to be displayed automatically if running tool from ArcMap.
-      parameters[2].value = lyrDownTrace
-      parameters[3].value = lyrUpTrace
-      parameters[4].value = lyrTidalTrace
+      # This enables layers to be added to the current map. Turned this off! These layers are not necessary in the map and can slow things down.
+      # parameters[2].value = lyrDownTrace
+      # parameters[3].value = lyrUpTrace
+      # parameters[4].value = lyrTidalTrace
       
       return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
       
@@ -1222,7 +1222,7 @@ class ntwrkPts_scs(object):
       has been changed."""
       if parameters[4].altered:
          fc = parameters[4].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[6].filter.list = field_names
       return
 
@@ -1260,6 +1260,13 @@ class lines_scs(object):
    def getParameterInfo(self):
       """Define parameters"""
       map, lnames = getMapLayers()
+      # Find containing folder of HydroNet_ND. This will allow for finding the service area layer files, without having to have them in the Map.
+      if "HydroNet_ND" in lnames:
+         descHydro = arcpy.Describe("HydroNet_ND")
+         # Folder containing NA layers (this is fixed, see MakeServiceLayers_scs). If the NA layers are not in the map, this will be used to generate their paths.
+         hydroDir = os.path.dirname(os.path.dirname(descHydro.path))
+      else:
+         hydroDir = None
       
       parm0 = defineParam("in_Points", "Input Network Points", "GPFeatureLayer", "Required", "Input")
       if "scsPoints" in lnames:
@@ -1273,19 +1280,22 @@ class lines_scs(object):
       if "naDownTrace" in lnames:
          parm2.value = "naDownTrace"
       else:
-         pass
+         if hydroDir:
+            parm2.value = hydroDir + os.sep + 'naDownTrace_500.lyrx'
          
       parm3 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
       if "naUpTrace" in lnames:
          parm3.value = "naUpTrace"
       else:
-         pass
+         if hydroDir:
+            parm3.value = hydroDir + os.sep + 'naUpTrace_3000.lyrx'
       
       parm4 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
       if "naTidalTrace" in lnames:
          parm4.value = "naTidalTrace"
       else:
-         pass
+         if hydroDir:
+            parm4.value = hydroDir + os.sep + 'naTidalTrace_3000.lyrx'
       
       parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
       
@@ -1304,7 +1314,7 @@ class lines_scs(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[5].filter.list = field_names
       return
 
@@ -1321,7 +1331,8 @@ class lines_scs(object):
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
       else:
-         scratchParm = arcpy.env.scratchGDB 
+         # scratchParm = arcpy.env.scratchGDB 
+         scratchParm = "in_memory"
       
       # Run the function
       (scsLines, lyrDownTrace, lyrUpTrace, lyrTidalTrace) = CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal, scratchParm)
@@ -1407,7 +1418,7 @@ class sites_scs(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[7].filter.list = field_names
       
       if parameters[9].altered and not parameters[9].hasBeenValidated:
@@ -1549,7 +1560,7 @@ class attribute_eo(object):
       has been changed."""
       if parameters[4].altered:
          fc = parameters[4].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[5].filter.list = field_names
       return
 
@@ -1720,7 +1731,7 @@ class build_element_lists(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
+         field_names = GetFlds(fc)
          parameters[1].filter.list = field_names
       # if parameters[5].valueAsText is not None:
       #    if not parameters[5].valueAsText.endswith('xls'):
