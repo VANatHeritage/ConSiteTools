@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-11-04
+# Last Edit: 2022-11-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -894,3 +894,14 @@ def BuildFieldMappings(in_FCs, in_Flds):
             print("Couldn't add field " + f + " from feature class " + fc + ".")
       fms.addFieldMap(fm)
    return fms.exportToString()
+
+def NullToZero(in_Table, field):
+   codeblock = '''def valUpd(val):
+   if val == None:
+      return 0
+   else:
+      return val
+   '''
+   expression = "valUpd(!%s!)" % field
+   arcpy.CalculateField_management(in_Table, field, expression, "PYTHON", codeblock)
+   return in_Table

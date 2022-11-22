@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-11-04
+# Last Edit: 2022-11-22
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1573,8 +1573,22 @@ class attribute_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_procEOs = os.path.join(out_gdb, "attribEOs")
-      out_sumTab = os.path.join(out_gdb, "sumTab")
+      
+      # set default naming suffix based on PF layer
+      in_nm = os.path.basename(in_ProcFeats)
+      if in_nm == "pfTerrestrial":
+         suf = '_tcs'
+      elif in_nm == "pfKarst":
+         suf = '_kcs'
+      elif in_nm == "pfStream":
+         suf = '_scs'
+      elif in_nm == "pfAnthro":
+         suf = '_ahz'
+      else:
+         suf = ''
+      
+      out_procEOs = os.path.join(out_gdb, "attribEOs" + suf)
+      out_sumTab = os.path.join(out_gdb, "sumTab" + suf)
 
       # Run function
       AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab)
@@ -1623,7 +1637,11 @@ class score_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs')
+      in_nm = os.path.basename(in_procEOs)
+      suf = in_nm[-4:]
+      if not suf.startswith("_"):
+         suf = ""
+      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs' + suf)
 
       # Run function
       ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
@@ -1679,10 +1697,14 @@ class build_portfolio(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_sortedEOs = os.path.join(out_gdb, 'priorEOs')
-      out_sumTab = os.path.join(out_gdb, 'sumTab_upd')
-      out_ConSites = os.path.join(out_gdb, 'priorConSites')
-      out_ConSites_XLS = os.path.join(out_folder, 'priorConSites.xls')
+      in_nm = os.path.basename(in_sortedEOs)
+      suf = in_nm[-4:]
+      if not suf.startswith("_"):
+         suf = ""
+      out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf)
+      out_sumTab = os.path.join(out_gdb, 'sumTab_upd' + suf)
+      out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf)
+      out_ConSites_XLS = os.path.join(out_folder, 'priorConSites' + suf + '.xls')
 
       # Run function
       BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_ConSites_XLS, in_consLands_flat, build)
@@ -1747,8 +1769,12 @@ class build_element_lists(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_Tab = os.path.join(out_gdb, 'elementList')
-      out_Excel = os.path.join(out_folder, 'elementList.xls')
+      in_nm = os.path.basename(in_procEOs)
+      suf = in_nm[-4:]
+      if not suf.startswith("_"):
+         suf = ""
+      out_Tab = os.path.join(out_gdb, 'elementList' + suf)
+      out_Excel = os.path.join(out_folder, 'elementList' + suf + '.xls')
 
       # Run function
       BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)
