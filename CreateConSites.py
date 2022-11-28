@@ -2076,36 +2076,38 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    Using scsLine features and NHDFlowline, finds and returns flowline 'filler' segments which meet segment/ total length
    criteria, which can be used to patch the gaps between inLines.
    
-   The workflow for finding filler segments starts by selecting flowlines from NHDFlowline:
+   The workflow for finding filler segments starts by selecting the following flowlines from NHDFlowline:
       - primary: flowlines which overlap inLines. There is no length criteria for these flowlines.
-      - secondary: flowlines which intersect the primary selection and have length <= max_flowline length.
+      - secondary: flowlines which intersect the primary selection and have length <= max_flowline length. Secondary
+         flowlines are only selected once, meaning a maximum of two secondary lines could be added to fill a given gap.
    The two selections are merged and unsplit to create contiguous potential filler line features.
-   To be included in the output, a filler feature must:
-      - be less than a total length limit, currently set as (max_flowline_length * 3)
+   To be included in outFillLines, a filler line must:
+      - be less than a total length limit, currently set as (max_flowline_length * 3). This is arbitrary!
       - intersect 2+ inLines (identified using a spatial join)
    
    :param inLines: Input line features, to find gaps between
    :param outFillLines: Output filler line features which can be used to patch the gaps in inLines
    :param flowlines: Original flowline layer (e.g. NHDFlowline)
-   :param max_flowline_length: Maximum length for non-intersecting flowlines (flowExtra), given as an integer in 
-      NHDFlowline layer's coordinate system units (assumed meters).
+   :param max_flowline_length: Maximum length limit for a single non-intersecting flowline (flowSec), given as an
+      integer in NHDFlowline layer's coordinate system units (assumed meters).
    :param scratchGDB: geodatabase to hold intermediate products
    :return: outFillLines
    """
    printMsg("Checking if any gaps can be patched...")
-   # First find flowlines overlapping with inLines. These are always considered for filling.
-   flow0 = arcpy.MakeFeatureLayer_management(flowlines)
-   arcpy.SelectLayerByLocation_management(flow0, "SHARE_A_LINE_SEGMENT_WITH", inLines)
+   # First find flowlines overlapping with inLines.
+   flowPri = arcpy.MakeFeatureLayer_management(flowlines)
+   arcpy.SelectLayerByLocation_management(flowPri, "SHARE_A_LINE_SEGMENT_WITH", inLines)
    # Add intersecting flowlines, if they are less than max_flowline_length.
-   flowExtra = arcpy.MakeFeatureLayer_management(flowlines, where_clause="Shape_Length <= " + str(max_flowline_length))
-   arcpy.SelectLayerByLocation_management(flowExtra, "INTERSECT", flow0)
-   arcpy.SelectLayerByLocation_management(flowExtra, "ARE_IDENTICAL_TO", flow0, selection_type="REMOVE_FROM_SELECTION")
+   flowSec = arcpy.MakeFeatureLayer_management(flowlines, where_clause="Shape_Length <= " + str(max_flowline_length))
+   arcpy.SelectLayerByLocation_management(flowSec, "INTERSECT", flowPri)
+   arcpy.SelectLayerByLocation_management(flowSec, "ARE_IDENTICAL_TO", flowPri, selection_type="REMOVE_FROM_SELECTION")
    # Combine the selections
-   flow0b = scratchGDB + os.sep + 'flow0b'
-   arcpy.Merge_management([flow0, flowExtra], flow0b)
+   flow0 = scratchGDB + os.sep + 'flow0'
+   arcpy.Merge_management([flowPri, flowSec], flow0)
+   
    # Erase inLines, so you are left with only the unincluded lines
    flow1 = scratchGDB + os.sep + 'flow1'
-   arcpy.PairwiseErase_analysis(flow0b, inLines, flow1)
+   arcpy.PairwiseErase_analysis(flow0, inLines, flow1)
    flow1s = scratchGDB + os.sep + 'flow1s'
    arcpy.MultipartToSinglepart_management(flow1, flow1s)
    # Merge adjacent lines
@@ -2113,7 +2115,7 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    UnsplitLines(flow1s, flow2, scratchGDB)
    
    # This section selects only gap segments with total length less than some defined value.
-   # Note this is a total length criteria, including any tributary segments which may have been picked up. That's why I'm using 3x the max flowline length here.
+   # Note this is a total length criteria, so it includes any tributary segments which may have been picked up. That's why I'm using 3x the max flowline length here.
    flow2b = scratchGDB + os.sep + 'flow2b'
    fill_max_length = max_flowline_length * 3
    arcpy.CalculateField_management(flow2, 'total_length', "!shape.length@meters!", field_type="FLOAT")
@@ -2121,7 +2123,7 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    # Decide whether to use the subset or not
    filler = flow2b  # flow2 | flow2b
    
-   # Find lines which intersect more than one of the inLines. These are the filler to include.
+   # Find gap filler lines which intersect more than one of the inLines
    flow3 = scratchGDB + os.sep + 'flow3'
    arcpy.analysis.SpatialJoin(filler, inLines, flow3, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
    fid = [a[0] for a in arcpy.da.SearchCursor(flow3, 'TARGET_FID')]
