@@ -1,7 +1,21 @@
 # ConSite Toolbox
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-04):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-22):
+
+#### Version 2.2-dev (in development)
+
+- TCS updates:
+  - subsets NWI wetlands prior to usage in CreateWetlandSBB to speed processing
+
+- SCS/SCU updates:
+  - Added an internal function `FillLines_scs` to fill in gaps and merge scsLines output (fills gaps up to 1500-m)
+  - Tool 2 will look for Service Area layer inputs in the default locations (the folder where the HydroNet geodatabase is stored), making it unnecessary to keep these layers in the map
+  
+- Conservation Portfolio Tools:
+  - overhaul of internal functions to speed processing
+  - Minor bug fixes and tweaks to BMI field rounding
+  - Default naming of outputs are now based on the PF feature class used in the first tool (e.g., when 'pfTerrestrial' is the input, the suffix is '_tcs'). All subsequent outputs will use the same suffix.
 
 #### Version 2.1
 
