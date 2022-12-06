@@ -905,3 +905,41 @@ def NullToZero(in_Table, field):
    expression = "valUpd(!%s!)" % field
    arcpy.CalculateField_management(in_Table, field, expression, "PYTHON", codeblock)
    return in_Table
+
+def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
+   """
+   Adds a field to in_Table, representing the sequential order in the group over one or more sorting columns.
+   Note that this is not necessarily a 'rank', because the sequence will increment regardless of ties in the sorting 
+   fields. This means that the seq_field will contain unique values within a group.
+   :param in_Table: Input table
+   :param sort_field: List of sorting columns (use same convention as Sort_management tool). Do not add the grp_field, this is done in the function.
+   :param grp_field: The grouping field
+   :param seq_field: The new sequence field, to add to in_Table
+   :return: in_Table
+   """
+   printMsg("Calculating group sequences by " + grp_field + "...")
+   tmpSrt = "in_memory/grpsrt"
+   # Add group field to sorting fields
+   final_sort = [[grp_field, "ASCENDING"]] + sort_field
+   arcpy.Sort_management(in_Table, tmpSrt, final_sort)
+   oid = GetFlds(tmpSrt, oid_only=True)
+   join_fld = GetFlds(tmpSrt)[-1]  # this should be the TARGET_FID field
+   # Add sequence field
+   arcpy.AddField_management(tmpSrt, seq_field, "LONG")
+   grp0 = [a[0] for a in arcpy.da.SearchCursor(tmpSrt, grp_field, where_clause=oid + "= 1")][0]
+   ct = 0
+   
+   # calculate sequence
+   with arcpy.da.UpdateCursor(tmpSrt, [grp_field, seq_field]) as curs:
+      for r in curs:
+         grp = r[0]
+         if grp != grp0:
+            ct = 1
+            grp0 = grp
+         else:
+            ct += 1
+         r[1] = ct
+         curs.updateRow(r)
+   # join sequence field to original table
+   arcpy.JoinField_management(in_Table, oid, tmpSrt, join_fld, seq_field)
+   return in_Table

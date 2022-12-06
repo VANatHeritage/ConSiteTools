@@ -838,7 +838,18 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    statsList = [["SF_EOID", "COUNT"]]
    for code in ecoregions:
       statsList.append([str(code), "SUM"])
+   statsList.append(["BMI_score", "MEAN"])
    arcpy.Statistics_analysis("lyr_EO", out_sumTab, statsList, ["ELCODE", "SNAME", "NEW_GRANK"])
+   
+   # add BMI scores of rank-n EOs within ELCODEs
+   calcGrpSeq("lyr_EO", [["ELCODE", "ASCENDING"], ["BMI_score", "DESCENDING"]], "ELCODE", "BMI_score_rank")
+   # Add value fields to sumTab
+   pivRnks = [1, 2, 3, 5, 10]
+   pivTab = scratchGDB + os.sep + "pivTab"
+   arcpy.management.PivotTable("lyr_EO", "ELCODE", "BMI_score_rank", "BMI_score", pivTab)
+   # coulddo: add these to a single field summarizing BMI scores at different ranks, or binary fields indicating if n-EOs are fully protected (e.g. 90+ BMI score)
+   pivFlds = ["BMI_score_rank" + str(i) for i in pivRnks]
+   arcpy.JoinField_management(out_sumTab, "ELCODE", pivTab, "ELCODE", pivFlds)
    
    # Add more info to summary table
    # Field: NUM_REG
@@ -899,6 +910,9 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    printMsg("Joining TIER field to the EO table...")
    arcpy.JoinField_management("lyr_EO", "ELCODE", out_sumTab, "ELCODE", "TIER")
    
+   # Rename field in the sumTab
+   arcpy.AlterField_management(out_sumTab, "TIER", "INIT_TIER", "INIT_TIER")
+   
    # Field: EO_MODRANK
    printMsg("Calculating modified competition ranks based on EO-ranks...")
    where_clause = "EXCLUSION = 'Keep'"
@@ -929,7 +943,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
       arcpy.AddField_management(in_procEOs, fld, "SHORT")
       
    # Get subset of choice elements
-   where_clause = '"TIER" = \'Choice\''
+   where_clause = '"INIT_TIER" = \'Choice\''
    arcpy.MakeTableView_management(in_sumTab, "choiceTab", where_clause)
    
    # Make a data dictionary relating ELCODE to TARGET 
@@ -1273,7 +1287,15 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"],["CS_CONSVALUE", "DESCENDING"]])
    
    arcpy.CopyRows_management(in_sumTab, out_sumTab)
-      
+   
+   # Make a polygon version of sumTab, dissolved by element. This was requested by Protection.
+   printMsg("Making a polygon version of element summary table...")
+   lyrEO = arcpy.MakeFeatureLayer_management(out_sortedEOs, where_clause="EXCLUSION = 'Keep'")
+   out_sumTab_poly = out_sumTab + '_poly'
+   arcpy.PairwiseDissolve_analysis(lyrEO, out_sumTab_poly, ["ELCODE"])
+   flds = [f for f in GetFlds(out_sumTab) if f not in ['ELCODE', GetFlds(out_sumTab, oid_only=True)]]
+   arcpy.JoinField_management(out_sumTab_poly, "ELCODE", out_sumTab, "ELCODE", flds)
+   
    printMsg('Conservation sites prioritized and portfolio summary updated.')
    
    # Export to Excel
