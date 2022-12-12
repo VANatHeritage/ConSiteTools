@@ -4,7 +4,7 @@
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-11-22
+# Last Edit: 2022-12-12
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1545,7 +1545,7 @@ class attribute_eo(object):
       # parm09 = defineParam("out_folder", "Project output folder", "DEFolder", "Required", "Input")
 
       # parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
-      # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab")
+      # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
@@ -1588,7 +1588,7 @@ class attribute_eo(object):
          suf = ''
       
       out_procEOs = os.path.join(out_gdb, "attribEOs" + suf)
-      out_sumTab = os.path.join(out_gdb, "sumTab" + suf)
+      out_sumTab = os.path.join(out_gdb, "elementSummary" + suf)
 
       # Run function
       AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab)
@@ -1608,7 +1608,7 @@ class score_eo(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "attribEOs")
-      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
+      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
       parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
       parm02.filter.list = ["Local Database"]
@@ -1662,7 +1662,7 @@ class build_portfolio(object):
       parm00 = defineParam("build", "Portfolio Build Option", "String", "Required", "Input", "NEW")
       parm00.filter.list = ["NEW", "NEW_EO", "NEW_CS", "UPDATE"]
       parm01 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "scoredEOs")
-      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
+      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
 
@@ -1671,7 +1671,7 @@ class build_portfolio(object):
       parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
 
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
-      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab_upd")
+      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
       # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
       # parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls")
 
@@ -1702,7 +1702,7 @@ class build_portfolio(object):
       if not suf.startswith("_"):
          suf = ""
       out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf)
-      out_sumTab = os.path.join(out_gdb, 'sumTab_upd' + suf)
+      out_sumTab = os.path.join(out_gdb, 'elementSummary_upd' + suf)
       out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf)
       out_ConSites_XLS = os.path.join(out_folder, 'priorConSites' + suf + '.xls')
 
@@ -1727,10 +1727,10 @@ class build_element_lists(object):
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
       parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input", "SITENAME")
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
-      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab_upd")
+      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
       # For some reason this is not working if you input a table view...
       # try:
-      #    parm03.value = "sumTab_upd"
+      #    parm03.value = "elementSummary_upd"
       # except:
       #    pass
       # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")

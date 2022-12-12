@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2020-09-15
-# Last Edit: 2022-11-04
+# Last Edit: 2022-12-12
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -34,9 +34,8 @@
    #     - EcoRegions feature class
    #        - copies to: tncEcoRegions_lam
 # - Once the script has finished running, open the map document again, and update the sources for all the layers. Save and close the map.
-# - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
-
-# NOTE: You no longer need to be on COV network to be able to extract Biotics data.   
+# - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. 
+#     If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
 # ---------------------------------------------------------------------------
 
 # Import function libraries and settings
@@ -48,19 +47,23 @@ def main():
    # Paths to input and output geodatabases and directories - change these every time
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
-   ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Aug2022'
+   ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
 
    # Fairly static data; keep using the same until specified otherwise
    src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
 
-   # Element exclusion tables are currently updated once annually, prior to December updates. This is a list because
-   # multiple tables can be provided, in which case they are merged into one table.
-   src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\ElementExclusions']
+   # headsup: Element exclusion tables are currently updated once annually, prior to December updates. For the December
+   #  run, those CSV files should be included in a list here. For all other quarters, just re-use the element exclusions
+   #  table created for the December run (i.e. the path to the single ArcGIS table in a list object).
+   src_elExclude = [r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Botany_2022-11-30.csv',
+                    r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
+                    r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
+   # src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\ElementExclusions']  # re-use option
 
    # headsup: These will need updates for every run. Updates paths as needed.
-   src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam220830\conslands_lam.shp'
-   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20220830_174348'
-   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20220830_174348'
+   src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
+   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_[timestamp]'
+   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_[timestamp]'
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
@@ -95,10 +98,10 @@ def main():
 
    # Set up outputs by type - no need to change these as long as your out_GDB and out_DIR above are valid
    attribEOs_tcs = out_GDB + os.sep + 'attribEOs_tcs'
-   sumTab_tcs = out_GDB + os.sep + 'sumTab_tcs'
+   sumTab_tcs = out_GDB + os.sep + 'elementSummary_tcs'
    scoredEOs_tcs = out_GDB + os.sep + 'scoredEOs_tcs'
    priorEOs_tcs = out_GDB + os.sep + 'priorEOs_tcs'
-   sumTab_upd_tcs = out_GDB + os.sep + 'sumTab_upd_tcs'
+   sumTab_upd_tcs = out_GDB + os.sep + 'elementSummary_upd_tcs'
    priorConSites_tcs = out_GDB + os.sep + 'priorConSites_tcs'
    priorConSites_tcs_XLS = out_DIR + os.sep + 'priorConSites_tcs.xls'
    elementList_tcs = out_GDB + os.sep + 'elementList_tcs'
@@ -107,10 +110,10 @@ def main():
    qcList_tcs_sites  = out_DIR + os.sep + 'qcList_tcs_sites.xls'
    
    # attribEOs_scu = out_GDB + os.sep + 'attribEOs_scu'
-   # sumTab_scu = out_GDB + os.sep + 'sumTab_scu'
+   # sumTab_scu = out_GDB + os.sep + 'elementSummary_scu'
    # scoredEOs_scu = out_GDB + os.sep + 'scoredEOs_scu'
    # priorEOs_scu = out_GDB + os.sep + 'priorEOs_scu'
-   # sumTab_upd_scu = out_GDB + os.sep + 'sumTab_upd_scu'
+   # sumTab_upd_scu = out_GDB + os.sep + 'elementSummary_upd_scu'
    # priorConSites_scu = out_GDB + os.sep + 'priorConSites_scu'
    # priorConSites_scu_XLS = out_DIR + os.sep + 'priorConSites_scu.xls'
    # elementList_scu = out_GDB + os.sep + 'elementList_scu'
@@ -119,10 +122,10 @@ def main():
    # qcList_scu_sites  = out_DIR + os.sep + 'qcList_scu_sites.xls'
    #
    # attribEOs_kcs = out_GDB + os.sep + 'attribEOs_kcs'
-   # sumTab_kcs = out_GDB + os.sep + 'sumTab_kcs'
+   # sumTab_kcs = out_GDB + os.sep + 'elementSummary_kcs'
    # scoredEOs_kcs = out_GDB + os.sep + 'scoredEOs_kcs'
    # priorEOs_kcs = out_GDB + os.sep + 'priorEOs_kcs'
-   # sumTab_upd_kcs = out_GDB + os.sep + 'sumTab_upd_kcs'
+   # sumTab_upd_kcs = out_GDB + os.sep + 'elementSummary_upd_kcs'
    # priorConSites_kcs = out_GDB + os.sep + 'priorConSites_kcs'
    # priorConSites_kcs_XLS = out_DIR + os.sep + 'priorConSites_kcs.xls'
    # elementList_kcs = out_GDB + os.sep + 'elementList_kcs'
@@ -152,26 +155,26 @@ def main():
    
    # Score EOs
    printMsg("Scoring terrestrial EOs...")
-   ScoreEOs(attribEOs_tcs, sumTab_tcs, scoredEOs_tcs, ysnMil = "false", ysnYear = "true")
+   ScoreEOs(attribEOs_tcs, sumTab_tcs, scoredEOs_tcs, ysnMil="false", ysnYear="true")
    
    # printMsg("Scoring stream EOs...")
-   # ScoreEOs(attribEOs_scu, sumTab_scu, scoredEOs_scu, ysnMil = "false", ysnYear = "true")
+   # ScoreEOs(attribEOs_scu, sumTab_scu, scoredEOs_scu, ysnMil="false", ysnYear="true")
    
    # printMsg("Scoring karst EOs...")
-   # ScoreEOs(attribEOs_kcs, sumTab_kcs, scoredEOs_kcs, ysnMil = "false", ysnYear = "true")
+   # ScoreEOs(attribEOs_kcs, sumTab_kcs, scoredEOs_kcs, ysnMil="false", ysnYear="true")
    
-   tNow = datetime.now()
+   tNow=datetime.now()
    printMsg("EO scoring ended at %s" %tNow.strftime("%H:%M:%S"))
    
    # Build Portfolio
    printMsg("Building terrestrial portfolio...")
-   BuildPortfolio(scoredEOs_tcs, priorEOs_tcs, sumTab_tcs, sumTab_upd_tcs, in_cs_tcs, priorConSites_tcs, priorConSites_tcs_XLS, in_consLands_flat, build = 'NEW')
+   BuildPortfolio(scoredEOs_tcs, priorEOs_tcs, sumTab_tcs, sumTab_upd_tcs, in_cs_tcs, priorConSites_tcs, priorConSites_tcs_XLS, in_consLands_flat, build='NEW')
    
    # printMsg("Building stream portfolio...")
-   # BuildPortfolio(scoredEOs_scu, priorEOs_scu, sumTab_scu, sumTab_upd_scu, in_cs_scu, priorConSites_scu, priorConSites_scu_XLS, in_consLands_flat, build = 'NEW')
+   # BuildPortfolio(scoredEOs_scu, priorEOs_scu, sumTab_scu, sumTab_upd_scu, in_cs_scu, priorConSites_scu, priorConSites_scu_XLS, in_consLands_flat, build='NEW')
    
    # printMsg("Building karst portfolio...")
-   # BuildPortfolio(scoredEOs_kcs, priorEOs_kcs, sumTab_kcs, sumTab_upd_kcs, in_cs_kcs, priorConSites_kcs, priorConSites_kcs_XLS, in_consLands_flat, build = 'NEW')
+   # BuildPortfolio(scoredEOs_kcs, priorEOs_kcs, sumTab_kcs, sumTab_upd_kcs, in_cs_kcs, priorConSites_kcs, priorConSites_kcs_XLS, in_consLands_flat, build='NEW')
    
    tNow = datetime.now()
    printMsg("Portolio building ended at %s" %tNow.strftime("%H:%M:%S"))
