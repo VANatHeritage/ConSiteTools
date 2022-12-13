@@ -58,12 +58,13 @@ def main():
    src_elExclude = [r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Botany_2022-11-30.csv',
                     r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
                     r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
-   # src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\ElementExclusions']  # re-use option
+   # src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Dec2021.gdb\ElementExclusions']  # re-use option
 
-   # headsup: These will need updates for every run. Updates paths as needed.
+   # headsup: These will need updates for every run, make sure to updates paths. Note that conslands may need Repair Geometry.
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
-   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_[timestamp]'
-   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_[timestamp]'
+   # arcpy.RepairGeometry_management(src_conslands, "DELETE_NULL", "ESRI")
+   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20221212_132348'
+   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20221212_132348'
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
