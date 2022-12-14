@@ -1137,18 +1137,18 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
       arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["EO_CONSVALUE", "SUM"], ["ChoiceRank", "MIN"]], "JOIN_FID")
       arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
-      arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 15)
+      arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
       code_block = '''def fn(myMin):
          if myMin == 1:
-            tier = "1. Irreplaceable"
+            tier = "Irreplaceable"
          elif myMin == 2:
-            tier = "2. Critical"
+            tier = "Critical"
          elif myMin == 3:
-            tier = "3. Vital"
+            tier = "Vital"
          elif myMin == 4:
-            tier = "4. High Priority"
+            tier = "High Priority"
          else:
-            tier = "5. General"
+            tier = "General"
          return tier
       '''
       arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_ChoiceRank!)", code_block=code_block)
