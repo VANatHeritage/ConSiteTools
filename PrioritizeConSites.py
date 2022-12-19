@@ -282,23 +282,18 @@ def updateSlots(in_procEOs, slotDict, rankFld):
       # Update dictionary
       slotDict[elcode] = availSlots
    # remove keys with no open slots
-   slotDict = {key: val for key, val in slotDict.items() if val != 0}
+   slotDict = {key: val for key, val in slotDict.items() if val != 0}  # this can be used in updatePortfolio, so that by-catch selection is limited to Elements with open slots
    return slotDict
 
-def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS"):
+def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS", slotDict=None):
    '''A helper function called by BuildPortfolio. Selects ConSites intersecting EOs in the EO portfolio, and adds them to the ConSite portfolio. Then selects "High Priority" EOs intersecting ConSites in the portfolio, and adds them to the EO portfolio (bycatch). Finally, updates the summary table to indicate how many EOs of each element are in the different tier classes, and how many are included in the current portfolio.
    Parameters:
    - in_procEOs: input feature class of processed EOs (i.e., out_procEOs from the AttributeEOs function, further processed by the ScoreEOs function)
    - in_ConSites: input Conservation Site boundaries
    - in_sumTab: input table summarizing number of included EOs per element (i.e., out_sumTab from the AttributeEOs function).
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
+   - slotDict: dictionary relating elcode to available slots (optional). If provided, the bycatch procedure will be limited to EOs for elements with open slots.
    '''
-   ## TESTING
-   # in_procEOs = in_sortedEOs
-   # in_ConSites
-   # in_sumTab
-   # slopFactor
-   
    # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
    where_clause = '("ChoiceRANK" <= 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" <> -1'
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
@@ -311,13 +306,18 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS")
    printMsg('ConSites portfolio updated')
    
    # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
-   where_clause = '"TIER" = \'Unassigned\' AND "OVERRIDE" <> -1'
+   if slotDict is not None:
+      # when slotDict provided, only select EOs for elements with open slots
+      elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
+      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
+   else:
+      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
    where_clause = '"PORTFOLIO" = 1'
    arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-   # arcpy.SelectLayerByLocation_management ("lyr_EO", "INTERSECT", "lyr_CS", 0, "NEW_SELECTION", "NOT_INVERT")
    arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
    arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
+   arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
    printMsg('EOs portfolio updated')
    
    # Fill in counter fields
@@ -338,7 +338,7 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS")
    
    portfolioTab = in_procEOs + '_portfolio'
    arcpy.Frequency_analysis(in_procEOs, portfolioTab, frequency_fields="ELCODE", summary_fields="PORTFOLIO")
-   try: 
+   try:
       arcpy.DeleteField_management(in_sumTab, "PORTFOLIO")
    except:
       pass
@@ -937,13 +937,6 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    - ysnYear: determines whether to use observation year as a ranking factor ("true"; default) or not ("false")
    - out_sortedEOs: output feature class of processed EOs, sorted by element code and rankings.
    '''
-   ## TESTING
-   # in_procEOs = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\attribEOs_tcs_Vital1'
-   # in_sumTab = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\elementSummary_tcs_Vital1'
-   # out_sortedEOs =  r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\scoredEOs_tcs_Vital1'
-   # ysnMil = "false"
-   # ysnYear = "true"
-   
    # Make copy of input
    scratchGDB = "in_memory"
    tmpEOs = scratchGDB + os.sep + "tmpEOs"
@@ -976,7 +969,9 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    targetDict = updateTiers("lyr_EO", targetDict, "RANK_eo")
    
    # VITAL tier: uses ONLY EO rank, so can use EO_MODRANK to assign to this Tier. 
-   # If we want to use add'l criteria (e.g. Obseravation Year) for Vital tier assignment, it will be more complicated.
+   # headsup: If we want to use add'l criteria (e.g. Observation Year) for Vital tier assignment, Vital assignment will be more complicated.
+   # Coulddo: vital tier could include either 1 or 2 EOs, just adjust query to either EO_MODRANK = 1 or EO_MODRANK <= 2. 
+   #  NOTE: Vital tier can not include >2 EOs with the current methods.
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_HP", "TIER = 'High Priority' and EO_MODRANK = 1")
    arcpy.CalculateField_management("lyr_HP", "TIER", "'Vital'")
    
@@ -1017,7 +1012,13 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    # Add "EO_CONSVALUE" field to in_procEOs, and calculate
    printMsg("Calculating conservation values of individual EOs...")
    arcpy.AddField_management(in_procEOs, "EO_CONSVALUE", "SHORT")
-   # coulddo: Codeblock subject to change based on reviewer input.
+   # Codeblock subject to change based on reviewer input.
+   # todo: Things to consider re: tier updates:
+   #  - initial changes to code do not affect how a given EO CONSVALUE was calculated. 
+   #  Potential changes could reflect tier re-assingments, e.g.:
+   #  - Should Vital tier have different values than High Priority? 
+   #  - How about unassigned? (previously assigned "Choice" tier)
+   #   - Note that with updated methods, some of these will eventually be moved to High Priority, others to General (once Portfolio is finalized).
    codeblock = '''def calcConsVal(tier, grank):
       if tier == "Irreplaceable":
          if grank == "G1":
@@ -1042,6 +1043,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
          else:
             consval = 65
       elif tier == "Vital" or tier == "High Priority":
+         # Formerly "Priority"
          if grank == "G1":
             consval = 60
          elif grank == "G2":
@@ -1053,6 +1055,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
          else:
             consval = 30
       elif tier == "Unassigned":
+         # Formerly "Choice"
          if grank == "G1":
             consval = 25
          elif grank == "G2":
@@ -1064,6 +1067,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
          else:
             consval = 5
       elif tier == "General":
+         # Formerly "Surplus"
          if grank == "G1":
             consval = 5
          elif grank == "G2":
@@ -1107,19 +1111,6 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       - UPDATE: Update portfolio but keep existing picks for both EOs and ConSites
    - slopFactor: Maximum distance allowable between features for them to still me considered coincident
    '''
-   ## TESTING
-   # in_gdb = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Inputs_Dec2022.gdb'
-   # in_sortedEOs =  r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\scoredEOs_tcs_Vital1'
-   # in_sumTab = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\elementSummary_tcs_Vital1'
-   # in_ConSites = in_gdb + os.sep + 'csTerrestrial'
-   # in_consLands_flat = in_gdb + os.sep + 'conslands_flat'
-   # out_sortedEOs =  r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\priorEOs_tcs_Vital1_2'
-   # out_sumTab = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\elementSummary_tcs_upd_Vital1_2'
-   # out_ConSites = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\ECS_Outputs_Dec2022.gdb\priorConSites_tcs_Vital1_2'
-   # out_Excel = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST_NewNames\Spreadsheets_Dec2022\vital1_2.xls'
-   # build = "NEW"
-   # slopFactor = "15 METERS"
-   
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
    scratchGDB = "in_memory"
@@ -1186,8 +1177,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
             tier = "General"
          return tier
       '''
-      arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_ChoiceRank!)", code_block=code_block)
-      arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["CS_CONSVALUE", "ECS_TIER"])
+      arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_ChoiceRANK!)", code_block=code_block)
+      arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["CS_CONSVALUE", "MIN_ChoiceRANK", "ECS_TIER"])
       printMsg('CS_CONSVALUE and ECS_TIER fields set')
       
       # Add "CS_AREA_HA" field to ConSites, and calculate
@@ -1225,9 +1216,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
    
    # Generic workflow for each ranking factor: 
-   #  - set up where_clause for still un-ranked High Priority EOs, make a feature layer
-   #  - update slots (updates the PORTFOLIO field of EOs)
-   #  - update portfolio (updates Consites and sumTab, and recreate slotDict from sumTab)
+   #  - set up where_clause for still un-ranked High Priority EOs, make a feature layer (lyr_EO)
+   #  - add ranks for the ranking field
+   #  - update slots based on ranks. This updates the PORTFOLIO field of EOs.
+   #  - update portfolio. This updates Consites, adds EOs to portfolio as bycatch, updates sumTab, and returns an updated available slotDict.
    
    printMsg('Trying to fill remaining slots based on land protection status...')
    if len(slotDict) > 0:
@@ -1235,40 +1227,40 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       printMsg('Filling slots based on BMI score...')
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "BMI_score", "DESCENDING", "RANK_bmi", 5, "ABS")
-      updateSlots("lyr_EO", slotDict, "RANK_bmi")
-      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+      slotDict = updateSlots("lyr_EO", slotDict, "RANK_bmi")
+      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
 
    if len(slotDict) > 0:
       printMsg('Filling slots based on presence on NAP...')
       where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "ysnNAP", "DESCENDING", "RANK_nap", 0.5, "ABS")
-      updateSlots("lyr_EO", slotDict, "RANK_nap")
-      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+      slotDict = updateSlots("lyr_EO", slotDict, "RANK_nap")
+      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
 
    if len(slotDict) > 0:
       printMsg('Filling slots based on overall site conservation value...')
       where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "CS_CONSVALUE", "DESCENDING", "RANK_csVal", 1, "ABS")
-      updateSlots("lyr_EO", slotDict, "RANK_csVal")
-      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+      slotDict = updateSlots("lyr_EO", slotDict, "RANK_csVal")
+      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
    
    if len(slotDict) > 0:
       printMsg('Updating tiers based on number of procedural features...')
       where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "COUNT_SFID", "DESCENDING", "RANK_numPF", 1, "ABS")
-      updateSlots("lyr_EO", slotDict, "RANK_numPF")
-      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+      slotDict = updateSlots("lyr_EO", slotDict, "RANK_numPF")
+      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
       
    if len(slotDict) > 0:
       printMsg('Filling slots based on EO size...')
       where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "SHAPE_Area", "DESCENDING", "RANK_eoArea", 0.1, "ABS", 2)
-      updateSlots("lyr_EO", slotDict, "RANK_eoArea")
-      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+      slotDict = updateSlots("lyr_EO", slotDict, "RANK_eoArea")
+      slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
       
    # TIER Finalization for Unassigned EOs/ConSites: Portfolio=1 becomes High Priority, Portfolio=0 becomes General
    # EOs
@@ -1280,7 +1272,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management("lyr_EO", "TIER", "'General'")
    
    # ConSites
-   arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", "PORTFOLIO = 1 AND ECS_TIER IN ('Unassigned', 'General')")  # Don't know if General is necessary here, but included just to be safe.
+   arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", "PORTFOLIO = 1 AND ECS_TIER = 'Unassigned'")
    printMsg("Updating " + str(countFeatures("lyr_CS")) + " unassigned ConSites in portfolio to High Priority.")
    arcpy.CalculateField_management("lyr_CS", "ECS_TIER", "'High Priority'")
    arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", "PORTFOLIO = 0 AND ECS_TIER = 'Unassigned'")
@@ -1288,7 +1280,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management("lyr_CS", "ECS_TIER", "'General'")
    
    # Now that TIERs are finalized, update Portfolio so that the final numbers in sumTab are correct
-   updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+   updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
    
    # Field: FinalRANK - this is similar to ChoiceRANK, but now there is no "Unassigned" Tier (5).
    printMsg("Assigning final tier ranks...")
@@ -1311,8 +1303,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    
    # Create final outputs
    printMsg("Assigning extended tier attributes...")
-   arcpy.AddField_management(in_sortedEOs, "EXT_TIER", "TEXT", "", "", 50)
-   codeblock = '''def extTier(exclusion, tier, eoModRank, eoRankNum, recent, portfolio):
+   arcpy.AddField_management(in_sortedEOs, "EXT_TIER", "TEXT", "", "", 75)
+   # TODO with tier update: could remove Portfolio from the function, change 'Swap Option' name for General tier?
+   #  Note: bmiRank is the first extended attribute used for ranking, so is used to tell if High Priority tier EO was subject to extended attribute ranking.
+   codeblock = '''def extTier(exclusion, tier, eoModRank, eoRankNum, recent, choiceRank, bycatch):
       if tier == None:
          if exclusion in ("Excluded Element", "Old Observation"):
             t = exclusion
@@ -1320,26 +1314,32 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
             t = "Restoration Potential"
          else:
             t = "Error Check Needed"
-      elif tier in ("Irreplaceable", "Critical", "Vital", "General"):
+      elif tier in ("Irreplaceable", "Critical", "Vital"):
          t = tier
       elif tier == "High Priority":
-         t = "High Priority - Top %s" %eoModRank
-         # This isn't relevant anymore. All High Priority are in portfolio.
-         # if portfolio == 1:
-         #    t = "High Priority - In Portfolio"
-         # else:
-         #    t = "High Priority - Swap Option"
+         if choiceRank == 4:
+            t = "High Priority - Top %s EO-Rank" %eoModRank
+         else:
+            if bycatch == 1:
+               t = "High Priority - Bycatch Selection"
+            else:
+               t = "High Priority - Extended Attribute Selection"
+      elif tier == "General":
+         if choiceRank == 5:
+            t = "General - Swap Option"
+         else:
+            t = "General"
       else:
          t = "Error Check Needed"
       if recent < 2:
          t += " (Update Needed)"
       else:
          pass
-         
       return t
       '''
-   expression = "extTier(!EXCLUSION!, !TIER!, !EO_MODRANK!, !EORANK_NUM!, !RECENT!, !PORTFOLIO!)"
-   arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, "PYTHON_9.3", codeblock)
+   expression = "extTier(!EXCLUSION!, !TIER!, !EO_MODRANK!, !EORANK_NUM!, !RECENT!, !ChoiceRANK!, !bycatch!)"
+   arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
+   arcpy.DeleteField_management(in_sortedEOs, "bycatch")  # coulddo: delete other fields here as needed.
    
    fldList = [
    ["ELCODE", "ASCENDING"], 
