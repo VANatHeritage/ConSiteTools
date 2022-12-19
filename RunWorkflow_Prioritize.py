@@ -47,7 +47,8 @@ def main():
    # Paths to input and output geodatabases and directories - change these every time
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
-   ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
+   # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST'
 
    # Fairly static data; keep using the same until specified otherwise
    src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
@@ -55,10 +56,10 @@ def main():
    # headsup: Element exclusion tables are currently updated once annually, prior to December updates. For the December
    #  run, those CSV files should be included in a list here. For all other quarters, just re-use the element exclusions
    #  table created for the December run (i.e. the path to the single ArcGIS table in a list object).
-   src_elExclude = [r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Botany_2022-11-30.csv',
-                    r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
-                    r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
-   # src_elExclude = [r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Dec2021.gdb\ElementExclusions']  # re-use option
+   # src_elExclude = [r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Botany_2022-11-30.csv',
+   #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
+   #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
+   src_elExclude = [r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022\ECS_Inputs_Dec2022.gdb\ElementExclusions']  # re-use option
 
    # headsup: These will need updates for every run, make sure to updates paths. Note that conslands may need Repair Geometry.
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
@@ -68,6 +69,10 @@ def main():
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
+   # Below for TESTING only
+   # in_GDB = ecs_dir + os.sep + "ECS_Inputs_Dec2022.gdb"
+   # out_GDB = ecs_dir + os.sep + "ECS_Outputs_Dec2022.gdb"
+   # out_DIR = ecs_dir + os.sep + "Spreadsheets_Dec2022"
 
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -178,7 +183,7 @@ def main():
    # BuildPortfolio(scoredEOs_kcs, priorEOs_kcs, sumTab_kcs, sumTab_upd_kcs, in_cs_kcs, priorConSites_kcs, priorConSites_kcs_XLS, in_consLands_flat, build='NEW')
    
    tNow = datetime.now()
-   printMsg("Portolio building ended at %s" %tNow.strftime("%H:%M:%S"))
+   printMsg("Portfolio building ended at %s" %tNow.strftime("%H:%M:%S"))
    
    # Build Elements List
    printMsg("Building terrestrial elements list...")

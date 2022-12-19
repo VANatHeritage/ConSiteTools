@@ -78,12 +78,10 @@ def replaceLayer(dataPath, layerName=None):
       map = aprx.activeMap
       l = map.listLayers(layerName)
       if len(l) >= 1:
-         for i in l:
-            map.removeLayer(i)
+         [map.removeLayer(i) for i in l if i.longName == layerName]
       l = map.listTables(layerName)
       if len(l) >= 1:
-         for i in l:
-            map.removeTable(i)
+         [map.removeLayer(i) for i in l if i.longName == layerName]
       map.addDataFromPath(dataPath).name = layerName
    except:
       print("Could not add data `" + dataPath + "` to current map.")
