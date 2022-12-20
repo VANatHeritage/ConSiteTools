@@ -1467,33 +1467,21 @@ class make_ecs_dir(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      # aprx = arcpy.mp.ArcGISProject("CURRENT")
-      # map = aprx.activeMap
-      # lyrs = map.listLayers()
-      # lnames = [l.name for l in lyrs]
+      # map, lnames = getMapLayers()
 
-      parm00 = defineParam("output_path", "Project directory", "DEFolder", "Required", "Input")
+      parm00 = defineParam("output_path", "ECS project location (folder will be created here)", "DEFolder", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
       parm03 = defineParam("in_ecoreg", "Input Eco-regions", "GPFeatureLayer", "Required", "Input")
 
-      # The function could also take the copies of Biotics PFs and Consites as input, which it then parses. Not using
-      # in the toolbox, as it doesn't match the Biotics workflow.
-      # parm02 = defineParam("in_PF", "Input procedural features", "GPFeatureLayer", "Required", "Input")
-      # if "Biotics ProcFeats" in lnames:
-      #    parm02.value = "Biotics ProcFeats"
-      # else:
-      #    pass
-      # parm03 = defineParam("in_ConSites", "Input conservation sites", "GPFeatureLayer", "Required", "Input")
-      # if "Biotics ConSites" in lnames:
-      #    parm03.value = "Biotics ConSites"
-      # else:
-      #    pass
+      # The function can also take the extracts of Biotics PFs and Consites as input, which it then parses.
+      parm04 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input")
+      parm05 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input")
 
-      # This could be a multivalue of outputs, all to be added to map.
-      parm04 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
+      # This is a list of layer paths, all to be added to map.
+      parm06 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
 
-      parms = [parm00, parm01, parm02, parm03, parm04]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -1515,11 +1503,11 @@ class make_ecs_dir(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      new_dir = os.path.join(output_path, "ECS_Run_" + datetime.today().strftime("%b%Y"))  # new folder naming scheme
       in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_ecoreg)
+      ig, og, sd, lyrs = MakeECSDir(new_dir, in_elExclude_ls, in_conslands, in_ecoreg, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
-      printMsg("Make sure to add fresh copies of Biotics data to the input geodatabase: `" + ig + "`.")
       return lyrs
 
 class attribute_eo(object):

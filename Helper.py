@@ -81,7 +81,7 @@ def replaceLayer(dataPath, layerName=None):
          [map.removeLayer(i) for i in l if i.longName == layerName]
       l = map.listTables(layerName)
       if len(l) >= 1:
-         [map.removeLayer(i) for i in l if i.longName == layerName]
+         [map.removeTable(i) for i in l if i.longName == layerName]
       map.addDataFromPath(dataPath).name = layerName
    except:
       print("Could not add data `" + dataPath + "` to current map.")

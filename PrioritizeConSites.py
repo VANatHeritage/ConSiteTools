@@ -629,28 +629,41 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
    createFGDB(og)
    # Extracts RULE-specific PF/CS to the new input geodatabase Note this is not used by the pyt toolbox, as user is 
    # expected to add the PF and CS manually.
+   out_lyrs = []
+   if in_PF == "None" or in_ConSites == "None":
+      # These paramaters are optional in the python toolbox tool.
+      printMsg("Skipping preparation for PFs and ConSites.")
+      in_PF, in_ConSites = None, None
    if in_PF and in_ConSites:
       arcpy.CopyFeatures_management(in_PF, ig + os.sep + os.path.basename(in_PF))
       arcpy.CopyFeatures_management(in_ConSites, ig + os.sep + os.path.basename(in_ConSites))
-      ParseSiteTypes(ig + os.sep + os.path.basename(in_PF), ig + os.sep + os.path.basename(in_ConSites), ig)
+      out = ParseSiteTypes(ig + os.sep + os.path.basename(in_PF), ig + os.sep + os.path.basename(in_ConSites), ig)
+      out_lyrs += out
    # Copy ancillary datasets to ECS input GDB
    if len(in_elExclude) != 0:
+      out = ig + os.sep + 'ElementExclusions'
       if len(in_elExclude) > 1:
-         MakeExclusionList(in_elExclude, ig + os.sep + 'ElementExclusions')
+         MakeExclusionList(in_elExclude, out)
       else:
          printMsg("Copying element exclusions table...")
-         arcpy.CopyRows_management(in_elExclude[0], ig + os.sep + 'ElementExclusions')
+         arcpy.CopyRows_management(in_elExclude[0], out)
+      out_lyrs.append(out)
    if in_conslands:
       printMsg("Copying " + in_conslands + "...")
-      arcpy.CopyFeatures_management(in_conslands, ig + os.sep + 'conslands_lam')
+      out = ig + os.sep + 'conslands_lam'
+      arcpy.CopyFeatures_management(in_conslands, out)
+      out_lyrs.append(out)
       printMsg("Creating flat conslands layer...")
-      bmiFlatten(ig + os.sep + 'conslands_lam', ig + os.sep + 'conslands_flat')
+      out = ig + os.sep + 'conslands_flat'
+      bmiFlatten(ig + os.sep + 'conslands_lam', out)
+      out_lyrs.append(out)
    if in_ecoreg:
+      out = ig + os.sep + 'tncEcoRegions_lam'
       printMsg("Copying " + in_ecoreg + "...")
-      arcpy.CopyFeatures_management(in_ecoreg, ig + os.sep + 'tncEcoRegions_lam')
+      arcpy.CopyFeatures_management(in_ecoreg, out)
+      out_lyrs.append(out)
    printMsg("Finished preparation for ECS directory " + wd + ".")
-   lyrs = [ig + os.sep + a for a in ['ElementExclusions', 'conslands_lam', 'conslands_flat', 'tncEcoRegions_lam']]
-   return ig, og, sd, lyrs
+   return ig, og, sd, out_lyrs
   
 def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab):
    '''Dissolves Procedural Features by EO-ID, then attaches numerous attributes to the EOs, creating a new output EO layer as well as an Element summary table. The outputs from this function are subsequently used in the function ScoreEOs. 
