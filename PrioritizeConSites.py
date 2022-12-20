@@ -1304,8 +1304,9 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # Create final outputs
    printMsg("Assigning extended tier attributes...")
    arcpy.AddField_management(in_sortedEOs, "EXT_TIER", "TEXT", "", "", 75)
-   # TODO with tier update: could remove Portfolio from the function, change 'Swap Option' name for General tier?
-   #  Note: bmiRank is the first extended attribute used for ranking, so is used to tell if High Priority tier EO was subject to extended attribute ranking.
+   # headsup with tier update:
+   #     - the bycatch attribute is populated in the updatePortfolio function.
+   #     - the Portfolio attribute is not used anymore, since the tiers are aligned with the portfolio. If that changes, would want to add it back.
    codeblock = '''def extTier(exclusion, tier, eoModRank, eoRankNum, recent, choiceRank, bycatch):
       if tier == None:
          if exclusion in ("Excluded Element", "Old Observation"):
