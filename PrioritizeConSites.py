@@ -1162,6 +1162,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["EO_CONSVALUE", "SUM"], ["ChoiceRank", "MIN"]], "JOIN_FID")
       arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
       arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
+      # decide: Do we want to distinguish ConSites associated only with excluded EOs? If yes, what would be the name here?
       code_block = '''def fn(myMin):
          if myMin == 1:
             tier = "Irreplaceable"
@@ -1172,9 +1173,13 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
          elif myMin == 4:
             tier = "High Priority"
          elif myMin == 5:
-            tier = "Unassigned"  # Note: this is not a final tier; updated later in this function.
+            tier = "Unassigned"
          else:
             tier = "General"
+         # elif myMin == 6:
+         #    tier = "General"
+         # else:
+         #    tier = "NA"
          return tier
       '''
       arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_ChoiceRANK!)", code_block=code_block)
@@ -1342,6 +1347,29 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
    arcpy.DeleteField_management(in_sortedEOs, "bycatch")  # coulddo: delete other fields here as needed.
    
+   # Field: Protection Significance Rank. Same as TIER/ECS_TIER, but with numeric value. Added to both EOs and ConSites.
+   # decide what to do with EOs which were excluded. Leave NULL?
+   printMsg("Assigning Protection Significance Ranks...")
+   arcpy.AddField_management(in_sortedEOs, "ProtSigRANK", "TEXT", field_length=20, field_alias="Protection Significance Rank")
+   codeblock = '''def calcRank(tier):
+      if tier == "Irreplaceable":
+         return "1. Irreplaceable"
+      elif tier == "Critical":
+         return "2. Critical"
+      elif tier == "Vital":
+         return "3. Vital"
+      elif tier == "High Priority":
+         return "4. High Priority"
+      elif tier == "General":
+         return "5. General"
+      '''
+   expression = "calcRank(!TIER!)"
+   arcpy.CalculateField_management(in_sortedEOs, "ProtSigRANK", expression, code_block=codeblock)
+   # ConSites
+   arcpy.AddField_management(in_ConSites, "ProtSigRANK", "TEXT", field_length=20, field_alias="Protection Significance Rank")
+   expression = "calcRank(!ECS_TIER!)"
+   arcpy.CalculateField_management(in_ConSites, "ProtSigRANK", expression, code_block=codeblock)
+   
    fldList = [
    ["ELCODE", "ASCENDING"], 
    ["FinalRANK", "ASCENDING"], 
@@ -1358,7 +1386,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ]
    arcpy.Sort_management(in_sortedEOs, out_sortedEOs, fldList)
    
-   arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"],["CS_CONSVALUE", "DESCENDING"]])
+   arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["ProtSigRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])
    
    arcpy.CopyRows_management(in_sumTab, out_sumTab)
    
