@@ -1008,10 +1008,8 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    firstChopPF = scratchGDB + os.sep + 'firstChopPF'
    arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
 
-   # NOTE: in rare cases, all PFs in a ProtoSite get erased (e.g. small island PFs covered by a hydrographic features).
-   #  This will result in an empty feature class for out_Clusters in this function and for the consite as a result.
-   #  Could do a workaround here, but decided to just add a warning to the CreateConSites function when this happens,
-   #  so that the user can deal with it by editing the modification features and/or PFs.
+   # NOTE: in rare cases, all PFs in a ProtoSite get erased (e.g. small island PFs covered by a hydrographic features). 
+   # This will result in an error, returning nothing for this function.
 
    # Eliminate parts comprising less than 1% of total original feature size
    # Originally considered 5%, but that appeared too high, especially for large delineated PFs. Will use 1%, but may decide to remove this altogether.
@@ -1038,9 +1036,14 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    explChop = scratchGDB + os.sep + 'explChop'
    arcpy.management.MultipartToSinglepart(firstChop, explChop)
    pfList = unique_values(in_PF, fld_ID)
+   pfErased = []
    for id in pfList:
       qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
       arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
+      if countFeatures("pfLyr") == 0:
+         # If no PF parts remain, the PF was completely erased. These are reported in a warning after the loop.
+         pfErased.append(id)
+         continue
       arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
       arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
       arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
@@ -1051,6 +1054,8 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
       arcpy.management.SelectLayerByLocation(rtnPartsLyr, "INTERSECT", "pfLyr")
       ExpandSelection(rtnPartsLyr, searchDist)
       arcpy.CalculateField_management(rtnPartsLyr, "keep", 1)
+   if len(pfErased) > 0:
+      printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If this affects the final site delineation, you may want to edit the modification features or PFs.")
 
    # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
