@@ -192,43 +192,43 @@ def updateTiers(in_procEOs, targetDict, rankFld):
    returns updated targetDict, which can be fed into this function for the next tier update.
    
    Same basic workflow as updateSlots, except this function updates TIER, and sets lower-ranked rows to General.
+   headsup: this uses pandas data frames, which are WAY faster than ArcGIS table queries.
    '''
-   printMsg("Updating tiers using " + rankFld + ", this could take a while...")
+   printMsg("Updating tiers using " + rankFld + "...")
+   df = fc2df(in_procEOs, ["ELCODE", "TIER", "SF_EOID", rankFld])
+   
    arcpy.SetProgressor("step", "Updating tiers using " + rankFld + "...", 0, len(targetDict), 1)
    n = 0
-   proc_lyr = arcpy.MakeFeatureLayer_management(in_procEOs)
    for elcode in targetDict:
       try:
          availSlots = targetDict[elcode]
          print(elcode)
          r = 1
          while availSlots > 0:
-            where_clause1 = '"ELCODE" = \'%s\' AND "TIER" = \'Unassigned\' AND "%s" <= %s' %(elcode, rankFld, str(r))
-            where_clause2 = '"ELCODE" = \'%s\' AND "TIER" = \'Unassigned\' AND "%s" > %s' %(elcode, rankFld, str(r))
-            arcpy.SelectLayerByAttribute_management(proc_lyr, "NEW_SELECTION", where_clause1)
-            c = countFeatures(proc_lyr)
-            #printMsg('Current rank: %s' % str(r))
-            #printMsg('Available slots: %s' % str(availSlots))
-            #printMsg('Features counted: %s' % str(c))
+            # pandas queries; note different operators from base python
+            where_clause1 = "ELCODE=='%s' & TIER=='Unassigned' & %s <= %s" %(elcode, rankFld, str(r))
+            where_clause2 = "ELCODE=='%s' & TIER=='Unassigned' & %s > %s" %(elcode, rankFld, str(r))
+            q1 = df.query(where_clause1)
+            c = len(q1)
             if c == 0:
                #print "Nothing to work with here. Moving on."
                break
             elif c < availSlots:
                #printMsg('Filling some slots')
-               arcpy.CalculateField_management(proc_lyr, "TIER", "'High Priority'", "PYTHON")
+               df.loc[df["SF_EOID"].isin(list(q1["SF_EOID"])), ["TIER"]] = "High Priority"
                availSlots -= c
                r += 1
             elif c == availSlots:
                #printMsg('Filling all slots')
-               arcpy.CalculateField_management(proc_lyr, "TIER", "'High Priority'", "PYTHON")
-               arcpy.SelectLayerByAttribute_management(proc_lyr, "NEW_SELECTION", where_clause2)
-               arcpy.CalculateField_management(proc_lyr, "TIER", "'General'", "PYTHON")
+               df.loc[df["SF_EOID"].isin(list(q1["SF_EOID"])), ["TIER"]] = "High Priority"
+               q2 = df.query(where_clause2)
+               df.loc[df["SF_EOID"].isin(list(q2["SF_EOID"])), ["TIER"]] = "General"
                availSlots -= c
                break
             else:
                #printMsg('Unable to differentiate; moving on to next criteria.')
-               arcpy.SelectLayerByAttribute_management(proc_lyr, "NEW_SELECTION", where_clause2)
-               arcpy.CalculateField_management(proc_lyr, "TIER", "'General'", "PYTHON")
+               q2 = df.query(where_clause2)
+               df.loc[df["SF_EOID"].isin(list(q2["SF_EOID"])), ["TIER"]] = "General"
                break
          n += 1
          arcpy.SetProgressorPosition(n)
@@ -237,6 +237,15 @@ def updateTiers(in_procEOs, targetDict, rankFld):
       except:
          printWrng('There was a problem processing elcode %s.' %elcode)
          tback()
+   
+   # Now update the tiers in the original table using the pandas data frame
+   with arcpy.da.UpdateCursor(in_procEOs, ["SF_EOID", "TIER"]) as curs:
+      for row in curs:
+         id = row[0]
+         val = df.query("SF_EOID == " + str(id)).iloc[0]["TIER"]
+         row[1] = val
+         curs.updateRow(row)
+   
    # remove keys with no open slots
    targetDict = {key: val for key, val in targetDict.items() if val != 0}
    printMsg("Finished updating tiers using " + rankFld + ".")
