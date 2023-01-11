@@ -990,8 +990,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    addRanks("lyr_EO", "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")
    targetDict = updateTiers("lyr_EO", targetDict, "RANK_eo")
    
-   # VITAL tier: uses ONLY EO rank, so can use EO_MODRANK to assign to this Tier. 
-   # headsup: If we want to use add'l criteria (e.g. Observation Year) for Vital tier assignment, Vital assignment will be more complicated.
+   # decide: Below is option 1. Select one Vital EO, based on EO Rank ONLY. Can use EO_MODRANK for this.
    # Coulddo: vital tier could include either 1 or 2 EOs, just adjust query to either EO_MODRANK = 1 or EO_MODRANK <= 2. 
    #  NOTE: Vital tier can not include >2 EOs with the current methods.
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_HP", "TIER = 'High Priority' and EO_MODRANK = 1")
@@ -1009,6 +1008,52 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    openSlots = list(targetDict.keys())
    if len(openSlots) > 0:
       printMsg(str(len(openSlots)) + " ELCODES have open slots remaining.")  # : " + ", ".join(openSlots))
+   
+   # decide: Below is option 2. Select one Vital EO, based on EO Rank AND Observation year
+   
+   # printMsg("Updating Vital-tier from existing High Priority EOs...")
+   # rnkEOs = scratchGDB + os.sep + 'rnkEOs'
+   # arcpy.Select_analysis(in_procEOs, rnkEOs, where_clause="TIER = 'High Priority'")
+   # elcodes_list = unique_values(rnkEOs, "ELCODE")
+   # printMsg("Trying to find Vital tier EO for " + str(len(elcodes_list)) + " elements.")
+   # 
+   # # Assign vital tier using RANK_eo
+   # q = "ELCODE IN ('" + "','".join(elcodes_list) + "')"
+   # lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
+   # addRanks(lyr, "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")  # these ranks should already exist, but safer to re-calculate
+   # arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", "RANK_eo = 1")
+   # # Find top-rank ELCODEs only occurring once. These are the 'Vital' EOs
+   # lis = [a[0] for a in arcpy.da.SearchCursor(lyr, ['ELCODE'])]
+   # elcodes = [i for i in lis if lis.count(i) == 1]
+   # q = "ELCODE IN ('" + "','".join(elcodes) + "')"
+   # arcpy.SelectLayerByAttribute_management(lyr, "SUBSET_SELECTION", q)
+   # arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
+   # elcodes_list = [i for i in elcodes_list if i not in elcodes]
+   # printMsg("Trying to assign a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
+   # 
+   # # For ELCODES still without a Vital EO, Assign vital tier using RANK_year
+   # q = "RANK_eo = 1 AND ELCODE IN ('" + "','".join(elcodes_list) + "')"
+   # lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
+   # addRanks(lyr, "OBSYEAR", "DESCENDING", "RANK_year", 3, "ABS")
+   # arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", "RANK_year = 1")
+   # # Find top-rank ELCODEs only occurring once. These are the 'Vital' EOs
+   # lis = [a[0] for a in arcpy.da.SearchCursor(lyr, ['ELCODE'])]
+   # elcodes = [i for i in lis if lis.count(i) == 1]
+   # q = "ELCODE IN ('" + "','".join(elcodes) + "')"
+   # arcpy.SelectLayerByAttribute_management(lyr, "SUBSET_SELECTION", q)
+   # arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
+   # elcodes_list = [i for i in elcodes_list if i not in elcodes]
+   # printMsg("Unable to assign a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
+   # 
+   # # Now update in_procEOs using EO IDs
+   # vital = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause="TIER = 'Vital'")
+   # eoids = unique_values(vital, 'SF_EOID')
+   # q = "SF_EOID IN (" + ",".join([str(int(i)) for i in eoids]) + ")"
+   # lyr = arcpy.MakeFeatureLayer_management(in_procEOs, where_clause=q)
+   # arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
+   # del lyr
+   
+   ## END Vital tier update based on EO Rank and OBSDATE
    
    # Field: ChoiceRANK
    printMsg("Assigning tier ranks...")
@@ -1037,7 +1082,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    # Codeblock subject to change based on reviewer input.
    # todo: Things to consider re: tier updates:
    #  - initial changes to code do not affect how a given EO CONSVALUE was calculated. 
-   #  Potential changes could reflect tier re-assingments, e.g.:
+   #  Potential changes could reflect tier re-assignments, e.g.:
    #  - Should Vital tier have different values than High Priority? 
    #  - How about unassigned? (previously assigned "Choice" tier)
    #   - Note that with updated methods, some of these will eventually be moved to High Priority, others to General (once Portfolio is finalized).
@@ -1185,6 +1230,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
       arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
       # decide: Do we want to distinguish ConSites associated only with excluded EOs (as opposed to grouping with General)? If yes, what should be the name here?
+      # Note: the "Unassigned" ConSites are either promoted to High Priority or demoted to General in the workflow.
       code_block = '''def fn(myMin):
          if myMin == 1:
             tier = "Irreplaceable"
@@ -1201,7 +1247,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
          # elif myMin == 6:
          #    tier = "General"
          # else:
-         #    tier = "NA"  # This is for ConSits only associated with excluded EOs.
+         #    tier = "NA"  # This is for ConSites only associated with excluded EOs.
          return tier
       '''
       arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_ChoiceRANK!)", code_block=code_block)
@@ -1328,7 +1374,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    expression = "calcRank(!TIER!)"
    arcpy.CalculateField_management(in_sortedEOs, "FinalRANK", expression, code_block=codeblock)
    
-   # Create final outputs
+   # Field: EXT_TIER
    printMsg("Assigning extended tier attributes...")
    arcpy.AddField_management(in_sortedEOs, "EXT_TIER", "TEXT", "", "", 75)
    # headsup with tier update:
@@ -1369,7 +1415,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
    arcpy.DeleteField_management(in_sortedEOs, "bycatch")  # coulddo: delete other fields here as needed.
    
-   # Field: Protection Significance Rank. Same as TIER/ECS_TIER field, but with numeric prefix. Added to both EOs and ConSites.
+   # Field: PSRANK (Protection Significance Rank). Same as TIER field (ECS_TIER for ConSites), but with numeric prefix. Added to both EOs and ConSites.
    # decide what to do with EOs which were excluded (TIER is NULL)
    printMsg("Assigning Protection Significance Ranks...")
    arcpy.AddField_management(in_sortedEOs, "PSRANK", "TEXT", field_length=20, field_alias="Protection Significance Rank")
@@ -1394,6 +1440,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    expression = "calcRank(!ECS_TIER!)"
    arcpy.CalculateField_management(in_ConSites, "PSRANK", expression, code_block=codeblock)
    
+   # Create final outputs
    fldList = [
    ["ELCODE", "ASCENDING"], 
    ["FinalRANK", "ASCENDING"], 
