@@ -1525,7 +1525,7 @@ class attribute_eo(object):
       parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam")
       parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "tncEcoRegions_lam")
-      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input", "GEN_REG")
+      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input")
       parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
       parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
       parm08 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
@@ -1548,8 +1548,13 @@ class attribute_eo(object):
       has been changed."""
       if parameters[4].altered:
          fc = parameters[4].valueAsText
-         field_names = GetFlds(fc)
-         parameters[5].filter.list = field_names
+         try:
+            field_names = GetFlds(fc)
+            parameters[5].filter.list = field_names
+            if "GEN_REG" in field_names:
+               parameters[5].value = "GEN_REG"
+         except:
+            pass
       return
 
    def updateMessages(self, parameters):
@@ -1713,7 +1718,7 @@ class build_element_lists(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
-      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input", "SITENAME")
+      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input")
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
       parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
       # For some reason this is not working if you input a table view...
@@ -1741,8 +1746,13 @@ class build_element_lists(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         parameters[1].filter.list = field_names
+         try:
+            field_names = GetFlds(fc)
+            parameters[1].filter.list = field_names
+            if "SITENAME" in field_names:
+               parameters[1].value = "SITENAME"
+         except:
+            pass
       # if parameters[5].valueAsText is not None:
       #    if not parameters[5].valueAsText.endswith('xls'):
       #       parameters[5].value = parameters[5].valueAsText.split('.')[0] + '.xls'
