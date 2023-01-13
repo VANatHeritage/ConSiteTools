@@ -492,7 +492,7 @@ class review_consite(object):
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB
       else:
-         scratchParm = arcpy.env.scratchWorkspace 
+         scratchParm = "in_memory"
 
       ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, scratchParm)
       arcpy.MakeFeatureLayer_management(out_Sites, "QC_lyr")

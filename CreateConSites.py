@@ -585,7 +585,7 @@ def prepInclusionZone(in_Zone1, in_Zone2, in_Score, out_Rast, truncVal = 9):
    print("Mission complete.")
    return out_Rast
    
-def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", scratchGDB = arcpy.env.scratchWorkspace):
+def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", scratchGDB = "in_memory"):
    '''Submits new (typically automated) Conservation Site features to a Quality Control procedure, comparing new to existing (old) shapes  from the previous production cycle. It determines which of the following applies to the new site:
    - N:  Site is new, not corresponding to any old site.
    - I:  Site is identical to an old site.
@@ -611,7 +611,9 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - cutVal: a cutoff percentage that will be used to flag features that represent significant boundary growth or reduction(e.g., 10%)
    - out_Sites: output new Conservation Sites feature class with QC information
    - fld_SiteID: the unique site ID field in the old CS feature class
-   - scratchGDB: scratch geodatabase for intermediate products'''
+   - scratchGDB: scratch geodatabase for intermediate products
+   '''
+   getScratchMsg(scratchGDB)
 
    # Recast cutVal as a number b/c for some reasons it's acting like text
    cutVal = float(cutVal)
@@ -677,119 +679,80 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       arcpy.management.CalculateField("ssLyr", "ModType", '"B"')
       qry = "ModType = 'B'"
       bLyr = arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
-      # Get the old site IDs to attach to SingleSites.  
-      # Single Sites provide the output geometry
+   else:
+      bLyr = None
+   
+   # Get the subset of single sites that are identical to old sites
+   if bLyr:
+      arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
+      c = countSelectedFeatures("bLyr")
+      if c > 0:
+         printMsg("%s sites are identical to the old ones..."%str(c))
+         arcpy.management.CalculateField("bLyr", "ModType", '"I"')
+   else:
+      pass
+   
+   # Attach the old site IDs to attach to automated sites
+   # coulddo: add S below, since they are associated with only 1 old site. However, that would result in duplicate AssignIDs in the output.
+   qry = "ModType IN ('B', 'I')"   # , 'S')"
+   arcpy.management.MakeFeatureLayer(out_Sites, "ssLyr", qry)
+   if countFeatures("ssLyr") > 0:
       printMsg("Attaching site IDs...")
       Join3 = scratchGDB + os.sep + "Join3"
-      arcpy.analysis.SpatialJoin("bLyr", orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT")
+      arcpy.analysis.SpatialJoin("ssLyr", orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT")
       arcpy.management.JoinField("ssLyr", "OBJECTID", Join3, "TARGET_FID", fld_SiteID)
       arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
    else:
       arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
-      bLyr = None
-   
-   # Get the subset of single sites that are identical to old sites
-   if bLyr: 
-      arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-      c = countSelectedFeatures("ssLyr")
-      if c > 0:
-         printMsg("%s sites are identical to the old ones..."%str(c))
-         arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
-   else:
-      pass
    
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
    arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   # ComboSites = scratchGDB + os.sep + "ComboSites"
-   # arcpy.management.CopyFeatures("mergeLyr")
    c = countSelectedFeatures("mergeLyr")
    if c > 0:
       printMsg("There are %s combo split-merge sites"%str(c))
       arcpy.management.CalculateField("mergeLyr", "ModType", '"C"')
-
-   # Process:  Add Fields; Calculate Fields
+   
+   printMsg("Examining boundary changes for boundary change only sites...")
+   # Calculate PercDiff for Boundary Change only sites
+   qry = "ModType = 'B'"
+   newB = scratchGDB + os.sep + "newB"
+   arcpy.MakeFeatureLayer_management(out_Sites, "B_Lyr", where_clause=qry)
+   if countFeatures("B_Lyr") > 0:
+      arcpy.CopyFeatures_management("B_Lyr", newB)
+      arcpy.CalculateField_management(newB, "new_area", "!shape.area@squaremeters!", field_type="DOUBLE")
+      # Make layer for old sites, calculate area
+      arcpy.MakeFeatureLayer_management(orig_CS, "o_lyr")
+      arcpy.SelectLayerByLocation_management("o_lyr", "INTERSECT", newB)
+      oldB = scratchGDB + os.sep + "oldB"
+      arcpy.CopyFeatures_management("o_lyr", oldB)
+      arcpy.CalculateField_management(oldB, "old_area", "!shape.area@squaremeters!", field_type="DOUBLE")
+      # Calculate intersection
+      tmpInt = scratchGDB + os.sep + "tmpInt"
+      arcpy.PairwiseIntersect_analysis([newB, oldB], tmpInt)
+      # Sum the difference of the intersect area from both new/old sites, compare that to old site area. 
+      calc = "100 * ((!new_area! - !shape.area@squaremeters!) + (!old_area! - !shape.area@squaremeters!)) / !old_area!"
+      arcpy.CalculateField_management(tmpInt, "PercDiff", calc, field_type="DOUBLE")
+      arcpy.JoinField_management(out_Sites, "AssignID", tmpInt, "AssignID", "PercDiff")
+   
+   # Process:  Add Fields; Calculate Flag Field
+   # Note that PercDiff would already be in the layer if there are "B" type sites, but ArcGIS will just ignore it in that case.
    printMsg("Calculating fields...")
    for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 1000)]:
-      arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2]) 
-   CodeBlock = """def Flag(ModType):
-      if ModType in ("N", "M", "C", "S", "B"):
+      arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2])
+   CodeBlock = """def Flag(ModType, percDiff):
+      if ModType in ("N", "M", "C", "S"):
          flg = 1
+      elif ModType == "B":
+         if percDiff >= %s:
+            flg = 1
+         else:
+            flg = 0
       else:
          flg = 0
-      return flg"""
-   Expression = "Flag(!ModType!)"
-   arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock) 
-      
-   # Loop through the individual Boundary Change sites and check for amount of change
-   qry = "ModType = 'B'"
-   arcpy.management.MakeFeatureLayer(out_Sites, "B_Lyr", qry)
-   myIndex = 1 # Set a counter index
-   printMsg("Examining boundary changes for boundary change only sites...")
-   with arcpy.da.UpdateCursor("B_Lyr", ["SHAPE@", "AssignID", "PercDiff", "Flag"]) as mySites: 
-      for site in mySites: 
-         try: # put all this in a TRY block so that even if one feature fails, script can proceed to next feature
-            # Extract the shape and ID from the data record
-            myShape = site[0]
-            myID = site[1]
-            printMsg("\nWorking on Site ID %s" %myID)
-            
-            qry = '"%s" = \'%s\'' %(fld_SiteID, myID)
-            tmpOldSite = arcpy.management.MakeFeatureLayer(orig_CS, "tmpLyr", qry)
-
-            # Get the area of the old site
-            OldArea = arcpy.SearchCursor(tmpOldSite).next().shape.area
-
-            # Process:  Symmetrical Difference (Analysis)
-            # Create features from the portions of the old and new sites that do NOT overlap
-            tmpSymDiff = "in_memory" + os.sep + "tmpSymDiff"
-            arcpy.analysis.SymDiff(tmpOldSite, myShape, tmpSymDiff, "ONLY_FID", "")
-
-            # Process:  Dissolve (Data Management)
-            # Dissolve the Symmetrical Difference polygons into a single (multi-part) polygon
-            tmpDissolve = "in_memory" + os.sep + "tmpDissolve"
-            arcpy.analysis.PairwiseDissolve(tmpSymDiff, tmpDissolve)
-
-            # Get the area of the difference shape
-            DiffArea = arcpy.SearchCursor(tmpDissolve).next().shape.area
-
-            # Calculate the percent difference from old shape, and set the value in the record
-            PercDiff = 100*DiffArea/OldArea
-            printMsg("The shapes differ by " + str(PercDiff) + " percent of original site area")
-            site[2] = PercDiff
-
-            # If the difference is greater than the cutoff, set the flag value to "Suspect", otherwise "Okay"
-            if PercDiff > cutVal:
-               printMsg("Shapes are significantly different; flagging record")
-               site[3] = 1
-            else:
-               printMsg("Shapes are similar; unflagging record")
-               site[3] = 0
-
-            # Update the data table
-            mySites.updateRow(site) 
-         
-         except:       
-            # Add failure message
-            printMsg("Failed to fully process feature " + str(myIndex))
-
-            # Error handling code swiped from "A Python Primer for ArcGIS"
-            tb = sys.exc_info()[2]
-            tbinfo = traceback.format_tb(tb)[0]
-            pymsg = "PYTHON ERRORS:\nTraceback Info:\n" + tbinfo + "\nError Info:\n " + str(sys.exc_info()[1])
-            msgs = "ARCPY ERRORS:\n" + arcpy.GetMessages(2) + "\n"
-
-            arcpy.AddError(msgs)
-            arcpy.AddError(pymsg)
-            printMsg(arcpy.GetMessages(1))
-
-            # Add status message
-            printMsg("\nMoving on to the next feature.  Note that the output will be incomplete.")
-         
-         finally:
-            # Increment the index by one, and clear the in_memory workspace before returning to beginning of the loop
-            myIndex += 1 
-            arcpy.Delete_management("in_memory")
+      return flg""" % (str(cutVal))
+   Expression = "Flag(!ModType!, !PercDiff!)"
+   arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock)
 
    return out_Sites
 
@@ -2087,7 +2050,7 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
          flowlines are only selected once, meaning a maximum of two secondary lines could be added to fill a given gap.
    The two selections are merged and unsplit to create contiguous potential filler line features.
    To be included in outFillLines, a filler line must:
-      - be less than a total length limit, currently set as (max_flowline_length * 3). This is arbitrary!
+      - be less than a total length limit, currently set as (max_flowline_length * 2). This is arbitrary!
       - intersect 2+ inLines (identified using a spatial join)
    
    :param inLines: Input line features, to find gaps between
@@ -2104,7 +2067,7 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    arcpy.SelectLayerByLocation_management(flowPri, "SHARE_A_LINE_SEGMENT_WITH", inLines)
    # Add intersecting flowlines, if they are less than max_flowline_length.
    flowSec = arcpy.MakeFeatureLayer_management(flowlines, where_clause="Shape_Length <= " + str(max_flowline_length))
-   arcpy.SelectLayerByLocation_management(flowSec, "INTERSECT", flowPri)
+   arcpy.SelectLayerByLocation_management(flowSec, "BOUNDARY_TOUCHES", flowPri)
    arcpy.SelectLayerByLocation_management(flowSec, "ARE_IDENTICAL_TO", flowPri, selection_type="REMOVE_FROM_SELECTION")
    # Combine the selections
    flow0 = scratchGDB + os.sep + 'flow0'
@@ -2120,9 +2083,10 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    UnsplitLines(flow1s, flow2, scratchGDB)
    
    # This section selects only gap segments with total length less than some defined value.
-   # Note this is a total length criteria, so it includes any tributary segments which may have been picked up. That's why I'm using 3x the max flowline length here.
+   # Note this is a total length criteria, so it includes any tributary segments which may have been picked up. 
+   # That's why I'm using a multiple of the max flowline length here to define fill_max_length.
    flow2b = scratchGDB + os.sep + 'flow2b'
-   fill_max_length = max_flowline_length * 3
+   fill_max_length = max_flowline_length * 2
    arcpy.CalculateField_management(flow2, 'total_length', "!shape.length@meters!", field_type="FLOAT")
    arcpy.Select_analysis(flow2, flow2b, "total_length < " + str(fill_max_length))
    # Decide whether to use the subset or not
@@ -2236,7 +2200,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
    
-   # This section finds small gaps between scsLines. If any are found, it adds them and re-creates out_Lines.
+   # This section finds small flowline gaps between scsLines. If any are found, it re-creates out_Lines, with gaps filled in
    if countFeatures(out_Lines) > 1:
       fillLines = out_Scratch + os.sep + "fillLines"
       FillLines_scs(out_Lines, fillLines, nhdFlow, 500, out_Scratch)

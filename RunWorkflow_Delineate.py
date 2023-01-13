@@ -36,7 +36,7 @@ def main():
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
    projFolder = r'D:\projects\ConSites\arc\statewide'
-   runName = 'statewideTCS_2_1'
+   runName = 'statewide_' + "_".join(siteTypes)
    outGDB = os.path.join(projFolder, runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
 
    # Geodatabase for storing scratch products
