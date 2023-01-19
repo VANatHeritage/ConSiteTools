@@ -1,10 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.1
+# Toolbox version: 2.1.1  # version scheme: major.minor.bugfix
+tbx_version = "2.1.1"  # headsup: the toolbox version here is appended to the Toolbox label. Make sure to update this before you commit changes.
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2022-11-04
+# Last Edit: 2023-01-10
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -90,7 +91,7 @@ def setViewExtent(lyrName, zoomBuffer=0, selected=True):
 class Toolbox(object):
    def __init__(self):
       """Define the toolbox (the name of the toolbox is the name of the .pyt file)."""
-      self.label = "ConSite Toolbox"
+      self.label = "ConSite Toolbox v" + tbx_version
       self.alias = "ConSiteToolbox"
 
       # List of tool classes associated with this toolbox
