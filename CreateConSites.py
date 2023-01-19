@@ -2039,7 +2039,7 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    printMsg("Network point generation complete.")
    return out_Points
    
-def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scratchGDB ="in_memory"):
+def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, barriers=None, scratchGDB ="in_memory"):
    """
    Using scsLine features and NHDFlowline, finds and returns flowline 'filler' segments which meet segment/ total length
    criteria, which can be used to patch the gaps between inLines.
@@ -2058,6 +2058,7 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    :param flowlines: Original flowline layer (e.g. NHDFlowline)
    :param max_flowline_length: Maximum length limit for a single non-intersecting flowline (flowSec), given as an
       integer in NHDFlowline layer's coordinate system units (assumed meters).
+   :param barriers: Feature class of barriers (i.e. dams). If given, filler lines within 100-m of barriers will be excluded.
    :param scratchGDB: geodatabase to hold intermediate products
    :return: outFillLines
    """
@@ -2088,9 +2089,14 @@ def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, scr
    flow2b = scratchGDB + os.sep + 'flow2b'
    fill_max_length = max_flowline_length * 2
    arcpy.CalculateField_management(flow2, 'total_length', "!shape.length@meters!", field_type="FLOAT")
-   arcpy.Select_analysis(flow2, flow2b, "total_length < " + str(fill_max_length))
-   # Decide whether to use the subset or not
-   filler = flow2b  # flow2 | flow2b
+   query = "total_length < " + str(fill_max_length)
+   lyr = arcpy.MakeFeatureLayer_management(flow2, where_clause=query)
+   if barriers is not None:
+      printMsg("Removing filler lines near barriers...")
+      # Use barriers to remove filler lines within 100-m
+      arcpy.SelectLayerByLocation_management(lyr, "WITHIN_A_DISTANCE", barriers, "100 Meters", "NEW_SELECTION", "INVERT")
+   arcpy.CopyFeatures_management(lyr, flow2b)
+   filler = flow2b
    
    # Find gap filler lines which intersect more than one of the inLines
    flow3 = scratchGDB + os.sep + 'flow3'
@@ -2200,10 +2206,17 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
    
+   # Get dam points from the upstream service area layer
+   if in_upTrace.endswith(".lyrx"):
+      na_lyr = arcpy.mp.LayerFile(inLyr)
+      damPts = na_lyr.listLayers("Point Barriers")[0]
+   else:
+      damPts = in_upTrace + "\Point Barriers"
+   
    # This section finds small flowline gaps between scsLines. If any are found, it re-creates out_Lines, with gaps filled in
    if countFeatures(out_Lines) > 1:
       fillLines = out_Scratch + os.sep + "fillLines"
-      FillLines_scs(out_Lines, fillLines, nhdFlow, 500, out_Scratch)
+      FillLines_scs(out_Lines, fillLines, nhdFlow, 500, damPts, out_Scratch)
       if countFeatures(fillLines) > 0:
          printMsg("Filling in small gaps...")
          newLines = out_Scratch + os.sep + 'newLines'
