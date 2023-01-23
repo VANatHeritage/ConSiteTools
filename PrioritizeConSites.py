@@ -259,16 +259,19 @@ def updateSlots(in_procEOs, slotDict, rankFld):
    - rankFld: the ranking field used to determine which record(s) should fill the available slots
    
    Same basic workflow as updateTiers, except this function updates PORTFOLIO, and does not set lower-ranked rows to General.
+   headsup: this uses pandas data frames, which are WAY faster than ArcGIS table queries.
    '''
    printMsg("Updating portfolio using " + rankFld + "...")
+   df = fc2df(in_procEOs, ["ELCODE", "TIER", "SF_EOID", "PORTFOLIO", rankFld])
+   
    for elcode in slotDict:
       availSlots = slotDict[elcode]
       r = 1
       while availSlots > 0:
-         where_clause = '"ELCODE" = \'%s\' AND "TIER" = \'Unassigned\' AND "PORTFOLIO" = 0 AND "%s" <= %s' %(elcode, rankFld, str(r))
-         #where_clause2 = '"ELCODE" = \'%s\' AND "TIER" = \'Unassigned\' AND "PORTFOLIO" = 0 AND "%s" > %s' %(elcode, rankFld, str(r))
-         arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_choiceEO", where_clause)
-         c = countFeatures("lyr_choiceEO")
+         # pandas queries; note different operators from base python
+         where_clause = "ELCODE=='%s' & TIER=='Unassigned' & PORTFOLIO==0 & %s <= %s" % (elcode, rankFld, str(r))
+         q1 = df.query(where_clause)
+         c = len(q1)
          #printMsg('Current rank: %s' % str(r))
          #printMsg('Available slots: %s' % str(availSlots))
          #printMsg('Features counted: %s' % str(c))
@@ -277,12 +280,12 @@ def updateSlots(in_procEOs, slotDict, rankFld):
             break
          elif c < availSlots:
             #printMsg('Filling some slots')
-            arcpy.CalculateField_management("lyr_choiceEO", "PORTFOLIO", "1", "PYTHON")
+            df.loc[df["SF_EOID"].isin(list(q1["SF_EOID"])), ["PORTFOLIO"]] = 1
             availSlots -= c
             r += 1
          elif c == availSlots:
             #printMsg('Filling all slots')
-            arcpy.CalculateField_management("lyr_choiceEO", "PORTFOLIO", "1", "PYTHON")
+            df.loc[df["SF_EOID"].isin(list(q1["SF_EOID"])), ["PORTFOLIO"]] = 1
             availSlots -= c
             break
          else:
@@ -290,6 +293,15 @@ def updateSlots(in_procEOs, slotDict, rankFld):
             break
       # Update dictionary
       slotDict[elcode] = availSlots
+   
+   # Now update the portfolio in the original table using the pandas data frame
+   with arcpy.da.UpdateCursor(in_procEOs, ["SF_EOID", "PORTFOLIO"]) as curs:
+      for row in curs:
+         id = row[0]
+         val = df.query("SF_EOID == " + str(id)).iloc[0]["PORTFOLIO"]
+         row[1] = val
+         curs.updateRow(row)
+   
    # remove keys with no open slots
    slotDict = {key: val for key, val in slotDict.items() if val != 0}  # this can be used in updatePortfolio, so that by-catch selection is limited to Elements with open slots
    return slotDict
