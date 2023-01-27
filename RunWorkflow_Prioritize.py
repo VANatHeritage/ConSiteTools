@@ -48,7 +48,7 @@ def main():
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_Vital1'
 
    # Fairly static data; keep using the same until specified otherwise
    src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
@@ -69,10 +69,14 @@ def main():
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
-   # Below for TESTING only
-   # in_GDB = ecs_dir + os.sep + "ECS_Inputs_Dec2022.gdb"
-   # out_GDB = ecs_dir + os.sep + "ECS_Outputs_Dec2022.gdb"
-   # out_DIR = ecs_dir + os.sep + "Spreadsheets_Dec2022"
+   
+   # Below for TESTING only ("src_" variables are not used in this case).
+   in_GDB = ecs_dir + os.sep + "ECS_Inputs_Dec2022.gdb"
+   out_GDB = ecs_dir + os.sep + "ECS_Outputs_Dec2022_TEST_20230125.gdb"
+   createFGDB(out_GDB)
+   out_DIR = ecs_dir + os.sep + "Spreadsheets_Dec2022_TEST_20230125"
+   if not os.path.exists(out_DIR):
+      os.makedirs(out_DIR)
 
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -96,7 +100,7 @@ def main():
 
    # Input cutoff years
    # This should change every calendar year
-   yyyy = int(datetime.now().strftime('%Y'))
+   yyyy = 2022 # int(datetime.now().strftime('%Y'))
    cutYear = yyyy - 25  # yyyy - 25 for TCS and SCU
    flagYear = yyyy - 20  # yyyy - 20 for TCS and SCU
    # cutYear_kcs = yyyy - 40  # yyyy - 40 for KCS

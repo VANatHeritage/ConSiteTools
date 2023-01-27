@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2022-11-22
+# Last Edit: 2023-01-27
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -182,6 +182,7 @@ def modRanks(in_rankTab, fld_origRank, fld_modRank = 'MODRANK', fld_rankOver="EL
       return rank'''
    expression = "modRank(!%s!, !%s!, %s)" %(fld_rankOver, fld_origRank, rankDict)
    arcpy.CalculateField_management(in_rankTab, fld_modRank, expression, "PYTHON_9.3", codeblock)
+   return
 
 def updateTiers(in_procEOs, targetDict, rankFld):
    '''A helper function called by ScoreEOs. Updates tier levels, specifically bumping "Unassigned" records up to "High Priority" or down to "General".
@@ -202,7 +203,7 @@ def updateTiers(in_procEOs, targetDict, rankFld):
    for elcode in targetDict:
       try:
          availSlots = targetDict[elcode]
-         print(elcode)
+         # print(elcode)
          r = 1
          while availSlots > 0:
             # pandas queries; note different operators from base python
@@ -789,12 +790,10 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
          return granks'''
    expression = "reclass(!RNDGRNK!)"
    arcpy.management.CalculateField(out_procEOs, "NEW_GRANK", expression, "PYTHON3", codeblock)
-   #arcpy.CalculateField_management(out_procEOs, "NEW_GRANK", expression, "PYTHON_9.3", codeblock)
    
    # Field: EXCLUSION
    printMsg("Calculating EXCLUSION field...")
    arcpy.management.AddField(out_procEOs, "EXCLUSION", "TEXT", "", "", 20) # This will be calculated below by groups
-   #arcpy.AddField_management(out_procEOs, "EXCLUSION", "TEXT", "", "", 20) # This will be calculated below by groups
    
    # Set EXCLUSION value for low EO ranks
    printMsg("Excluding low EO ranks...")
@@ -870,14 +869,26 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
       arcpy.CalculateField_management("lyr_EO", code, 0, "PYTHON")
    
    # decide: below is an option to include ALL elements to this table, along with total and ineligible counts.
-   # arcpy.analysis.Frequency(out_procEOs, scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK", "EXCLUSION"])
-   # arcpy.management.PivotTable(scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK"], "EXCLUSION", "FREQUENCY", out_sumTab)
-   # pfld = [a.replace(" ", "_") for a in unique_values(out_procEOs, "EXCLUSION")]
-   # [NullToZero(out_sumTab, p) for p in pfld]
-   # arcpy.CalculateField_management(out_sumTab, "COUNT_ALL_EO", "!" + "! + !".join(pfld) + "!", field_type="SHORT")
-   # efld = [a for a in pfld if a != "Keep"]
-   # arcpy.CalculateField_management(out_sumTab, "COUNT_INELIGIBLE_EO", "!" + "! + !".join(efld) + "!", field_type="SHORT")
-   # arcpy.DeleteField_management(out_sumTab, pfld)
+   arcpy.analysis.Frequency(out_procEOs, scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK", "EXCLUSION"])
+   arcpy.management.PivotTable(scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK"], "EXCLUSION", "FREQUENCY", out_sumTab)
+   pfld = [a.replace(" ", "_") for a in unique_values(out_procEOs, "EXCLUSION")]
+   [NullToZero(out_sumTab, p) for p in pfld]
+   # add EXCL (indicator for if element was excluded)
+   codeblock = '''def excl(count):
+      if count > 0:
+         return "Yes"
+      else:
+         return "No"
+      '''
+   expression = "excl(!Excluded_Element!)"
+   arcpy.AddField_management(out_sumTab, "EXCL", "TEXT", field_length=3, field_alias="Excluded?")
+   arcpy.CalculateField_management(out_sumTab, "EXCL", expression, code_block=codeblock)
+   # Count ALL EOs
+   arcpy.CalculateField_management(out_sumTab, "COUNT_ALL_EO", "!" + "! + !".join(pfld) + "!", field_type="SHORT")
+   # Count EXCLUDED EOs
+   efld = [a for a in pfld if a != "Keep"]
+   arcpy.CalculateField_management(out_sumTab, "COUNT_INELIG_EO", "!" + "! + !".join(efld) + "!", field_type="SHORT")
+   arcpy.DeleteField_management(out_sumTab, pfld)
    
    # Get subset of EOs meeting criteria, based on EXCLUSION field
    where_clause = '"EXCLUSION" = \'Keep\''
@@ -889,15 +900,15 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    for code in ecoregions:
       statsList.append([str(code), "SUM"])
    statsList.append(["BMI_score", "MEAN"])
-   # Option to only include eligible EO elements in sumTab.
-   arcpy.Statistics_analysis("lyr_EO", out_sumTab, statsList, ["ELCODE", "SNAME", "NEW_GRANK"])
-   # decide: below is for when sumTab includes ALL elements. In that case, fields are joined.
-   # arcpy.Statistics_analysis("lyr_EO", scratchGDB + os.sep + "eo_stats", statsList, ["ELCODE"])
-   # jfld = [a[1] + "_" + a[0] for a in statsList]
-   # arcpy.JoinField_management(out_sumTab, "ELCODE", scratchGDB + os.sep + "eo_stats", "ELCODE", jfld)
+   # decide: Option to only include eligible EO elements in sumTab.
+   # arcpy.Statistics_analysis("lyr_EO", out_sumTab, statsList, ["ELCODE", "SNAME", "NEW_GRANK"])
+   # option below is for when sumTab includes ALL elements. In that case, fields are joined.
+   arcpy.Statistics_analysis("lyr_EO", scratchGDB + os.sep + "eo_stats", statsList, ["ELCODE"])
+   jfld = [a[1] + "_" + a[0] for a in statsList]
+   arcpy.JoinField_management(out_sumTab, "ELCODE", scratchGDB + os.sep + "eo_stats", "ELCODE", jfld)
    
    # Rename count field
-   arcpy.AlterField_management(out_sumTab, "COUNT_SF_EOID", "COUNT_ELIGIBLE_EOS", "COUNT_ELIGIBLE_EOS")
+   arcpy.AlterField_management(out_sumTab, "COUNT_SF_EOID", "COUNT_ELIG_EO", "COUNT_ELIG_EO")
    
    # add BMI scores of rank-n EOs within ELCODEs
    calcGrpSeq("lyr_EO", [["ELCODE", "ASCENDING"], ["BMI_score", "DESCENDING"]], "ELCODE", "BMI_score_rank")
@@ -948,7 +959,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
       else:
          target = initTarget
       return target'''
-   expression = "target(!NEW_GRANK!, !COUNT_ELIGIBLE_EOS!)"
+   expression = "target(!NEW_GRANK!, !COUNT_ELIG_EO!)"
    arcpy.CalculateField_management(out_sumTab, "TARGET", expression, "PYTHON_9.3", codeblock)
    
    # Field: TIER
@@ -962,7 +973,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
             return "Critical"
          else:
             return "Unassigned"'''
-   expression = "calcTier(!COUNT_ELIGIBLE_EOS!)"
+   expression = "calcTier(!COUNT_ELIG_EO!)"
    arcpy.CalculateField_management(out_sumTab, "TIER", expression, "PYTHON_9.3", codeblock)
    
    # Join the TIER field to the EO table
@@ -1352,7 +1363,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # Now that TIERs are finalized, update Portfolio so that the final numbers in sumTab are correct
    updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
    
-   # Field: FinalRANK - this is similar to ChoiceRANK, but now there is no "Unassigned" Tier (5). This is used to calculate ConSite tiers (ECS_TIER).
+   # Field: FinalRANK - this is similar to ChoiceRANK, but now there is no "Unassigned" Tier, so there are only 6 values.
+   # This is used to calculate ConSite tiers (ECS_TIER) and in BuildElementLists.
    printMsg("Assigning final tier ranks...")
    arcpy.AddField_management(in_sortedEOs, "FinalRANK", "SHORT")
    codeblock = '''def calcRank(tier):
@@ -1365,9 +1377,9 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       elif tier == "High Priority":
          return 4
       elif tier == "General":
-         return 6
+         return 5
       else:
-         return 7'''
+         return 6'''
    expression = "calcRank(!TIER!)"
    arcpy.CalculateField_management(in_sortedEOs, "FinalRANK", expression, code_block=codeblock)
    
@@ -1424,7 +1436,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
          tier = "Vital"
       elif myMin == 4:
          tier = "High Priority"
-      elif myMin == 6:
+      elif myMin == 5:
          tier = "General"
       else:
          tier = "NA"
@@ -1432,33 +1444,33 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    '''
    arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
    arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_FinalRANK!)", code_block=code_block)
-   arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["ECS_TIER"])
+   arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["MIN_FinalRANK", "ECS_TIER"])
    printMsg('ECS_TIER field set.')
    
-   # Field: PSRANK (Protection Significance Rank). Same as TIER field (ECS_TIER for ConSites), but with numeric prefix and NA for ineligible EOs. 
+   # Field: ESSENTIAL (binary yes/no, with numbered tier ranks for essential EOs/ConSites).
    # Added to both EOs and ConSites.
-   printMsg("Assigning Protection Significance Ranks...")
-   arcpy.AddField_management(in_sortedEOs, "PSRANK", "TEXT", field_length=20, field_alias="Protection Significance Rank")
+   printMsg("Assigning ESSENTIAL...")
+   arcpy.AddField_management(in_sortedEOs, "ESSENTIAL", "TEXT", field_length=30, field_alias="Essential?")
    codeblock = '''def calcRank(tier):
       if tier == "Irreplaceable":
-         return "1. Irreplaceable"
+         return "Yes - 1. Irreplaceable"
       elif tier == "Critical":
-         return "2. Critical"
+         return "Yes - 2. Critical"
       elif tier == "Vital":
-         return "3. Vital"
+         return "Yes - 3. Vital"
       elif tier == "High Priority":
-         return "4. High Priority"
+         return "Yes - 4. High Priority"
       elif tier == "General":
-         return "5. General"
+         return "No"
       else:
-         return "NA"  # this will be used for ineligible EOs, and ConSites where all constituent EOs are ineligible
+         return "No"  # on NHDE, all non-essential TCS display "NO".
       '''
    expression = "calcRank(!TIER!)"
-   arcpy.CalculateField_management(in_sortedEOs, "PSRANK", expression, code_block=codeblock)
+   arcpy.CalculateField_management(in_sortedEOs, "ESSENTIAL", expression, code_block=codeblock)
    # ConSites
-   arcpy.AddField_management(in_ConSites, "PSRANK", "TEXT", field_length=20, field_alias="Protection Significance Rank")
+   arcpy.AddField_management(in_ConSites, "ESSENTIAL", "TEXT", field_length=30, field_alias="Essential?")
    expression = "calcRank(!ECS_TIER!)"
-   arcpy.CalculateField_management(in_ConSites, "PSRANK", expression, code_block=codeblock)
+   arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
    
    # Create final outputs
    fldList = [
@@ -1477,7 +1489,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ]
    arcpy.Sort_management(in_sortedEOs, out_sortedEOs, fldList)
    
-   arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["PSRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])
+   arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["MIN_FinalRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])
    
    arcpy.CopyRows_management(in_sumTab, out_sumTab)
    
@@ -1520,8 +1532,8 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    dissBnds = scratchGDB + os.sep + "dissBnds"
    arcpy.Dissolve_management(in_Bounds, dissBnds, fld_ID, "", "MULTI_PART")
    
-   # Make feature layer containing only viable EOs
-   where_clause = '"FinalRANK" < 7'
+   # Make feature layer containing only eligible EOs
+   where_clause = '"FinalRANK" < 6'
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
    
    # Perform spatial join between EOs and dissolved boundaries
@@ -1554,7 +1566,7 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
          return "Vital"
       elif rank == 4:
          return "High Priority"
-      elif rank == 6:
+      elif rank == 5:
          return "General"
       else:
          return "NA"
@@ -1562,8 +1574,8 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    expression = "calcTier(!MIN_FinalRANK!)"
    arcpy.CalculateField_management(sumTab, "TIER", expression, "PYTHON_9.3", codeblock)
    
-   # Make a data dictionary relating ELCODE to COUNT_ELIGIBLE_EOS
-   viableDict = TabToDict(in_elementTab, "ELCODE", "COUNT_ELIGIBLE_EOS")
+   # Make a data dictionary relating ELCODE to COUNT_ELIG_EO
+   viableDict = TabToDict(in_elementTab, "ELCODE", "COUNT_ELIG_EO")
    
    # Add and calculate an ALL_IN field
    # This indicates if the boundary contains all of the state's viable example(s) of an Element
