@@ -12,7 +12,7 @@
 
 # Import modules
 print("Initiating arcpy, which takes longer than it should...")
-import arcpy, os, sys, traceback, numpy
+import arcpy, os, sys, traceback, numpy, pandas
 from datetime import datetime as datetime
 
 # Set overwrite option so that existing data may be overwritten
@@ -943,3 +943,28 @@ def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
    # join sequence field to original table
    arcpy.JoinField_management(in_Table, oid, tmpSrt, join_fld, seq_field)
    return in_Table
+
+def fc2df(feature_class, field_list, skip_nulls=True):
+   """
+   Load data into a Pandas Data Frame for subsequent analysis.
+   :param feature_class: Input ArcGIS Feature Class.
+   :param field_list: Fields for input.
+   :return: Pandas DataFrame object.
+   """
+   if not skip_nulls:
+      return pandas.DataFrame(
+         arcpy.da.FeatureClassToNumPyArray(
+            in_table=feature_class,
+            field_names=field_list,
+            skip_nulls=False,
+            null_value=-99999
+         )
+      )
+   else:
+      return pandas.DataFrame(
+         arcpy.da.FeatureClassToNumPyArray(
+            in_table=feature_class,
+            field_names=field_list,
+            skip_nulls=True
+         )
+      )

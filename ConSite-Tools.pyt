@@ -1698,10 +1698,11 @@ class build_portfolio(object):
       out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf)
       out_sumTab = os.path.join(out_gdb, 'elementSummary_upd' + suf)
       out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf)
-      out_ConSites_XLS = os.path.join(out_folder, 'priorConSites' + suf + '.xls')
+      # out_ConSites_XLS = os.path.join(out_folder, 'priorConSites' + suf + '.xls')
+      # out_EO_XLS = os.path.join(out_folder, 'priorEOs' + suf + '.xls')
 
       # Run function
-      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_ConSites_XLS, in_consLands_flat, build)
+      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_folder, in_consLands_flat, build)
       replaceLayer(out_sortedEOs)
       replaceLayer(out_sumTab)
       replaceLayer(out_ConSites)

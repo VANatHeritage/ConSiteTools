@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2020-09-15
-# Last Edit: 2022-12-12
+# Last Edit: 2023-02-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -48,7 +48,7 @@ def main():
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_TEST'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_Vital1'
 
    # Fairly static data; keep using the same until specified otherwise
    src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
@@ -69,10 +69,6 @@ def main():
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
-   # Below for TESTING only
-   # in_GDB = ecs_dir + os.sep + "ECS_Inputs_Dec2022.gdb"
-   # out_GDB = ecs_dir + os.sep + "ECS_Outputs_Dec2022.gdb"
-   # out_DIR = ecs_dir + os.sep + "Spreadsheets_Dec2022"
 
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -109,7 +105,6 @@ def main():
    priorEOs_tcs = out_GDB + os.sep + 'priorEOs_tcs'
    sumTab_upd_tcs = out_GDB + os.sep + 'elementSummary_upd_tcs'
    priorConSites_tcs = out_GDB + os.sep + 'priorConSites_tcs'
-   priorConSites_tcs_XLS = out_DIR + os.sep + 'priorConSites_tcs.xls'
    elementList_tcs = out_GDB + os.sep + 'elementList_tcs'
    elementList_tcs_XLS = out_DIR + os.sep + 'elementList_tcs.xls'
    qcList_tcs_EOs = out_DIR + os.sep + 'qcList_tcs_EOs.xls'
@@ -121,7 +116,6 @@ def main():
    # priorEOs_scu = out_GDB + os.sep + 'priorEOs_scu'
    # sumTab_upd_scu = out_GDB + os.sep + 'elementSummary_upd_scu'
    # priorConSites_scu = out_GDB + os.sep + 'priorConSites_scu'
-   # priorConSites_scu_XLS = out_DIR + os.sep + 'priorConSites_scu.xls'
    # elementList_scu = out_GDB + os.sep + 'elementList_scu'
    # elementList_scu_XLS = out_DIR + os.sep + 'elementList_scu.xls'
    # qcList_scu_EOs = out_DIR + os.sep + 'qcList_scu_EOs.xls'
@@ -133,7 +127,6 @@ def main():
    # priorEOs_kcs = out_GDB + os.sep + 'priorEOs_kcs'
    # sumTab_upd_kcs = out_GDB + os.sep + 'elementSummary_upd_kcs'
    # priorConSites_kcs = out_GDB + os.sep + 'priorConSites_kcs'
-   # priorConSites_kcs_XLS = out_DIR + os.sep + 'priorConSites_kcs.xls'
    # elementList_kcs = out_GDB + os.sep + 'elementList_kcs'
    # elementList_kcs_XLS = out_DIR + os.sep + 'elementList_kcs.xls'
    # qcList_kcs_EOs = out_DIR + os.sep + 'qcList_kcs_EOs.xls'
@@ -174,13 +167,13 @@ def main():
    
    # Build Portfolio
    printMsg("Building terrestrial portfolio...")
-   BuildPortfolio(scoredEOs_tcs, priorEOs_tcs, sumTab_tcs, sumTab_upd_tcs, in_cs_tcs, priorConSites_tcs, priorConSites_tcs_XLS, in_consLands_flat, build='NEW')
+   BuildPortfolio(scoredEOs_tcs, priorEOs_tcs, sumTab_tcs, sumTab_upd_tcs, in_cs_tcs, priorConSites_tcs, out_DIR, in_consLands_flat, build='NEW')
    
    # printMsg("Building stream portfolio...")
-   # BuildPortfolio(scoredEOs_scu, priorEOs_scu, sumTab_scu, sumTab_upd_scu, in_cs_scu, priorConSites_scu, priorConSites_scu_XLS, in_consLands_flat, build='NEW')
+   # BuildPortfolio(scoredEOs_scu, priorEOs_scu, sumTab_scu, sumTab_upd_scu, in_cs_scu, priorConSites_scu, out_DIR, in_consLands_flat, build='NEW')
    
    # printMsg("Building karst portfolio...")
-   # BuildPortfolio(scoredEOs_kcs, priorEOs_kcs, sumTab_kcs, sumTab_upd_kcs, in_cs_kcs, priorConSites_kcs, priorConSites_kcs_XLS, in_consLands_flat, build='NEW')
+   # BuildPortfolio(scoredEOs_kcs, priorEOs_kcs, sumTab_kcs, sumTab_upd_kcs, in_cs_kcs, priorConSites_kcs, out_DIR, in_consLands_flat, build='NEW')
    
    tNow = datetime.now()
    printMsg("Portfolio building ended at %s" %tNow.strftime("%H:%M:%S"))

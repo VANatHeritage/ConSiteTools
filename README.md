@@ -13,8 +13,9 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
   - Tool 2 will look for Service Area layer inputs in the default locations (the folder where the HydroNet geodatabase is stored), making it unnecessary to keep these layers in the map
   
 - Conservation Portfolio Tools:
+  - Final tier names changed, tiers are now considered "Protection Significance Ranks" in a new PSRANK field, and assigned a numeric value from 1 to 5.
+  - Tier assignments updated
   - overhaul of internal functions to speed processing
-  - Minor bug fixes and tweaks to BMI field rounding
   - Default naming of outputs are now based on the PF feature class used in the first tool (e.g., when 'pfTerrestrial' is the input, the suffix is '_tcs'). All subsequent outputs will use the same suffix.
 
 #### Version 2.1
