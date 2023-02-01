@@ -1208,14 +1208,14 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    - out_sumTab: updated output element portfolio summary table
    - in_ConSites: input Conservation Site boundaries
    - out_ConSites: output prioritized Conservation Sites
-   - out_Excel: Output prioritized ConSite attribute table converted to Excel spreadsheet. Specify "None" if none is desired.
+   - out_Excel: Location (directory) where output Excel files (of ConSites and EOs) should be placed. Specify "None" to not output Excel files.
    - in_consLands_flat: Input "flattened" version of Conservation Lands, based on level of Biodiversity Management Intent (BMI)
    - build: type of portfolio build to perform. The options are:
       - NEW: overwrite any existing portfolio picks for both EOs and ConSites
       - NEW_EO: overwrite existing EO picks, but keep previous ConSite picks
       - NEW_CS: overwrite existing ConSite picks, but keep previous EO picks
       - UPDATE: Update portfolio but keep existing picks for both EOs and ConSites
-   - slopFactor: Maximum distance allowable between features for them to still me considered coincident
+   - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    '''
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
@@ -1403,7 +1403,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
             if bycatch == 1:
                t = "High Priority - Bycatch Selection"
             else:
-               t = "High Priority - Extended Attribute Selection"
+               t = "High Priority - Secondary Ranking Selection"
       elif tier == "General":
          if choiceRank == 5:
             t = "General - Swap Option"
@@ -1419,9 +1419,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       '''
    expression = "extTier(!EXCLUSION!, !TIER!, !EO_MODRANK!, !EORANK_NUM!, !RECENT!, !ChoiceRANK!, !bycatch!)"
    arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
-   arcpy.DeleteField_management(in_sortedEOs, ["bycatch"])  # coulddo: delete other fields here if they are not needed.
    
-   # Now that EO tiers are finalized, set ECS_TIER for ConSites
+   # Fields: ECS_TIER and EEO_TIER. These include the final tier text to be stored in Biotics.
    cs_id = GetFlds(in_ConSites, oid_only=True)
    eo_cs = scratchGDB + os.sep + "eo_cs"
    arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, eo_cs, "JOIN_ONE_TO_MANY", "KEEP_ALL", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
@@ -1442,33 +1441,37 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
          tier = "NA"
       return tier
    '''
+   # ECS_TIER
    arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
    arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_FinalRANK!)", code_block=code_block)
    arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["MIN_FinalRANK", "ECS_TIER"])
-   printMsg('ECS_TIER field set.')
+
+   # EEO_TIER
+   arcpy.AddField_management(in_sortedEOs, "EEO_TIER", "TEXT", "", "", 20)
+   arcpy.CalculateField_management(in_sortedEOs, "EEO_TIER", "fn(!FinalRANK!)", code_block=code_block)
+   printMsg('ECS_TIER and EEO_TIER fields added.')
    
-   # Field: ESSENTIAL (binary yes/no, with numbered tier ranks for essential EOs/ConSites).
-   # Added to both EOs and ConSites.
+   # Field: ESSENTIAL (binary yes/no, with tier ranks for essential EOs/ConSites). Added to both EOs and ConSites.
    printMsg("Assigning ESSENTIAL...")
-   arcpy.AddField_management(in_sortedEOs, "ESSENTIAL", "TEXT", field_length=30, field_alias="Essential?")
    codeblock = '''def calcRank(tier):
       if tier == "Irreplaceable":
-         return "Yes - 1. Irreplaceable"
+         return "Yes - Irreplaceable"
       elif tier == "Critical":
-         return "Yes - 2. Critical"
+         return "Yes - Critical"
       elif tier == "Vital":
-         return "Yes - 3. Vital"
+         return "Yes - Vital"
       elif tier == "High Priority":
-         return "Yes - 4. High Priority"
+         return "Yes - High Priority"
       elif tier == "General":
          return "No"
       else:
          return "No"  # on NHDE, all non-essential TCS display "NO".
       '''
-   expression = "calcRank(!TIER!)"
+   expression = "calcRank(!EEO_TIER!)"
+   arcpy.AddField_management(in_sortedEOs, "ESSENTIAL", "TEXT", field_length=20, field_alias="Essential EO?")
    arcpy.CalculateField_management(in_sortedEOs, "ESSENTIAL", expression, code_block=codeblock)
    # ConSites
-   arcpy.AddField_management(in_ConSites, "ESSENTIAL", "TEXT", field_length=30, field_alias="Essential?")
+   arcpy.AddField_management(in_ConSites, "ESSENTIAL", "TEXT", field_length=20, field_alias="Essential ConSite?")
    expression = "calcRank(!ECS_TIER!)"
    arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
    
@@ -1488,8 +1491,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ["PORTFOLIO", "DESCENDING"]
    ]
    arcpy.Sort_management(in_sortedEOs, out_sortedEOs, fldList)
+   arcpy.DeleteField_management(out_sortedEOs, ["bycatch", "ORIG_FID", "ORIG_FID_1"])  # coulddo: delete other fields here if they are not needed.
    
    arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["MIN_FinalRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])
+   arcpy.DeleteField_management(out_ConSites, ["ORIG_FID"])  # coulddo: delete other fields here if they are not needed.
    
    arcpy.CopyRows_management(in_sumTab, out_sumTab)
    
@@ -1508,8 +1513,12 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       pass
    else:
       printMsg("Exporting to Excel...")
-      arcpy.TableToExcel_conversion(out_ConSites, out_Excel)
-      
+      arcpy.TableToExcel_conversion(out_ConSites, os.path.join(out_Excel, os.path.basename(out_ConSites) + '.xls'))
+      # Export a table for EOs, with a reduce set of fields
+      tmp_tab = scratchGDB + os.sep + "eo_tab"
+      arcpy.CopyRows_management(out_sortedEOs, tmp_tab)
+      arcpy.DeleteField_management(tmp_tab, ["SF_EOID", "ELCODE", "SNAME", "EORANK", "EOLASTOBS", "PORTFOLIO", "EEO_TIER", "ESSENTIAL"], method="KEEP_FIELDS")
+      arcpy.TableToExcel_conversion(tmp_tab,  os.path.join(out_Excel, os.path.basename(out_sortedEOs) + '.xls'))
    printMsg('Prioritization process complete.')
    
    return (out_sortedEOs, out_sumTab, out_ConSites, out_Excel)
@@ -1554,9 +1563,9 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    statsList = [["FinalRANK", "MIN"],["EO_MODRANK", "MIN"]]
    arcpy.Statistics_analysis(sjTab, sumTab, statsList, caseFields)
    
-   # Add and calculate a TIER field
-   printMsg("Calculating TIER field...")
-   arcpy.AddField_management(sumTab, "TIER", "TEXT", "", "", "15")
+   # Add and calculate a EEO_TIER field
+   printMsg("Calculating EEO_TIER field...")
+   arcpy.AddField_management(sumTab, "EEO_TIER", "TEXT", "", "", "20")
    codeblock = '''def calcTier(rank):
       if rank == 1:
          return "Irreplaceable"
@@ -1572,7 +1581,7 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
          return "NA"
       '''
    expression = "calcTier(!MIN_FinalRANK!)"
-   arcpy.CalculateField_management(sumTab, "TIER", expression, "PYTHON_9.3", codeblock)
+   arcpy.CalculateField_management(sumTab, "EEO_TIER", expression, "PYTHON_9.3", codeblock)
    
    # Make a data dictionary relating ELCODE to COUNT_ELIG_EO
    viableDict = TabToDict(in_elementTab, "ELCODE", "COUNT_ELIG_EO")
@@ -1641,3 +1650,4 @@ def qcSitesVsEOs(in_Sites, in_EOs, out_siteList, out_eoList):
       printMsg("There are %s sites without EOs. Exporting list."%count)
    else:
       printMsg("There are no sites without EOs.")
+   return
