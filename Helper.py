@@ -462,12 +462,14 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
    arcpy.analysis.PairwiseDissolve(inFeats, dissFeats, "", "", "SINGLE_PART")
    trashList.append(dissFeats)
    
-   cleanFeats = scratchGDB + os.sep + "cleanFeats"
-   CleanFeatures(dissFeats, cleanFeats)
-   trashList.append(cleanFeats)
+   # This is redundant to dissolve to single part. Not using.
+   # cleanFeats = scratchGDB + os.sep + "cleanFeats"
+   # CleanFeatures(dissFeats, cleanFeats)
+   # trashList.append(cleanFeats)
    
    # Make feature layer
-   inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr") 
+   # inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr")
+   inFeats_lyr = arcpy.management.MakeFeatureLayer(dissFeats, "inFeats_lyr")
 
    # Aggregate features
    # printMsg("Aggregating features...")
