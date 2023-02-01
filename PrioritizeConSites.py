@@ -2,14 +2,11 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-01-27
+# Last Edit: 2023-02-01
 # Creator:  Kirsten R. Hazler
 
 # Summary:
 # Suite of functions to prioritize and review Conservation Sites.
-# todo:
-#  - any summaries as requested by Protection
-#  - metadata templates with attribute descriptions?
 # ---------------------------------------------------------------------------
 
 # Import modules and functions
