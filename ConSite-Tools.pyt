@@ -5,14 +5,11 @@ tbx_version = "2.2-dev"  # headsup: the toolbox version here is appended to the 
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-01-19
+# Last Edit: 2023-02-02
 # Creator:  Kirsten R. Hazler
 
 # Summary:
 # A toolbox for automatic delineation and prioritization of Natural Heritage Conservation Sites
-
-# Usage Notes:
-# Some tools are set to run in foreground only, otherwise service layers would not update in map. 
 # ----------------------------------------------------------------------------------------
 
 import CreateConSites
@@ -1470,7 +1467,7 @@ class make_ecs_dir(object):
       """Define parameter definitions"""
       # map, lnames = getMapLayers()
 
-      parm00 = defineParam("output_path", "ECS project location (folder will be created here)", "DEFolder", "Required", "Input")
+      parm00 = defineParam("output_path", "ECS Run Folder", "DEFolder", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
       parm03 = defineParam("in_ecoreg", "Input Eco-regions", "GPFeatureLayer", "Required", "Input")
@@ -1504,9 +1501,9 @@ class make_ecs_dir(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      new_dir = os.path.join(output_path, "ECS_Run_" + datetime.today().strftime("%b%Y"))  # new folder naming scheme
+      # new_dir = os.path.join(output_path, "ECS_Run_" + datetime.today().strftime("%b%Y"))  # new folder naming scheme
       in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(new_dir, in_elExclude_ls, in_conslands, in_ecoreg, in_PF, in_ConSites)
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_ecoreg, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
       return lyrs

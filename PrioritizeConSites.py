@@ -85,6 +85,7 @@ def addRanks(in_Table, fld_Sorting, order = 'ASCENDING', fld_Ranking='RANK', thr
    - thresh: the amount by which sorted values must differ to be ranked differently. 
    - threshtype: determines whether the threshold is an absolute value ("ABS") or a percentage ("PER")
    - rounding: determines whether sorted values are to be rounded prior to ranking, and by how much. Must be an integer or None. With rounding = 2, 1234.5678 and 1234.5690 are treated as the equivalent number for ranking purposes. With rounding = -1, 11 and 12 are treated as equivalents for ranking. Rounding is recommended if the sorting field is a double type, otherwise the function may fail.
+   - fld_rankOver: field containing group IDs.  Ranks are calculated within groups.
    '''
    # First create sorted table by group and sorting field values
    srt = 'in_memory/srt'
@@ -145,7 +146,7 @@ def modRanks(in_rankTab, fld_origRank, fld_modRank = 'MODRANK', fld_rankOver="EL
    - in_rankTab: the input table to which modified ranks will be added. Must contain original ranks
    - fld_origRank: field in input table containing original rank values
    - fld_modRank: field to contain modified ranks; will be created if it doesn't already exist
-   - fld_rankOver: field containing group IDs. Modified ranks are calculated by-group.
+   - fld_rankOver: field containing group IDs. Modified ranks are calculated within groups.
    '''
    scratchGDB = "in_memory"
    if not arcpy.ListFields(in_rankTab, fld_modRank):
@@ -652,8 +653,7 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
       printMsg("Folder `" + sd + "` created.")
    createFGDB(ig)
    createFGDB(og)
-   # Extracts RULE-specific PF/CS to the new input geodatabase Note this is not used by the pyt toolbox, as user is 
-   # expected to add the PF and CS manually.
+   # Extracts RULE-specific PF/CS to the new input geodatabase.
    out_lyrs = []
    if in_PF == "None" or in_ConSites == "None":
       # These paramaters are optional in the python toolbox tool.
@@ -663,7 +663,7 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
       arcpy.CopyFeatures_management(in_PF, ig + os.sep + os.path.basename(in_PF))
       arcpy.CopyFeatures_management(in_ConSites, ig + os.sep + os.path.basename(in_ConSites))
       out = ParseSiteTypes(ig + os.sep + os.path.basename(in_PF), ig + os.sep + os.path.basename(in_ConSites), ig)
-      out_lyrs += out
+      out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
    # Copy ancillary datasets to ECS input GDB
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'
