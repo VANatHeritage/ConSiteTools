@@ -1452,17 +1452,17 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    printMsg("Assigning ESSENTIAL...")
    codeblock = '''def calcRank(tier):
       if tier == "Irreplaceable":
-         return "Yes - Irreplaceable"
+         return "YES - Irreplaceable"
       elif tier == "Critical":
-         return "Yes - Critical"
+         return "YES - Critical"
       elif tier == "Vital":
-         return "Yes - Vital"
+         return "YES - Vital"
       elif tier == "High Priority":
-         return "Yes - High Priority"
+         return "YES - High Priority"
       elif tier == "General":
-         return "No"
+         return "NO - General"
       else:
-         return "No"  # on NHDE, all non-essential TCS display "NO".
+         return "NA"  # on NHDE (currently), all non-essential TCS display "NO".
       '''
    expression = "calcRank(!EEO_TIER!)"
    arcpy.AddField_management(in_sortedEOs, "ESSENTIAL", "TEXT", field_length=20, field_alias="Essential EO?")
