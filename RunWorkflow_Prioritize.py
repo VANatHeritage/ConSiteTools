@@ -2,7 +2,7 @@
 # RunWorkflow_Prioritize.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2020-09-15
-# Last Edit: 2023-02-01
+# Last Edit: 2023-02-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -48,7 +48,7 @@ def main():
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Run_Dec2022_Vital1'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Test_Feb2023'
 
    # Fairly static data; keep using the same until specified otherwise
    src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'

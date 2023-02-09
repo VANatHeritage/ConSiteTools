@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-11-22
+# Last Edit: 2023-02-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -895,7 +895,9 @@ def BuildFieldMappings(in_FCs, in_Flds):
       fms.addFieldMap(fm)
    return fms.exportToString()
 
-def NullToZero(in_Table, field):
+def NullToZero(in_Table, field, new_field=None):
+   if new_field is None:
+      new_field = field
    codeblock = '''def valUpd(val):
    if val == None:
       return 0
@@ -903,7 +905,7 @@ def NullToZero(in_Table, field):
       return val
    '''
    expression = "valUpd(!%s!)" % field
-   arcpy.CalculateField_management(in_Table, field, expression, "PYTHON", codeblock)
+   arcpy.CalculateField_management(in_Table, new_field, expression, "PYTHON", codeblock, field_type="FLOAT")
    return in_Table
 
 def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):

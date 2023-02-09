@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-02-01
+# Last Edit: 2023-02-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -386,7 +386,87 @@ def buildSlotDict(in_sumTab):
    count = countFeatures("vw_EOsum")
    printMsg("There are %s Elements with remaining slots to fill."%count)
    return slotDict
+
+def tierSummary(in_Bounds, fld_ID, in_EOs, slopFactor, out_field = "EEO_SUMMARY", summary_type="Text"):
+   """
+   Adds a text field and/or numeric summary field(s) of EOs by tier, for each unique fld_ID in in_Bounds.
+   :param in_Bounds: Input boundary polygons (e.g. sites)
+   :param fld_ID: Unique ID field for boundary polygons
+   :param in_EOs: Input EOs, with tiers assigned
+   :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
+   :param out_field: New field to contain the tier text summary.
+   :param summary_type: Type of summary field(s) to add.
+      "Text" = Text tier summary only (single column)
+      "Numeric" = numeric tier count fields only (multiple columns)
+      "All" = both text tier summary and numeric tier count fields
+   :return: in_Bounds
+   """
+   scratchGDB = "in_memory"
+   # Field names: update these if the EO field names change
+   tier_field = "EEO_TIER"
+   rank_field = "FinalRANK"
+
+   printMsg("Adding EO counts by tier within " + os.path.basename(in_Bounds) + "...")
+   sjEOs = scratchGDB + os.sep + "sjEOs"
+   arcpy.SpatialJoin_analysis(in_EOs, in_Bounds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
+   stats = scratchGDB + os.sep + "stats"
+   arcpy.analysis.Statistics(sjEOs, stats, [[tier_field, "COUNT"]], [rank_field, fld_ID, tier_field])
+   tiers = TabToDict(stats, rank_field, tier_field)
+   pt = scratchGDB + os.sep + "pt"
+   arcpy.management.PivotTable(stats, fld_ID, rank_field, "FREQUENCY", pt)
    
+   # Update names of fields to match tier names
+   ct_flds = []
+   for t in tiers:
+      fld = "EEOs_" + tiers[t].replace(" ", "")
+      NullToZero(pt, rank_field + str(t), new_field=fld)
+      ct_flds.append(fld)
+   
+   if summary_type != "Numeric":
+      # Field: EEO_SUMMARY
+      codeblock = '''def fn(ir, cr, vi, hp, ge):
+         text = []
+         total = int(ir + cr + vi + hp)
+         if total == 0:
+            return
+         if ir > 0:
+            if ir == 1:
+               text.append(str(int(ir)) + " Irreplaceable NHR")
+            else:
+               text.append(str(int(ir)) + " Irreplaceable NHRs")
+         if cr > 0:
+            if cr == 1:
+               text.append(str(int(cr)) + " Critical NHR")
+            else:
+               text.append(str(int(cr)) + " Critical NHRs")
+         if vi > 0:
+            if vi == 1:
+               text.append(str(int(vi)) + " Vital NHR")
+            else:
+               text.append(str(int(vi)) + " Vital NHRs")
+         if hp > 0:
+            if hp == 1:
+               text.append(str(int(hp)) + " High Priority NHR")
+            else:
+               text.append(str(int(hp)) + " High Priority NHRs")
+         if len(text) > 1:
+            return ", ".join(text[:-1]) + " and " + text[-1:][0]
+         else:
+            return text[0]
+      '''
+      call = "fn(!EEOs_Irreplaceable!, !EEOs_Critical!, !EEOs_Vital!, !EEOs_HighPriority!, !EEOs_General!)"
+      arcpy.CalculateField_management(pt, out_field, call, code_block=codeblock, field_type="TEXT")
+      
+   # Add fields to in_Bounds
+   if summary_type == "All":
+      flds = [out_field] + ct_flds
+   elif summary_type == "Numeric":
+      flds = ct_flds
+   else:
+      flds = out_field
+   arcpy.DeleteField_management(in_Bounds, flds)
+   arcpy.JoinField_management(in_Bounds, fld_ID, pt, fld_ID, flds)
+   return in_Bounds
 
 ### MAIN FUNCTIONS ###
 def getBRANK(in_PF, in_ConSites):
@@ -1462,7 +1542,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       elif tier == "General":
          return "NO - General"
       else:
-         return "NA"  # on NHDE (currently), all non-essential TCS display "NO".
+         return "NA"  # These are consites which contain only ineligible EOs
       '''
    expression = "calcRank(!EEO_TIER!)"
    arcpy.AddField_management(in_sortedEOs, "ESSENTIAL", "TEXT", field_length=20, field_alias="Essential EO?")
@@ -1471,6 +1551,9 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.AddField_management(in_ConSites, "ESSENTIAL", "TEXT", field_length=20, field_alias="Essential ConSite?")
    expression = "calcRank(!ECS_TIER!)"
    arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
+   
+   # Field: EEO_SUMMARY (EO counts by tier in ConSites; text summary column)
+   tierSummary(in_ConSites, "SITEID", in_sortedEOs, slopFactor, out_field="EEO_SUMMARY", summary_type="Text")
    
    # Create final outputs
    fldList = [
