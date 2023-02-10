@@ -706,7 +706,7 @@ def MakeExclusionList(in_Tabs, out_Tab):
       
    printMsg('Finished creating Element Exclusion table.')
 
-def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in_PF=None, in_ConSites=None):
+def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_ConSites=None):
    """
    Sets up new ECS directory with necessary folders and input/output geodatabases. The input geodatabase is then
    populated with necessary inputs for ECS. If provided, the Element exclusion table, conservation lands, and
@@ -716,14 +716,13 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
    :param ecs_dir: ECS working directory
    :param in_elExclude: list of source element exclusions tables (csv)
    :param in_conslands: source conservation lands feature class
-   :param in_ecoreg: source eco-regions feature class
    :param in_PF: Procedural features extract from Biotics (generated using 1: Extract Biotics data)
    :param in_ConSites: ConSites extract from Biotics (generated using 1: Extract Biotics data)
    :return: (input geodatabase, output geodatabase, spreadsheet directory, output datasets)
    """
    if in_elExclude is None:
       in_elExclude = []
-   dt = datetime.today().strftime("%b%Y")  # would prefer %Y%m, but this is convention
+   dt = datetime.today().strftime("%b%Y")
    wd = ecs_dir
    sd = os.path.join(wd, "Spreadsheets_" + dt)
    ig = os.path.join(wd, "ECS_Inputs_" + dt + ".gdb")
@@ -733,18 +732,30 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
       printMsg("Folder `" + sd + "` created.")
    createFGDB(ig)
    createFGDB(og)
-   # Extracts RULE-specific PF/CS to the new input geodatabase.
+   # Copy ancillary datasets to ECS input GDB
    out_lyrs = []
+   if in_conslands:
+      printMsg("Copying " + in_conslands + "...")
+      out = ig + os.sep + 'conslands'
+      arcpy.CopyFeatures_management(in_conslands, out)
+      arcpy.RepairGeometry_management(out, "DELETE_NULL", "ESRI")  # adding this because there can be topology issues in the source conslands layer
+      out_lyrs.append(out)
+      printMsg("Creating flat conslands layer...")
+      out = ig + os.sep + 'conslands_flat'
+      bmiFlatten(ig + os.sep + 'conslands', out)
+      out_lyrs.append(out)
    if in_PF == "None" or in_ConSites == "None":
       # These paramaters are optional in the python toolbox tool.
       printMsg("Skipping preparation for PFs and ConSites.")
       in_PF, in_ConSites = None, None
    if in_PF and in_ConSites:
-      arcpy.CopyFeatures_management(in_PF, ig + os.sep + os.path.basename(in_PF))
-      arcpy.CopyFeatures_management(in_ConSites, ig + os.sep + os.path.basename(in_ConSites))
-      out = ParseSiteTypes(ig + os.sep + os.path.basename(in_PF), ig + os.sep + os.path.basename(in_ConSites), ig)
+      # Extracts RULE-specific PF/CS to the new input geodatabase.
+      pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
+      arcpy.CopyFeatures_management(in_PF, pf_out)
+      cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
+      arcpy.CopyFeatures_management(in_ConSites, cs_out)
+      out = ParseSiteTypes(pf_out, cs_out, ig)
       out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
-   # Copy ancillary datasets to ECS input GDB
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'
       if len(in_elExclude) > 1:
@@ -753,24 +764,10 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_ecoreg=None, in
          printMsg("Copying element exclusions table...")
          arcpy.CopyRows_management(in_elExclude[0], out)
       out_lyrs.append(out)
-   if in_conslands:
-      printMsg("Copying " + in_conslands + "...")
-      out = ig + os.sep + 'conslands_lam'
-      arcpy.CopyFeatures_management(in_conslands, out)
-      out_lyrs.append(out)
-      printMsg("Creating flat conslands layer...")
-      out = ig + os.sep + 'conslands_flat'
-      bmiFlatten(ig + os.sep + 'conslands_lam', out)
-      out_lyrs.append(out)
-   if in_ecoreg:
-      out = ig + os.sep + 'tncEcoRegions_lam'
-      printMsg("Copying " + in_ecoreg + "...")
-      arcpy.CopyFeatures_management(in_ecoreg, out)
-      out_lyrs.append(out)
    printMsg("Finished preparation for ECS directory " + wd + ".")
    return ig, og, sd, out_lyrs
   
-def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab):
+def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab):
    '''Dissolves Procedural Features by EO-ID, then attaches numerous attributes to the EOs, creating a new output EO layer as well as an Element summary table. The outputs from this function are subsequently used in the function ScoreEOs. 
    Parameters:
    - in_ProcFeats: Input feature class with "site-worthy" procedural features
@@ -778,13 +775,14 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    - in_consLands: Input feature class with conservation lands (managed areas), e.g., MAs.shp
    - in_consLands_flat: A "flattened" version of in_ConsLands, based on level of Biodiversity Management Intent (BMI). (This is needed due to stupid overlapping polygons in our database. Sigh.)
    - in_ecoReg: A polygon feature class representing ecoregions
-   - fld_RegCode: Field in in_ecoReg with short, unique region codes
    - cutYear: Integer value indicating hard cutoff year. EOs with last obs equal to or earlier than this cutoff are to be excluded from the ECS process altogether.
    - flagYear: Integer value indicating flag year. EOs with last obs equal to or earlier than this cutoff are to be flagged with "Update Needed". However, this cutoff does not affect the ECS process.
    - out_procEOs: Output EOs with TIER scores and other attributes.
    - out_sumTab: Output table summarizing number of included EOs per element'''
    
    scratchGDB = "in_memory"
+   # Field holding generalized ecoregion text
+   fld_RegCode = "GEN_REG"
    
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO...")
@@ -1122,14 +1120,14 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    if len(openSlots) > 0:
       printMsg(str(len(openSlots)) + " ELCODES have open slots remaining.")  # : " + ", ".join(openSlots))
    
-   # Select one Vital EO, based on EO Rank AND Observation year.
+   # Headsup: military land ranking is not used in current ECS. Regardless, decided not to incorporate military land ranking into Vital tier promotions.
    printMsg("Updating Vital-tier from existing High Priority EOs...")
    rnkEOs = scratchGDB + os.sep + 'rnkEOs'
    arcpy.Select_analysis(in_procEOs, rnkEOs, where_clause="TIER = 'High Priority'")
    elcodes_list = unique_values(rnkEOs, "ELCODE")
-   printMsg("Trying to find Vital tier EO for " + str(len(elcodes_list)) + " elements.")
    
    # Assign vital tier using RANK_eo
+   printMsg("Trying to find Vital tier EO for " + str(len(elcodes_list)) + " elements using EO-Rank...")
    q = "ELCODE IN ('" + "','".join(elcodes_list) + "')"
    lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
    addRanks(lyr, "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")  # these ranks should already exist, but safer to re-calculate
@@ -1141,23 +1139,24 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    arcpy.SelectLayerByAttribute_management(lyr, "SUBSET_SELECTION", q)
    arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
    elcodes_list = [i for i in elcodes_list if i not in elcodes]
-   printMsg("Trying to assign a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
    
-   # For ELCODES still without a Vital EO, Assign vital tier using RANK_year
-   q = "RANK_eo = 1 AND ELCODE IN ('" + "','".join(elcodes_list) + "')"
-   lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
-   addRanks(lyr, "OBSYEAR", "DESCENDING", "RANK_year", 3, "ABS")
-   arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", "RANK_year = 1")
-   # Find top-rank ELCODEs only occurring once. These are the 'Vital' EOs
-   lis = [a[0] for a in arcpy.da.SearchCursor(lyr, ['ELCODE'])]
-   elcodes = [i for i in lis if lis.count(i) == 1]
-   q = "ELCODE IN ('" + "','".join(elcodes) + "')"
-   arcpy.SelectLayerByAttribute_management(lyr, "SUBSET_SELECTION", q)
-   arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
-   elcodes_list = [i for i in elcodes_list if i not in elcodes]
-   printMsg("Unable to assign a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
+   if ysnYear == "true":
+      printMsg("Trying to assign a Vital tier EO for " + str(len(elcodes_list)) + " elements using observation year...")
+      # For ELCODES still without a Vital EO, Assign vital tier using RANK_year
+      q = "RANK_eo = 1 AND ELCODE IN ('" + "','".join(elcodes_list) + "')"
+      lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
+      addRanks(lyr, "OBSYEAR", "DESCENDING", "RANK_year", 3, "ABS")
+      arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", "RANK_year = 1")
+      # Find top-rank ELCODEs only occurring once. These are the 'Vital' EOs
+      lis = [a[0] for a in arcpy.da.SearchCursor(lyr, ['ELCODE'])]
+      elcodes = [i for i in lis if lis.count(i) == 1]
+      q = "ELCODE IN ('" + "','".join(elcodes) + "')"
+      arcpy.SelectLayerByAttribute_management(lyr, "SUBSET_SELECTION", q)
+      arcpy.CalculateField_management(lyr, "TIER", "'Vital'")
+      elcodes_list = [i for i in elcodes_list if i not in elcodes]
    
    # Now update in_procEOs using EO IDs
+   printMsg("Could not select a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
    vital = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause="TIER = 'Vital'")
    eoids = unique_values(vital, 'SF_EOID')
    q = "SF_EOID IN (" + ",".join([str(int(i)) for i in eoids]) + ")"

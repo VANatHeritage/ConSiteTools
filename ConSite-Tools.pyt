@@ -1470,16 +1470,13 @@ class make_ecs_dir(object):
       parm00 = defineParam("output_path", "ECS Run Folder", "DEFolder", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
-      parm03 = defineParam("in_ecoreg", "Input Eco-regions", "GPFeatureLayer", "Required", "Input")
-
       # The function can also take the extracts of Biotics PFs and Consites as input, which it then parses.
-      parm04 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input")
-      parm05 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input")
+      parm03 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input", "Biotics ProcFeats")
+      parm04 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input", "Biotics ConSites")
 
       # This is a list of layer paths, all to be added to map.
-      parm06 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
-
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
+      parm05 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
 
    def isLicensed(self):
@@ -1503,7 +1500,7 @@ class make_ecs_dir(object):
       declareParams(parameters)
       # new_dir = os.path.join(output_path, "ECS_Run_" + datetime.today().strftime("%b%Y"))  # new folder naming scheme
       in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_ecoreg, in_PF, in_ConSites)
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
       return lyrs
@@ -1520,20 +1517,18 @@ class attribute_eo(object):
       """Define parameter definitions"""
       parm00 = defineParam("in_ProcFeats", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Elements Exclusion Table", "GPTableView", "Required", "Input", "ElementExclusions")
-      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam")
+      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands")
       parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
-      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "tncEcoRegions_lam")
-      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input")
-      parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
-      parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
-      parm08 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm08.filter.list = ["Local Database"]
-      # parm09 = defineParam("out_folder", "Project output folder", "DEFolder", "Required", "Input")
+      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "ecoregions")
+      parm05 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
+      parm06 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
+      parm07 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm07.filter.list = ["Local Database"]
 
       # parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
 
    def isLicensed(self):
@@ -1544,20 +1539,16 @@ class attribute_eo(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[4].altered:
-         fc = parameters[4].valueAsText
-         try:
-            field_names = GetFlds(fc)
-            parameters[5].filter.list = field_names
-            if "GEN_REG" in field_names:
-               parameters[5].value = "GEN_REG"
-         except:
-            pass
       return
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
       parameter.  This method is called after internal validation."""
+      if parameters[4].altered:
+         fc = parameters[4].valueAsText
+         field_names = GetFlds(fc)
+         if "GEN_REG" not in field_names:
+            parameters[4].setErrorMessage("Ecoregions layer must contain the field 'GEN_REG', with generalized ecoregion names.")
       return
 
    def execute(self, parameters, messages):
@@ -1582,7 +1573,7 @@ class attribute_eo(object):
       out_sumTab = os.path.join(out_gdb, "elementSummary" + suf)
 
       # Run function
-      AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab)
+      AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
       replaceLayer(out_procEOs)
       replaceLayer(out_sumTab)
 

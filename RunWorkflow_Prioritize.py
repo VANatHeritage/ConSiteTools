@@ -31,8 +31,6 @@
    #     - ConsLands feature class
    #        - copies to: conslands_lam
    #        - creates conslands_flat, by running the bmiFlatten tool to make a flat version of the conservation lands
-   #     - EcoRegions feature class
-   #        - copies to: tncEcoRegions_lam
 # - Once the script has finished running, open the map document again, and update the sources for all the layers. Save and close the map.
 # - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. 
 #     If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
@@ -48,10 +46,11 @@ def main():
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Test_Feb2023'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Testing_Feb2023'
 
    # Fairly static data; keep using the same until specified otherwise
-   src_ecoreg = r'D:\projects\EssentialConSites\ref\ECS_Run_Jun2022\ECS_Inputs_Jun2022.gdb\tncEcoRegions_lam'
+   # src_ecoreg = 'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/TNC_Ecoregions_Virginia/FeatureServer/2' # AGOL feature service layer
+   src_ecoreg = r'D:\projects\EssentialConSites\ECS_input_database.gdb\VA_tncEcoRegions_lam'  # local copy of feature service
 
    # headsup: Element exclusion tables are currently updated once annually, prior to December updates. For the December
    #  run, those CSV files should be included in a list here. For all other quarters, just re-use the element exclusions
@@ -63,12 +62,11 @@ def main():
 
    # headsup: These will need updates for every run, make sure to updates paths. Note that conslands may need Repair Geometry.
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
-   # arcpy.RepairGeometry_management(src_conslands, "DELETE_NULL", "ESRI")
    src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20221212_132348'
    src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20221212_132348'
 
    # Create ECS directory
-   in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_ecoreg, src_PF, src_CS)
+   in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_elExclude, src_conslands, src_PF, src_CS)
 
    # Input Procedural Features by site type
    # No need to change these as long as your in_GDB above is valid
@@ -85,10 +83,8 @@ def main():
    # Input other standard variables
    # No need to change this if in_GDB is valid and naming conventions maintained
    in_elExclude = in_GDB + os.sep + 'ElementExclusions'
-   in_consLands = in_GDB + os.sep + 'conslands_lam'
+   in_consLands = in_GDB + os.sep + 'conslands'
    in_consLands_flat = in_GDB + os.sep + 'conslands_flat'
-   in_ecoReg = in_GDB + os.sep + 'tncEcoRegions_lam'
-   fld_RegCode = 'GEN_REG'
 
    # Input cutoff years
    # This should change every calendar year
@@ -141,13 +137,13 @@ def main():
    
    # Attribute EOs
    printMsg("Attributing terrestrial EOs...")
-   AttributeEOs(in_pf_tcs, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, attribEOs_tcs, sumTab_tcs)
+   AttributeEOs(in_pf_tcs, in_elExclude, in_consLands, in_consLands_flat, src_ecoreg, cutYear, flagYear, attribEOs_tcs, sumTab_tcs)
    
    # printMsg("Attributing stream EOs...")
-   # AttributeEOs(in_pf_scu, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, attribEOs_scu, sumTab_scu)
+   # AttributeEOs(in_pf_scu, in_elExclude, in_consLands, in_consLands_flat, src_ecoreg, cutYear, flagYear, attribEOs_scu, sumTab_scu)
    
    # printMsg("Attributing karst EOs...")
-   # AttributeEOs(in_pf_kcs, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear_kcs, flagYear_kcs, attribEOs_kcs, sumTab_kcs)
+   # AttributeEOs(in_pf_kcs, in_elExclude, in_consLands, in_consLands_flat, src_ecoreg, cutYear_kcs, flagYear_kcs, attribEOs_kcs, sumTab_kcs)
    
    tNow = datetime.now()
    printMsg("EO attribution ended at %s" %tNow.strftime("%H:%M:%S"))
