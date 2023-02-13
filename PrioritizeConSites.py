@@ -11,7 +11,7 @@
 
 # Import modules and functions
 from Helper import *
-from CreateConSites import bmiFlatten, ParseSiteTypes
+from CreateConSites import bmiFlatten, ExtractBiotics, ParseSiteTypes
 
 arcpy.env.overwriteOutput = True
 
@@ -748,14 +748,24 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_Con
       # These paramaters are optional in the python toolbox tool.
       printMsg("Skipping preparation for PFs and ConSites.")
       in_PF, in_ConSites = None, None
-   if in_PF and in_ConSites:
-      # Extracts RULE-specific PF/CS to the new input geodatabase.
-      pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
-      arcpy.CopyFeatures_management(in_PF, pf_out)
-      cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
-      arcpy.CopyFeatures_management(in_ConSites, cs_out)
-      out = ParseSiteTypes(pf_out, cs_out, ig)
-      out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
+   else:
+      if in_PF == "BIOTICS_DLINK.ProcFeats" and in_ConSites == "BIOTICS_DLINK.ConSites":
+         # This will work with Biotics link layers.
+         try:
+            pf_out, cs_out = ExtractBiotics(in_PF, in_ConSites, ig)
+         except:
+            printWrng("Error extracting data from Biotics. You will need to copy the necessary PFs and ConSites to the ECS Input GDB.")
+         else:
+            out = ParseSiteTypes(pf_out, cs_out, ig)
+            out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
+      else:
+         printMsg("Copying already-extracted Biotics data...")
+         pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
+         arcpy.CopyFeatures_management(in_PF, pf_out)
+         cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
+         arcpy.CopyFeatures_management(in_ConSites, cs_out)
+         out = ParseSiteTypes(pf_out, cs_out, ig)
+         out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'
       if len(in_elExclude) > 1:

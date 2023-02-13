@@ -1465,14 +1465,12 @@ class make_ecs_dir(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      # map, lnames = getMapLayers()
-
       parm00 = defineParam("output_path", "ECS Run Folder", "DEFolder", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
       # The function can also take the extracts of Biotics PFs and Consites as input, which it then parses.
-      parm03 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input", "Biotics ProcFeats")
-      parm04 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input", "Biotics ConSites")
+      parm03 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ProcFeats")
+      parm04 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ConSites")
 
       # This is a list of layer paths, all to be added to map.
       parm05 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
