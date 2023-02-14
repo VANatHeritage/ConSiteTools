@@ -1520,13 +1520,11 @@ class attribute_eo(object):
       parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "ecoregions")
       parm05 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
       parm06 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
-      parm07 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm07.filter.list = ["Local Database"]
 
-      # parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
-      # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
+      parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
+      parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
 
    def isLicensed(self):
@@ -1537,6 +1535,23 @@ class attribute_eo(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated:
+            in_nm = os.path.basename(fc)
+            # set default naming suffix based on PF layer
+            if in_nm == "pfTerrestrial":
+               suf = '_tcs'
+            elif in_nm == "pfKarst":
+               suf = '_kcs'
+            elif in_nm == "pfStream":
+               suf = '_scs'
+            elif in_nm == "pfAnthro":
+               suf = '_ahz'
+            else:
+               suf = ''
+            parameters[7].value = "attribEOs" + suf
+            parameters[8].value = "elementSummary" + suf
       return
 
    def updateMessages(self, parameters):
@@ -1553,22 +1568,6 @@ class attribute_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      
-      # set default naming suffix based on PF layer
-      in_nm = os.path.basename(in_ProcFeats)
-      if in_nm == "pfTerrestrial":
-         suf = '_tcs'
-      elif in_nm == "pfKarst":
-         suf = '_kcs'
-      elif in_nm == "pfStream":
-         suf = '_scs'
-      elif in_nm == "pfAnthro":
-         suf = '_ahz'
-      else:
-         suf = ''
-      
-      out_procEOs = os.path.join(out_gdb, "attribEOs" + suf)
-      out_sumTab = os.path.join(out_gdb, "elementSummary" + suf)
 
       # Run function
       AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
@@ -1589,9 +1588,7 @@ class score_eo(object):
       """Define parameter definitions"""
       parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "attribEOs")
       parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
-      # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm02.filter.list = ["Local Database"]
+      parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
       parm03 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
       parm04 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
 
@@ -1606,6 +1603,14 @@ class score_eo(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated:
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            parameters[2].value = "scoredEOs" + suf
       return
 
    def updateMessages(self, parameters):
@@ -1617,11 +1622,6 @@ class score_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      in_nm = os.path.basename(in_procEOs)
-      suf = in_nm[-4:]
-      if not suf.startswith("_"):
-         suf = ""
-      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs' + suf)
 
       # Run function
       ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
@@ -1646,16 +1646,12 @@ class build_portfolio(object):
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
 
-      parm05 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm05.filter.list = ["Local Database"]
-      parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
+      parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
+      parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
+      parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
+      parm08 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
 
-      # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
-      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
-      # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
-      # parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls")
-
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
 
    def isLicensed(self):
@@ -1666,6 +1662,16 @@ class build_portfolio(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[1].altered:
+         fc = parameters[1].valueAsText
+         if not parameters[1].hasBeenValidated:
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            parameters[5].value = "priorEOs" + suf
+            parameters[6].value = "elementSummary_upd" + suf
+            parameters[7].value = "priorConSites" + suf
       return
 
    def updateMessages(self, parameters):
@@ -1677,15 +1683,6 @@ class build_portfolio(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      in_nm = os.path.basename(in_sortedEOs)
-      suf = in_nm[-4:]
-      if not suf.startswith("_"):
-         suf = ""
-      out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf)
-      out_sumTab = os.path.join(out_gdb, 'elementSummary_upd' + suf)
-      out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf)
-      # out_ConSites_XLS = os.path.join(out_folder, 'priorConSites' + suf + '.xls')
-      # out_EO_XLS = os.path.join(out_folder, 'priorEOs' + suf + '.xls')
 
       # Run function
       BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_folder, in_consLands_flat, build)
@@ -1709,17 +1706,9 @@ class build_element_lists(object):
       parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input")
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
       parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
-      # For some reason this is not working if you input a table view...
-      # try:
-      #    parm03.value = "elementSummary_upd"
-      # except:
-      #    pass
-      # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")
-      # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output", "elementList.xls")
 
-      parm04 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm04.filter.list = ["Local Database"]
-      parm05 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
+      parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
+      parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
@@ -1734,16 +1723,20 @@ class build_element_lists(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         try:
-            field_names = GetFlds(fc)
-            parameters[1].filter.list = field_names
-            if "SITENAME" in field_names:
-               parameters[1].value = "SITENAME"
-         except:
-            pass
-      # if parameters[5].valueAsText is not None:
-      #    if not parameters[5].valueAsText.endswith('xls'):
-      #       parameters[5].value = parameters[5].valueAsText.split('.')[0] + '.xls'
+         if not parameters[0].hasBeenValidated:
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            parameters[4].value = "elementList" + suf
+            parameters[5].value = "elementList" + suf + ".xls"
+            try:
+               field_names = GetFlds(fc)
+               parameters[1].filter.list = field_names
+               if "SITENAME" in field_names:
+                  parameters[1].value = "SITENAME"
+            except:
+               pass
       return
 
    def updateMessages(self, parameters):
@@ -1755,12 +1748,6 @@ class build_element_lists(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      in_nm = os.path.basename(in_procEOs)
-      suf = in_nm[-4:]
-      if not suf.startswith("_"):
-         suf = ""
-      out_Tab = os.path.join(out_gdb, 'elementList' + suf)
-      out_Excel = os.path.join(out_folder, 'elementList' + suf + '.xls')
 
       # Run function
       BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)
