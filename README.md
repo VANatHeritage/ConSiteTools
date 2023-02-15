@@ -9,13 +9,14 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
   - subsets NWI wetlands prior to usage in `CreateWetlandSBB`, to speed processing
 
 - SCS/SCU updates:
-  - Added an internal function `FillLines_scs` to fill in gaps between nearby scsLines
-  - `2: Generate SCS Lines` will now find the three Service Area layers in the HydroNet_ND geodatabase location, making it unnecessary to keep them in the map
+  - Added an internal function `FillLines_scs` to fill in small gaps between nearby scsLines
+  - `2: Generate SCS Lines` will look for Service Area layers in the HydroNet_ND geodatabase location, making it unnecessary to keep them in the map
   
 - Conservation Portfolio Tools:
-  - Tier names and assignment methods updated, several new fields added to output files. Portfolio remains unchanged.
+  - New 'Vital' tier added, and tier names and assignment methods updated. Portfolio remains unchanged.
+  - numerous field name changes, new fields added
   - overhaul of internal functions to speed processing
-  - Default suffixes of outputs (e.g. '_tcs') are based on the PF feature class used in the first tool
+  - tools now add suffix to default output file names based on the site type (e.g. '_tcs') 
 
 #### Version 2.1
 

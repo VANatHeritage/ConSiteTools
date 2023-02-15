@@ -46,7 +46,7 @@ def main():
 
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Testing_Feb2023'
+   ecs_dir = r'D:\projects\EssentialConSites\testing\ECS_Testing_' + datetime.today().strftime('%Y%m%d')
 
    # Fairly static data; keep using the same until specified otherwise
    # src_ecoreg = 'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/TNC_Ecoregions_Virginia/FeatureServer/2' # AGOL feature service layer
