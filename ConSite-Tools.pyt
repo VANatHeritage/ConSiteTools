@@ -677,9 +677,7 @@ class tabulate_exclusions(object):
       self.label = "Create Element Exclusion List"
       self.description = ""
       self.canRunInBackground = True
-      # self.category = "Conservation Portfolio Tools"
       self.category = "Preparation and Review Tools"
-      # TODO: move this function to the proper section
 
    def getParameterInfo(self):
       """Define parameter definitions"""
@@ -712,6 +710,7 @@ class tabulate_exclusions(object):
       declareParams(parameters)
 
       MakeExclusionList(in_Tabs, out_Tab)
+      replaceLayer(out_Tab)
 
       return (out_Tab)
 
@@ -1466,9 +1465,9 @@ class make_ecs_dir(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("output_path", "ECS Run Folder", "DEFolder", "Required", "Input")
-      parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
-      parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
-      # The function can also take the extracts of Biotics PFs and Consites as input, which it then parses.
+      parm01 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
+      parm02 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
+      # The function can also take Biotics PFs and Consites as input, which it then parses.
       parm03 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ProcFeats")
       parm04 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ConSites")
 
@@ -1496,9 +1495,9 @@ class make_ecs_dir(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      # new_dir = os.path.join(output_path, "ECS_Run_" + datetime.today().strftime("%b%Y"))  # new folder naming scheme
+      
       in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_PF, in_ConSites)
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_conslands, in_elExclude_ls, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
       return lyrs
@@ -1521,8 +1520,12 @@ class attribute_eo(object):
       parm05 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
       parm06 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
 
-      parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
-      parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
+      # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
+      # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
+      
+      parm07 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm07.filter.list = ["Local Database"]
+      parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
@@ -1550,8 +1553,9 @@ class attribute_eo(object):
                suf = '_ahz'
             else:
                suf = ''
-            parameters[7].value = "attribEOs" + suf
-            parameters[8].value = "elementSummary" + suf
+            parameters[8].value = suf
+            # parameters[7].value = "attribEOs" + suf
+            # parameters[8].value = "elementSummary" + suf
       return
 
    def updateMessages(self, parameters):
@@ -1568,6 +1572,11 @@ class attribute_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      # headsup: The 'suf' parameter is optional, and has the value "None" when left empty. However it produced errors in logical tests.
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      # Set output names
+      out_procEOs = os.path.join(out_gdb, "attribEOs" + suf2)
+      out_sumTab = os.path.join(out_gdb, "elementSummary" + suf2)
 
       # Run function
       AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
@@ -1588,11 +1597,16 @@ class score_eo(object):
       """Define parameter definitions"""
       parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "attribEOs")
       parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
-      parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm03 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
-      parm04 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+      
+      # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
+      parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm02.filter.list = ["Local Database"]
+      parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04]
+      parm04 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
+      parm05 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
 
    def isLicensed(self):
@@ -1610,7 +1624,8 @@ class score_eo(object):
             suf = in_nm[-4:]
             if not suf.startswith("_"):
                suf = ""
-            parameters[2].value = "scoredEOs" + suf
+            # parameters[2].value = "scoredEOs" + suf
+            parameters[3].value = suf
       return
 
    def updateMessages(self, parameters):
@@ -1622,6 +1637,9 @@ class score_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      # Set output names
+      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs' + suf2)
 
       # Run function
       ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
@@ -1645,13 +1663,18 @@ class build_portfolio(object):
       parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
+      
+      parm05 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm05.filter.list = ["Local Database"]
+      parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      
+      # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
+      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
+      # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
+      # parm08 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
 
-      parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
-      parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
-      parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
-      parm08 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
-
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
 
    def isLicensed(self):
@@ -1669,9 +1692,10 @@ class build_portfolio(object):
             suf = in_nm[-4:]
             if not suf.startswith("_"):
                suf = ""
-            parameters[5].value = "priorEOs" + suf
-            parameters[6].value = "elementSummary_upd" + suf
-            parameters[7].value = "priorConSites" + suf
+            parameters[7].value = suf
+            # parameters[5].value = "priorEOs" + suf
+            # parameters[6].value = "elementSummary_upd" + suf
+            # parameters[7].value = "priorConSites" + suf
       return
 
    def updateMessages(self, parameters):
@@ -1683,6 +1707,11 @@ class build_portfolio(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      # Set output names
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf2)
+      out_sumTab = os.path.join(out_gdb, 'elementSummary_upd' + suf2)
+      out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf2)
 
       # Run function
       BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_folder, in_consLands_flat, build)
@@ -1707,10 +1736,15 @@ class build_element_lists(object):
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
       parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
 
-      parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
-      parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
+      # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
+      # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
+      
+      parm04 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm04.filter.list = ["Local Database"]
+      parm05 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -1728,8 +1762,9 @@ class build_element_lists(object):
             suf = in_nm[-4:]
             if not suf.startswith("_"):
                suf = ""
-            parameters[4].value = "elementList" + suf
-            parameters[5].value = "elementList" + suf + ".xls"
+            # parameters[4].value = "elementList" + suf
+            # parameters[5].value = "elementList" + suf + ".xls"
+            parameters[6].value = suf
             try:
                field_names = GetFlds(fc)
                parameters[1].filter.list = field_names
@@ -1748,6 +1783,10 @@ class build_element_lists(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      # Set output names
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      out_Tab = os.path.join(out_gdb, 'elementList' + suf2)
+      out_Excel = os.path.join(out_folder, 'elementList' + suf2 + '.xls')
 
       # Run function
       BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)

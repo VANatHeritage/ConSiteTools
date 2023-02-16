@@ -706,7 +706,7 @@ def MakeExclusionList(in_Tabs, out_Tab):
       
    printMsg('Finished creating Element Exclusion table.')
 
-def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_ConSites=None):
+def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_ConSites=None):
    """
    Sets up new ECS directory with necessary folders and input/output geodatabases. The input geodatabase is then
    populated with necessary inputs for ECS. If provided, the Element exclusion table, conservation lands, and
@@ -714,8 +714,8 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_Con
    conservation lands layer. If both are provided, ParseSiteTypes is used to create site-type feature classes from the
    input PF and CS layers.
    :param ecs_dir: ECS working directory
-   :param in_elExclude: list of source element exclusions tables (csv)
    :param in_conslands: source conservation lands feature class
+   :param in_elExclude: list of source element exclusions tables (csv)
    :param in_PF: Procedural features extract from Biotics (generated using 1: Extract Biotics data)
    :param in_ConSites: ConSites extract from Biotics (generated using 1: Extract Biotics data)
    :return: (input geodatabase, output geodatabase, spreadsheet directory, output datasets)
@@ -735,7 +735,7 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_Con
    # Copy ancillary datasets to ECS input GDB
    out_lyrs = []
    if in_conslands:
-      printMsg("Copying " + in_conslands + "...")
+      printMsg("Copying and repairing " + in_conslands + "...")
       out = ig + os.sep + 'conslands'
       arcpy.CopyFeatures_management(in_conslands, out)
       arcpy.RepairGeometry_management(out, "DELETE_NULL", "ESRI")  # adding this because there can be topology issues in the source conslands layer
@@ -747,14 +747,13 @@ def MakeECSDir(ecs_dir, in_elExclude=None, in_conslands=None, in_PF=None, in_Con
    if in_PF == "None" or in_ConSites == "None":
       # These paramaters are optional in the python toolbox tool.
       printMsg("Skipping preparation for PFs and ConSites.")
-      in_PF, in_ConSites = None, None
    else:
       if in_PF == "BIOTICS_DLINK.ProcFeats" and in_ConSites == "BIOTICS_DLINK.ConSites":
          # This will work with Biotics link layers.
          try:
             pf_out, cs_out = ExtractBiotics(in_PF, in_ConSites, ig)
          except:
-            printWrng("Error extracting data from Biotics. You will need to copy the necessary PFs and ConSites to the ECS Input GDB.")
+            printWrng("Error extracting data from Biotics. You will need to copy the PFs and ConSites (parsed by site type) to the ECS Input GDB.")
          else:
             out = ParseSiteTypes(pf_out, cs_out, ig)
             out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
@@ -1623,7 +1622,7 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    - out_Excel: Output table converted to Excel spreadsheet. Specify "None" if none is desired.
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    '''
-   scratchGDB = arcpy.env.scratchGDB
+   scratchGDB = "in_memory"
    
    # Dissolve boundaries on the specified ID field, retaining only that field.
    printMsg("Dissolving...")
