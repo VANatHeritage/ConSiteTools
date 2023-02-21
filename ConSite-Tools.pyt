@@ -1523,7 +1523,7 @@ class attribute_eo(object):
       # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
       
-      parm07 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm07 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
       parm07.filter.list = ["Local Database"]
       parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1599,7 +1599,7 @@ class score_eo(object):
       parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm02 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
       parm02.filter.list = ["Local Database"]
       parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1664,15 +1664,15 @@ class build_portfolio(object):
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       
-      parm05 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm05 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
       parm05.filter.list = ["Local Database"]
-      parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm06 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
       
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
       # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
       # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
-      # parm08 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
+      # parm08 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
@@ -1739,9 +1739,9 @@ class build_element_lists(object):
       # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
       # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
       
-      parm04 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm04 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
       parm04.filter.list = ["Local Database"]
-      parm05 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm05 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
