@@ -953,7 +953,7 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
 def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, searchDist, smthDist, scratchGDB = "in_memory"):
    '''Uses Erase Features to chop out sections of input features. Stitches non-trivial fragments back together only if within search distance of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
    
-   NOTE: I think this function is a bottleneck.
+   Attempts have been made to improve this function, but it remains a bottleneck and is pretty slow when there are large numbers of PFs.
    
    Parameters:
    - in_PF: input Procedural Features
@@ -966,7 +966,6 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - smthDist: dilation distance for smoothing
    '''
    # Use in_EraseFeats to chop out sections of PFs
-   printMsg('Running ChopMod...')
    firstChopPF = scratchGDB + os.sep + 'firstChopPF'
    arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
 
@@ -984,40 +983,51 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # Use regular Erase, not Clean Erase; multipart is good output at this point
    firstChop = scratchGDB + os.sep + 'firstChop'
    arcpy.analysis.Erase(in_Feats, in_EraseFeats, firstChop)
+   arcpy.AlterField_management(firstChop, fld_ID, "feat_" + fld_ID)  # this distinguishes the chopped features ID field from the PF's ID field.
+   # Make a single-part version
+   explChop = scratchGDB + os.sep + 'explChop'
+   arcpy.management.MultipartToSinglepart(firstChop, explChop)
+   # Find SBB fragments intersecting associated PFs
+   partsSBB = scratchGDB + os.sep + "partsSBB"
+   arcpy.SpatialJoin_analysis(explChop, rtnPartsPF, partsSBB, "JOIN_ONE_TO_MANY", "KEEP_ALL", match_option="INTERSECT")
+   qry = "feat_" + fld_ID + " = " + fld_ID
+   # these features intersect PFs, so they will be kept. They already have keep = 1, which is joined from the PFs.
+   keepLyr = arcpy.MakeFeatureLayer_management(partsSBB, where_clause=qry)
 
    # Eliminate parts comprising less than 25% of total original feature size
    # Previously had this set to 5% but that threshold was too low 
    printMsg('Eliminating insignificant fragments...')
    rtnParts0 = scratchGDB + os.sep + 'rtnParts0'
-   arcpy.management.EliminatePolygonPart(firstChop, rtnParts0, 'PERCENT', '', 25, 'ANY')
+   arcpy.management.EliminatePolygonPart(firstChop, rtnParts0, 'PERCENT', '', 25, 'ANY')  # NOTE: this also fills in polygon holes.
    rtnParts = scratchGDB + os.sep + 'rtnParts'
    arcpy.MultipartToSinglepart_management(rtnParts0, rtnParts)
    arcpy.CalculateField_management(rtnParts, "keep", 0, field_type="SHORT")
+   # Add SBBs parts which intersect PFs
+   arcpy.Append_management(keepLyr, rtnParts, "NO_TEST")
    
-   # This loop adds back parts of SBBs intersecting retained PFs, then uses searchDist to mark fragments to keep.
-   explChop = scratchGDB + os.sep + 'explChop'
-   arcpy.management.MultipartToSinglepart(firstChop, explChop)
+   # Mark final SBB fragments to keep 
    pfList = unique_values(in_PF, fld_ID)
+   pfErasedList = unique_values(rtnPartsPF, fld_ID)
    pfErased = []
-   for id in pfList:
-      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
-      if countFeatures("pfLyr") == 0:
+   n = 0
+   arcpy.SetProgressor("step", "Finding SBB fragments to keep...", 0, len(pfList), 1)
+   for pfid in pfList:
+      arcpy.SetProgressorPosition(n)
+      n += 1
+      if pfid not in pfErasedList:
          # If no PF parts remain, the PF was completely erased. These are reported in a warning after the loop.
-         pfErased.append(id)
+         pfErased.append(pfid)
          continue
-      arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
-      arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
-      arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
-      # Once the parts to retain are included (based on size and intersection with retained PFs), 
-      #  procedure below will mark fragments to keep, based on intersection with PFs and searchDist. 
-      #  This will remove the need for the Shrinkwrap loop and subsequent CullFrags, improving processing time.
+      # The parts to retain (based on size and intersection with retained PFs) are included in rtnParts. 
+      # The procedure below will mark fragments to keep, starting with fragments intersecting PFs and expanding from there.
+      # This removes the need for the Shrinkwrap loop and subsequent CullFrags, improving processing time.
+      qry = "feat_" + fld_ID + " = '" + pfid + "'"
       rtnPartsLyr = arcpy.management.MakeFeatureLayer(rtnParts, "rtnPartsLyr", qry)
-      arcpy.management.SelectLayerByLocation(rtnPartsLyr, "INTERSECT", "pfLyr")
+      arcpy.management.SelectLayerByAttribute(rtnPartsLyr, "NEW_SELECTION", "keep = 1")
       ExpandSelection(rtnPartsLyr, searchDist)
       arcpy.CalculateField_management(rtnPartsLyr, "keep", 1)
    if len(pfErased) > 0:
-      printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If this affects the final site delineation, you may want to edit the modification features or PFs.")
+      printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If you think this affected the final site delineation, you may want to edit the modification features or PFs and re-run.")
 
    # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
