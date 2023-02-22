@@ -6,7 +6,7 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 #### Version 2.2-dev (in development)
 
 - TCS updates:
-  - subsets NWI wetlands prior to usage in `CreateWetlandSBB`, to speed processing
+  - Site delineation unchanged, but several updates made to improve processing speed and usage
 
 - SCS/SCU updates:
   - Added an internal function `FillLines_scs` to fill in small gaps between nearby scsLines
@@ -16,7 +16,7 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
   - New 'Vital' tier added, and tier names and assignment methods updated. Portfolio remains unchanged.
   - numerous field name changes, new fields added
   - overhaul of internal functions to speed processing
-  - tools now add suffix to default output file names based on the site type (e.g. '_tcs') 
+  - tools now auto-populate output locations and a default output file name suffix, which is based on the site type (e.g. '_tcs')
 
 #### Version 2.1
 

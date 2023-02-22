@@ -1523,7 +1523,7 @@ class attribute_eo(object):
       # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
       
-      parm07 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm07 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
       parm07.filter.list = ["Local Database"]
       parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1556,6 +1556,13 @@ class attribute_eo(object):
             parameters[8].value = suf
             # parameters[7].value = "attribEOs" + suf
             # parameters[8].value = "elementSummary" + suf
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            out_gdb = fold + os.sep + gdb
+            if arcpy.Exists(out_gdb):
+               parameters[7].value = out_gdb
       return
 
    def updateMessages(self, parameters):
@@ -1599,7 +1606,7 @@ class score_eo(object):
       parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm02 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm02 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
       parm02.filter.list = ["Local Database"]
       parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1625,7 +1632,14 @@ class score_eo(object):
             if not suf.startswith("_"):
                suf = ""
             # parameters[2].value = "scoredEOs" + suf
+            # Set output parameters
             parameters[3].value = suf
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path'])
+            out_gdb = fold + os.sep + gdb
+            if arcpy.Exists(out_gdb):
+               parameters[2].value = out_gdb
       return
 
    def updateMessages(self, parameters):
@@ -1664,7 +1678,7 @@ class build_portfolio(object):
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       
-      parm05 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm05 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
       parm05.filter.list = ["Local Database"]
       parm06 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
@@ -1696,6 +1710,17 @@ class build_portfolio(object):
             # parameters[5].value = "priorEOs" + suf
             # parameters[6].value = "elementSummary_upd" + suf
             # parameters[7].value = "priorConSites" + suf
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path'])
+            out_gdb = fold + os.sep + gdb
+            if arcpy.Exists(out_gdb):
+               parameters[5].value = out_gdb
+            subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+            out_fold = fold + os.sep + subf
+            if arcpy.Exists(out_fold):
+               parameters[6].value = out_fold
       return
 
    def updateMessages(self, parameters):
@@ -1739,7 +1764,7 @@ class build_element_lists(object):
       # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
       # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
       
-      parm04 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm04 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
       parm04.filter.list = ["Local Database"]
       parm05 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
@@ -1772,6 +1797,17 @@ class build_element_lists(object):
                   parameters[1].value = "SITENAME"
             except:
                pass
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path'])
+            out_gdb = fold + os.sep + gdb
+            if arcpy.Exists(out_gdb):
+               parameters[4].value = out_gdb
+            subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+            out_fold = fold + os.sep + subf
+            if arcpy.Exists(out_fold):
+               parameters[5].value = out_fold
       return
 
    def updateMessages(self, parameters):
