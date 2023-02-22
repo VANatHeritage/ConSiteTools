@@ -970,3 +970,83 @@ def fc2df(feature_class, field_list, skip_nulls=True):
             skip_nulls=True
          )
       )
+
+def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, chain=True, scratchGDB="in_memory"):
+   """Clusters features based on specified search distance, with optional group-by field. Features within twice
+   the search distance of each other will be assigned to the same group. Use 'fldGrpBy' to only group features
+   having the save value in the `fldGrpBy` field.
+   This function converts the input to single-part, and will return single-part features. However, if the input includes
+   multi-part features, the `chain` option affects final groupings, if chain=True, the multiple parts of the original
+   input feature will be assigned to the same output group, regardless of their separation distance.
+
+   inFeats = The input features to group
+   searchDist = The search distance to use for clustering. This should be half of the max distance allowed to include
+      features in the same cluster. E.g., if you want features within 500 m of each other to cluster, enter "250 METERS"
+   fldGrpID = The desired name for the output grouping field. If not specified, it will be "grpID".
+   fldGrpBy = (optional) Field to group features by; only features with the same value in this column will be grouped,
+      if within the search distance.
+   chain = Should the single parts of the input multi-part features always be assigned to the same group? Only relevant 
+      for inFeats containing multiple-part features. If your input is single-part, you should use chain=False.
+   scratchGDB = geodatabase to hold intermediate products
+   """
+
+   # Delete the GrpID field from the input features, if it already exists.
+   arcpy.DeleteField_management(inFeats, fldGrpID)
+
+   # Buffer input features
+   print('Buffering input features...')
+   if fldGrpBy is not None:
+      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='LIST', dissolve_field=fldGrpBy)
+   else:
+      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='ALL')
+
+   # Make unique group polygons, associate with original features
+   arcpy.MultipartToSinglepart_management(scratchGDB + os.sep + "tmp_groups0", scratchGDB + os.sep + "tmp_groups")
+   arcpy.CalculateField_management(scratchGDB + os.sep + 'tmp_groups', fldGrpID, '!OBJECTID!', field_type="LONG")
+   print('Intersecting to find groups...')
+   arcpy.PairwiseIntersect_analysis([inFeats, scratchGDB + os.sep + 'tmp_groups'], scratchGDB + os.sep + 'tmp_flat_group0')
+
+   if fldGrpBy is not None:
+      arcpy.Select_analysis(scratchGDB + os.sep + 'tmp_flat_group0', scratchGDB + os.sep + 'tmp_flat_group', where_clause=fldGrpBy + ' = ' + fldGrpBy + '_1')
+      grpTab = scratchGDB + os.sep + 'tmp_flat_group'
+   else:
+      grpTab = scratchGDB + os.sep + 'tmp_flat_group0'
+
+   if chain:
+      print('Updating group IDs using original FIDs...')
+      orid = 'FID_' + os.path.basename(inFeats)
+      # orig groups
+      go = {a[0]: [] for a in arcpy.da.SearchCursor(grpTab, fldGrpID)}
+      [go[a[0]].append(a[1]) for a in arcpy.da.SearchCursor(grpTab, [fldGrpID, orid])]
+      # fids
+      fo = {a[0]: [] for a in arcpy.da.SearchCursor(grpTab, orid)}
+      [fo[a[0]].append(a[1]) for a in arcpy.da.SearchCursor(grpTab, [orid, fldGrpID])]
+      # for re-assigning groups
+      go2 = {a[0]: -1 for a in arcpy.da.SearchCursor(grpTab, fldGrpID)}
+      # Re-group using original FIDS
+      for g in go:
+         # g is the original group id
+         # get fids by group
+         fids = go[g]
+         # get groups by fids
+         grps = []
+         g0 = 0
+         g1 = 1
+         while g0 != g1:
+            g0 = len(grps)
+            grps = list(set(grps + [i for s in [fo.get(f) for f in fids] for i in s]))
+            fids = list(set(fids + [i for s in [go.get(g) for g in grps] for i in s]))
+            g1 = len(grps)
+         ng = min(grps)
+         for a in grps:
+            go2[a] = ng
+      # update rows with final group
+      with arcpy.da.UpdateCursor(grpTab, [fldGrpID]) as curs:
+         for r in curs:
+            r[0] = go2[r[0]]
+            curs.updateRow(r)
+
+   print('Joining ' + fldGrpID + ' to ' + os.path.basename(inFeats) + '...')
+   arcpy.JoinField_management(inFeats, 'OBJECTID', grpTab, 'FID_' + os.path.basename(inFeats), [fldGrpID])
+
+   return inFeats

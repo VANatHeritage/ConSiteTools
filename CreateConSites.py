@@ -952,9 +952,6 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
 
 def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, searchDist, smthDist, scratchGDB = "in_memory"):
    '''Uses Erase Features to chop out sections of input features. Stitches non-trivial fragments back together only if within search distance of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
-   
-   Attempts have been made to improve this function, but it remains a bottleneck and is pretty slow when there are large numbers of PFs.
-   
    Parameters:
    - in_PF: input Procedural Features
    - in_Feats: input features to be chopped (typically SBBs)
@@ -1005,27 +1002,23 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    # Add SBBs parts which intersect PFs
    arcpy.Append_management(keepLyr, rtnParts, "NO_TEST")
    
-   # Mark final SBB fragments to keep 
+   # Find "groups" of fragments within fld_ID groups
+   fragGrp = "fragGrp"  # field to hold group IDs
+   SpatialCluster_GrpFld(rtnParts, multiMeasure(searchDist, 0.5)[2], fragGrp, fldGrpBy='feat_' + fld_ID, chain=False)
+   # Mark to keep ALL fragments in a group which contain a keep=1 fragment (intersecting a PF)
+   grpKeep = [a[0] for a in arcpy.da.SearchCursor(rtnParts, [fragGrp, "keep"]) if a[1] == 1]
+   with arcpy.da.UpdateCursor(rtnParts, [fragGrp, "keep"]) as curs:
+      for r in curs:
+         if r[0] in grpKeep:
+            r[1] = 1
+         else:
+            r[1] = 0
+         curs.updateRow(r)
+   
+   # Check for PFs which were completely erased
    pfList = unique_values(in_PF, fld_ID)
    pfErasedList = unique_values(rtnPartsPF, fld_ID)
-   pfErased = []
-   n = 0
-   arcpy.SetProgressor("step", "Finding SBB fragments to keep...", 0, len(pfList), 1)
-   for pfid in pfList:
-      arcpy.SetProgressorPosition(n)
-      n += 1
-      if pfid not in pfErasedList:
-         # If no PF parts remain, the PF was completely erased. These are reported in a warning after the loop.
-         pfErased.append(pfid)
-         continue
-      # The parts to retain (based on size and intersection with retained PFs) are included in rtnParts. 
-      # The procedure below will mark fragments to keep, starting with fragments intersecting PFs and expanding from there.
-      # This removes the need for the Shrinkwrap loop and subsequent CullFrags, improving processing time.
-      qry = "feat_" + fld_ID + " = '" + pfid + "'"
-      rtnPartsLyr = arcpy.management.MakeFeatureLayer(rtnParts, "rtnPartsLyr", qry)
-      arcpy.management.SelectLayerByAttribute(rtnPartsLyr, "NEW_SELECTION", "keep = 1")
-      ExpandSelection(rtnPartsLyr, searchDist)
-      arcpy.CalculateField_management(rtnPartsLyr, "keep", 1)
+   pfErased = [p for p in pfList if p not in pfErasedList]
    if len(pfErased) > 0:
       printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If you think this affected the final site delineation, you may want to edit the modification features or PFs and re-run.")
 
