@@ -1561,7 +1561,7 @@ class attribute_eo(object):
             fold = os.path.dirname(d["path"])
             gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
-            if arcpy.Exists(out_gdb):
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[7].value = out_gdb
       return
 
@@ -1636,9 +1636,10 @@ class score_eo(object):
             parameters[3].value = suf
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
-            gdb = os.path.basename(d['path'])
+            # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
-            if arcpy.Exists(out_gdb):
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[2].value = out_gdb
       return
 
@@ -1713,14 +1714,14 @@ class build_portfolio(object):
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
-            gdb = os.path.basename(d['path'])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
-            if arcpy.Exists(out_gdb):
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[5].value = out_gdb
-            subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
-            out_fold = fold + os.sep + subf
-            if arcpy.Exists(out_fold):
-               parameters[6].value = out_fold
+               subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+               out_fold = fold + os.sep + subf
+               if arcpy.Exists(out_fold):
+                  parameters[6].value = out_fold
       return
 
    def updateMessages(self, parameters):
@@ -1780,9 +1781,9 @@ class build_element_lists(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         if not parameters[0].hasBeenValidated:
+      if parameters[2].altered:
+         fc = parameters[2].valueAsText
+         if not parameters[2].hasBeenValidated:
             in_nm = os.path.basename(fc)
             suf = in_nm[-4:]
             if not suf.startswith("_"):
@@ -1800,14 +1801,14 @@ class build_element_lists(object):
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
-            gdb = os.path.basename(d['path'])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
-            if arcpy.Exists(out_gdb):
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[4].value = out_gdb
-            subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
-            out_fold = fold + os.sep + subf
-            if arcpy.Exists(out_fold):
-               parameters[5].value = out_fold
+               subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+               out_fold = fold + os.sep + subf
+               if arcpy.Exists(out_fold):
+                  parameters[5].value = out_fold
       return
 
    def updateMessages(self, parameters):

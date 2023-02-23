@@ -21,7 +21,7 @@ def main():
    
    # Specify which site type(s) to run.
    # Choices are: "TCS", "AHZ", "SCU", "SCS"
-   siteTypes = ("TCS", "AHZ", "SCU", "SCS")
+   siteTypes = ("TCS")
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
@@ -35,10 +35,10 @@ def main():
    
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
-   projFolder = r'D:\projects\ConSites\arc\statewide'
-   runName = 'statewide_' + "_".join(siteTypes)
+   projFolder = r'C:\David\proc\ConSites_statewide'
+   runName = 'statewideTCS_2_2_dev'
    outGDB = os.path.join(projFolder, runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
-
+   
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
    scratchGDB = "in_memory"  # OPTIONS: "in_memory" | os.path.join(projFolder, "scratch_" + runName + ".gdb")
