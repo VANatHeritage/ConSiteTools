@@ -1001,10 +1001,11 @@ def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, 
       arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='ALL')
 
    # Make unique group polygons, associate with original features
-   arcpy.MultipartToSinglepart_management(scratchGDB + os.sep + "tmp_groups0", scratchGDB + os.sep + "tmp_groups")
-   arcpy.CalculateField_management(scratchGDB + os.sep + 'tmp_groups', fldGrpID, '!OBJECTID!', field_type="LONG")
+   tmpGrp = scratchGDB + os.sep + "tmp_groups"
+   arcpy.MultipartToSinglepart_management(scratchGDB + os.sep + "tmp_groups0", tmpGrp)
+   arcpy.CalculateField_management(tmpGrp, fldGrpID, '!' + GetFlds(tmpGrp, oid_only=True) + '!', field_type="LONG")
    print('Intersecting to find groups...')
-   arcpy.PairwiseIntersect_analysis([inFeats, scratchGDB + os.sep + 'tmp_groups'], scratchGDB + os.sep + 'tmp_flat_group0')
+   arcpy.PairwiseIntersect_analysis([inFeats, tmpGrp], scratchGDB + os.sep + 'tmp_flat_group0')
 
    if fldGrpBy is not None:
       arcpy.Select_analysis(scratchGDB + os.sep + 'tmp_flat_group0', scratchGDB + os.sep + 'tmp_flat_group', where_clause=fldGrpBy + ' = ' + fldGrpBy + '_1')

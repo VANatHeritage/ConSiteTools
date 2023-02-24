@@ -963,8 +963,9 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - smthDist: dilation distance for smoothing
    '''
    # Use in_EraseFeats to chop out sections of PFs
+   printMsg("Chopping PFs...")
    firstChopPF = scratchGDB + os.sep + 'firstChopPF'
-   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
+   arcpy.PairwiseErase_analysis(in_PF, in_EraseFeats, firstChopPF)
 
    # NOTE: in rare cases, all PFs in a ProtoSite get erased (e.g. small island PFs covered by a hydrographic features). 
    # This will result in an error, returning nothing for this function.
@@ -978,8 +979,9 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
 
    # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
+   printMsg("Chopping SBBs...")
    firstChop = scratchGDB + os.sep + 'firstChop'
-   arcpy.analysis.Erase(in_Feats, in_EraseFeats, firstChop)
+   arcpy.PairwiseErase_analysis(in_Feats, in_EraseFeats, firstChop)
    arcpy.AlterField_management(firstChop, fld_ID, "feat_" + fld_ID)  # this distinguishes the chopped features ID field from the PF's ID field.
    # Make a single-part version
    explChop = scratchGDB + os.sep + 'explChop'
