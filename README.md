@@ -1,22 +1,27 @@
 # ConSite Toolbox
 ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-02-01):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-01):
 
-#### Version 2.2-dev (in development)
+#### Version 2.2
 
-- TCS updates:
-  - Site delineation unchanged, but several updates made to improve processing speed and usage
+- Conservation Portfolio Tools:
+  - The assignment methods and names of several tier levels were updated. Portfolio remains unchanged.
+  - output files have numerous field name changes, and new fields added
+  - overhaul of internal functions to speed up processing
+  - tools now auto-populate output locations
+  - output file name suffix parameter added, which auto-populates based on the site type
 
 - SCS/SCU updates:
-  - Added an internal function `FillLines_scs` to fill in small gaps between nearby scsLines
-  - `2: Generate SCS Lines` will look for Service Area layers in the HydroNet_ND geodatabase location, making it unnecessary to keep them in the map
-  
-- Conservation Portfolio Tools:
-  - New 'Vital' tier added, and tier names and assignment methods updated. Portfolio remains unchanged.
-  - numerous field name changes, new fields added
-  - overhaul of internal functions to speed processing
-  - tools now auto-populate output locations and a default output file name suffix, which is based on the site type (e.g. '_tcs')
+  - Several changes for tool `2: Generate SCS Lines`:
+    - tool will look input Service Area layers in the HydroNet_ND geodatabase location, making it unnecessary to keep them in the map
+    - Added an internal function `FillLines_scs` to fill in small gaps between nearby scsLines
+
+- TCS updates:
+  - Site delineation unchanged, but updates made to improve processing speed and usage, primarily for tool `3. Create Conservation Sites`
+
+- Other:
+  - re-worked `Review Conservation Sites` tool to improve processing speed. Site names are now included in the output feature class.
 
 #### Version 2.1
 

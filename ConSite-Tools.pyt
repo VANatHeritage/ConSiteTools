@@ -457,10 +457,11 @@ class review_consite(object):
          parm03.value = "%s_QC"%parm00.value
       
       parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "String", "Required", "Input", "SITEID")
+      parm05 = defineParam("fld_SiteName", "Conservation Site Name field", "String", "Required", "Input", "SITENAME")
       
-      parm05 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+      parm06 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -475,6 +476,7 @@ class review_consite(object):
          fc = parameters[1].valueAsText
          field_names = [f.name for f in arcpy.ListFields(fc) if f.type != 'OID']  # Does not work with OBJECTID, so don't allow it.
          parameters[4].filter.list = field_names
+         parameters[5].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -492,7 +494,7 @@ class review_consite(object):
       else:
          scratchParm = "in_memory"
 
-      ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, scratchParm)
+      ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, fld_SiteName, scratchParm)
       arcpy.MakeFeatureLayer_management(out_Sites, "QC_lyr")
 
       return out_Sites

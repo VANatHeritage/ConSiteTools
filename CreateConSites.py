@@ -584,7 +584,7 @@ def prepInclusionZone(in_Zone1, in_Zone2, in_Score, out_Rast, truncVal = 9):
    print("Mission complete.")
    return out_Rast
    
-def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", scratchGDB = "in_memory"):
+def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", fld_SiteName="SITENAME", scratchGDB = "in_memory"):
    '''Submits new (typically automated) Conservation Site features to a Quality Control procedure, comparing new to existing (old) shapes  from the previous production cycle. It determines which of the following applies to the new site:
    - N:  Site is new, not corresponding to any old site.
    - I:  Site is identical to an old site.
@@ -601,6 +601,9 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - ModType:  Text field indicating how the site has been modified, relative to existing old sites.  Values are "N". "M", "S", "I", or "B" as described above.
    - PercDiff:  Numeric field indicating the percent difference between old and new boundaries, as described above.  Applies only to sites where ModType = "B".
    - AssignID:  Long integer field containing the old SITEID associated with the new site.  This field is automatically populated only for sites where ModType is "B" or "I".  For other sites, the ID should be manually assigned during site review.  Attributes associated with this ID may be transferred, in whole or in part, from the old site to the new site.  
+   - AssignName: Text field, populated with the Site Name(s) of old site(s) that intersect the new site. For sites coded “B” or “I”, this will simply be the name of the old site 
+    that corresponds to the new site. For sites coded “M” or “C”, the multiple old site’s names are concatenated, using a semi-colon as a separator. For sites coded “S”, indicating that two or more 
+    new sites were split off from one old site, a dash and sequential number are appended to the end of the old site’s name, which ensures that the new site’s AssignName is unique. 
    - Flag:  Short integer field indicating whether the new site needs to be examined by a human (1) or not (0).  All sites where ModType is "N", "M", or "S" are flagged automatically.  Sites where ModType = "B" are flagged if the value in the PercDiff field is greater than the user-specified threshold.
    - Comment:  Text field to be used by site reviewers to enter comments.  Nothing is entered automatically.
 
@@ -610,6 +613,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - cutVal: a cutoff percentage that will be used to flag features that represent significant boundary growth or reduction(e.g., 10%)
    - out_Sites: output new Conservation Sites feature class with QC information
    - fld_SiteID: the unique site ID field in the old CS feature class
+   - fld_SiteName: the unique site name field in the old CS feature class
    - scratchGDB: scratch geodatabase for intermediate products
    '''
    getScratchMsg(scratchGDB)
@@ -620,7 +624,15 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Determine how many old sites are overlapped by each automated site.  
    # Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
-   fldmap = "Shape_Length \"Shape_Length\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Length,-1,-1;Shape_Area \"Shape_Area\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Area,-1,-1"
+   
+   # Sort original CS by area, so the spatial join will list the largest CS first (for new sites which intersect multiple original sites)
+   arcpy.Sort_management(orig_CS, scratchGDB + os.sep + 'orig_CS', [["Shape_area", "DESCENDING"]])
+   orig_CS = scratchGDB + os.sep + 'orig_CS'
+   
+   # Use field map to add Site ID and Site Names to the output layer
+   fldmap1 = 'AssignID "AssignID" true true false 100 Text 0 0,Join,";",%s,%s,-1,-1' % (orig_CS, fld_SiteID)
+   fldmap2 = 'AssignName "AssignName" true true false 1000 Text 0 0,Join,"; ",%s,%s,-1,-1' % (orig_CS, fld_SiteName)
+   fldmap = """%s;%s""" % (fldmap1, fldmap2)
    arcpy.analysis.SpatialJoin(auto_CS, orig_CS, out_Sites, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldmap, "INTERSECT")
    
    # Add a field to indicate site type
@@ -691,19 +703,6 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    else:
       pass
    
-   # Attach the old site IDs to attach to automated sites
-   # coulddo: add S below, since they are associated with only 1 old site. However, that would result in duplicate AssignIDs in the output.
-   qry = "ModType IN ('B', 'I')"   # , 'S')"
-   arcpy.management.MakeFeatureLayer(out_Sites, "ssLyr", qry)
-   if countFeatures("ssLyr") > 0:
-      printMsg("Attaching site IDs...")
-      Join3 = scratchGDB + os.sep + "Join3"
-      arcpy.analysis.SpatialJoin("ssLyr", orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT")
-      arcpy.management.JoinField("ssLyr", "OBJECTID", Join3, "TARGET_FID", fld_SiteID)
-      arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
-   else:
-      arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
-   
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
    arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
@@ -734,7 +733,7 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       arcpy.CalculateField_management(tmpInt, "PercDiff", calc, field_type="DOUBLE")
       arcpy.JoinField_management(out_Sites, "AssignID", tmpInt, "AssignID", "PercDiff")
    
-   # Process:  Add Fields; Calculate Flag Field
+   # Process: Add Fields; Calculate Flag Field
    # Note that PercDiff would already be in the layer if there are "B" type sites, but ArcGIS will just ignore it in that case.
    printMsg("Calculating fields...")
    for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 1000)]:
@@ -752,7 +751,22 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       return flg""" % (str(cutVal))
    Expression = "Flag(!ModType!, !PercDiff!)"
    arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock)
-
+   
+   # Process: Update AssignID and Name for split sites, adding a sequential number based on area of new site. 
+   # This should ensure that AssignName is unique.
+   slyr = arcpy.MakeFeatureLayer_management(out_Sites, "slyr", "ModType IN ('S')")  # could add "C", but don't think it's necessary.
+   if countFeatures(slyr) > 0:
+      printMsg("Adding sequential numbers to IDs and names for split and combo sites...")
+      arcpy.CalculateField_management(slyr, "tmp_area", "!Shape.area@squaremeters!", field_type="FLOAT")
+      calcGrpSeq(slyr, [["tmp_area", "DESCENDING"]], "AssignID", "rnk_area")
+      # arcpy.CalculateField_management(slyr, "AssignID", "!AssignID! + '-' + str(!rnk_area!)")  # not doing this. AssignID's will be NULLed out later for splits
+      arcpy.CalculateField_management(slyr, "AssignName", "!AssignName! + '-' + str(!rnk_area!)")
+      arcpy.DeleteField_management(out_Sites, ["tmp_area", "rnk_area"])
+   
+   # set AssignID to Null, for anything not B or I (1 to 1 match)
+   mlyr = arcpy.MakeFeatureLayer_management(out_Sites, "mlyr", "ModType NOT IN ('B', 'I')")
+   arcpy.CalculateField_management(mlyr, "AssignID", "None")
+   
    return out_Sites
 
 

@@ -923,6 +923,7 @@ def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
    tmpSrt = "in_memory/grpsrt"
    # Add group field to sorting fields
    final_sort = [[grp_field, "ASCENDING"]] + sort_field
+   arcpy.DeleteField_management(in_Table, seq_field)  # removes existing field, has no effect if it doesn't exist
    arcpy.Sort_management(in_Table, tmpSrt, final_sort)
    oid = GetFlds(tmpSrt, oid_only=True)
    join_fld = GetFlds(tmpSrt)[-1]  # this should be the TARGET_FID field

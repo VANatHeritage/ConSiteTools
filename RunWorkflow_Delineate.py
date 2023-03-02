@@ -82,6 +82,7 @@ def main():
    fld_Rule = "RULE" # Source Feature Rule field
    fld_Buff = "BUFFER" # Source Feature Buffer field
    fld_SiteID = "SITEID" # Conservation Site ID
+   fld_SiteName = "SITENAME" # Conservation Site Name
    fld_Tidal = "Tidal"
    in_TranSurf = [in_Roads, in_Rail]
    
@@ -154,7 +155,7 @@ def main():
             printMsg("Reviewing terrestrial ConSites...")
             tStart = datetime.now()
             printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-            ReviewConSites(tcs_sites, csTCS, cutVal, tcs_sites_qc, fld_SiteID, scratchGDB)
+            ReviewConSites(tcs_sites, csTCS, cutVal, tcs_sites_qc, fld_SiteID, fld_SiteName, scratchGDB)
             tEnd = datetime.now()
             printMsg("TCS Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
             deltaString = GetElapsedTime(tStart, tEnd)
@@ -199,7 +200,7 @@ def main():
             printMsg("Reviewing AHZ ConSites...")
             tStart = datetime.now()
             printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-            ReviewConSites(ahz_sites, csAHZ, cutVal, ahz_sites_qc, fld_SiteID, scratchGDB)
+            ReviewConSites(ahz_sites, csAHZ, cutVal, ahz_sites_qc, fld_SiteID, fld_SiteName, scratchGDB)
             tEnd = datetime.now()
             printMsg("AHZ Site review ended at %s" %tEnd.strftime("%H:%M:%S"))
             deltaString = GetElapsedTime(tStart, tEnd)
@@ -264,7 +265,7 @@ def main():
                printMsg("Comparing new sites to old sites for QC...")
                tStart = datetime.now()
                printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-               ReviewConSites(scuPolys, csSCS, cutVal, scuPolys_qc, fld_SiteID, scratchGDB)
+               ReviewConSites(scuPolys, csSCS, cutVal, scuPolys_qc, fld_SiteID, fld_SiteName, scratchGDB)
                tEnd = datetime.now()
                printMsg("SCU review ended at %s" %tEnd.strftime("%H:%M:%S"))
                deltaString = GetElapsedTime(tStart, tEnd)
@@ -286,7 +287,7 @@ def main():
                printMsg("Comparing new sites to old sites for QC...")
                tStart = datetime.now()
                printMsg("Processing started at %s on %s" %(tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-               ReviewConSites(scsPolys, csSCS, cutVal, scsPolys_qc, fld_SiteID, scratchGDB)
+               ReviewConSites(scsPolys, csSCS, cutVal, scsPolys_qc, fld_SiteID, fld_SiteName, scratchGDB)
                tEnd = datetime.now()
                printMsg("SCS review ended at %s" %tEnd.strftime("%H:%M:%S"))
                deltaString = GetElapsedTime(tStart, tEnd)

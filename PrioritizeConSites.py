@@ -995,7 +995,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    arcpy.AlterField_management(out_sumTab, "COUNT_SF_EOID", "COUNT_ELIG_EO", "COUNT_ELIG_EO")
    
    # add BMI scores of rank-n EOs within ELCODEs
-   calcGrpSeq("lyr_EO", [["ELCODE", "ASCENDING"], ["BMI_score", "DESCENDING"]], "ELCODE", "BMI_score_rank")
+   calcGrpSeq("lyr_EO", [["BMI_score", "DESCENDING"]], "ELCODE", "BMI_score_rank")
    # Add value fields to sumTab
    pivRnks = [1, 2, 3, 5, 10]
    pivTab = scratchGDB + os.sep + "pivTab"
