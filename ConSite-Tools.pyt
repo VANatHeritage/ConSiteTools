@@ -1783,7 +1783,19 @@ class build_element_lists(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         # generally this is ConSites, only use this to update the field list.
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated:
+            try:
+               field_names = GetFlds(fc)
+               parameters[1].filter.list = field_names
+               if "SITENAME" in field_names:
+                  parameters[1].value = "SITENAME"
+            except:
+               pass
       if parameters[2].altered:
+         # This will be EOs. Take naming and set output parameters based on this layer.
          fc = parameters[2].valueAsText
          if not parameters[2].hasBeenValidated:
             in_nm = os.path.basename(fc)
@@ -1793,13 +1805,6 @@ class build_element_lists(object):
             # parameters[4].value = "elementList" + suf
             # parameters[5].value = "elementList" + suf + ".xls"
             parameters[6].value = suf
-            try:
-               field_names = GetFlds(fc)
-               parameters[1].filter.list = field_names
-               if "SITENAME" in field_names:
-                  parameters[1].value = "SITENAME"
-            except:
-               pass
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
