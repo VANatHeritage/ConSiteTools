@@ -1525,7 +1525,7 @@ class attribute_eo(object):
       # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
       
-      parm07 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
+      parm07 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm07.filter.list = ["Local Database"]
       parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1608,7 +1608,7 @@ class score_eo(object):
       parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm02 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
+      parm02 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm02.filter.list = ["Local Database"]
       parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
@@ -1681,15 +1681,15 @@ class build_portfolio(object):
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       
-      parm05 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
+      parm05 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm05.filter.list = ["Local Database"]
-      parm06 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm06 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
       
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
       # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
       # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
-      # parm08 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      # parm08 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
@@ -1760,17 +1760,21 @@ class build_element_lists(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
-      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input")
+      parm01 = defineParam("fld_ID", "Boundary ID field(s)", "Field", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
       parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
 
       # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
       # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
       
-      parm04 = defineParam("out_gdb", "Project Output GDB", "DEWorkspace", "Required", "Input")
+      parm04 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm04.filter.list = ["Local Database"]
-      parm05 = defineParam("out_folder", "Project Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm05 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
       parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+
+      # This will set up the list of fields for boundary ID
+      parm01.filter.list = ['Short', 'Long', 'Text']
+      parm01.parameterDependencies = [parm00.name]
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
@@ -1787,13 +1791,11 @@ class build_element_lists(object):
          # generally this is ConSites, only use this to update the field list.
          fc = parameters[0].valueAsText
          if not parameters[0].hasBeenValidated:
-            try:
-               field_names = GetFlds(fc)
-               parameters[1].filter.list = field_names
-               if "SITENAME" in field_names:
-                  parameters[1].value = "SITENAME"
-            except:
-               pass
+            field_names = GetFlds(fc)
+            if "SITENAME" in field_names:
+               parameters[1].value = "SITENAME"
+            else:
+               parameters[1].value = None
       if parameters[2].altered:
          # This will be EOs. Take naming and set output parameters based on this layer.
          fc = parameters[2].valueAsText
@@ -1832,8 +1834,11 @@ class build_element_lists(object):
       out_Tab = os.path.join(out_gdb, 'elementList' + suf2)
       out_Excel = os.path.join(out_folder, 'elementList' + suf2 + '.xls')
 
+      # Convert polygon ID field(s) to list
+      fld_IDs = fld_ID.split(';')
+
       # Run function
-      BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)
+      BuildElementLists(in_Bounds, fld_IDs, in_procEOs, in_elementTab, out_Tab, out_Excel)
       replaceLayer(out_Tab)
 
       return (out_Tab)

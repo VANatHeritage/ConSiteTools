@@ -1,5 +1,10 @@
 # ConSite Toolbox
-ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
+ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites, with additional tools for prioritization.
+
+## Getting started:
+This toolbox works best with ArcGIS Pro version 3+, though it may work with earlier versions. To use:
+1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
+2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
 ### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-01):
 

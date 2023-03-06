@@ -1623,7 +1623,10 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    '''
    scratchGDB = "in_memory"
-   
+
+   # convert fld_ID to list
+   if not isinstance(fld_ID, list):
+      fld_ID = [fld_ID]
    # Dissolve boundaries on the specified ID field, retaining only that field.
    printMsg("Dissolving...")
    dissBnds = scratchGDB + os.sep + "dissBnds"
@@ -1647,7 +1650,8 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    # Compute the summary stats
    printMsg("Computing summary statistics...")
    sumTab = scratchGDB + os.sep + "sumTab"
-   caseFields = "%s;ELCODE;SNAME;RNDGRNK"%fld_ID
+   fld_ID_sep = ";".join(fld_ID)
+   caseFields = "%s;ELCODE;SNAME;RNDGRNK"%fld_ID_sep
    statsList = [["FinalRANK", "MIN"],["EO_MODRANK", "MIN"]]
    arcpy.Statistics_analysis(sjTab, sumTab, statsList, caseFields)
    
@@ -1693,7 +1697,8 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
 
    # Sort to create final output table
    printMsg("Sorting...")
-   sortFlds ="%s ASCENDING;MIN_FinalRANK ASCENDING;ALL_IN DESCENDING; RNDGRNK ASCENDING"%fld_ID
+   fld_ID_srt = ";".join([f + ' ASCENDING' for f in fld_ID])
+   sortFlds ="%s;MIN_FinalRANK ASCENDING;ALL_IN DESCENDING; RNDGRNK ASCENDING"%fld_ID_srt
    arcpy.Sort_management(sumTab, out_Tab, sortFlds)
    
    # Export to Excel
