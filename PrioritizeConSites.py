@@ -387,41 +387,85 @@ def buildSlotDict(in_sumTab):
    printMsg("There are %s Elements with remaining slots to fill."%count)
    return slotDict
 
-def tierSummary(in_Bounds, fld_ID, in_EOs, slopFactor, out_field = "EEO_SUMMARY", summary_type="Text"):
+def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO_SUMMARY", slopFactor="15 Meters"):
    """
-   Adds a text field and/or numeric summary field(s) of EOs by tier, for each unique fld_ID in in_Bounds.
+   Adds a text field and/or numeric summary field(s) of EOs by tier, for each unique value in fld_ID in in_Bounds.
    :param in_Bounds: Input boundary polygons (e.g. sites)
    :param fld_ID: Unique ID field for boundary polygons
    :param in_EOs: Input EOs, with tiers assigned
-   :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
-   :param out_field: New field to contain the tier text summary.
    :param summary_type: Type of summary field(s) to add.
       "Text" = Text tier summary only (single column)
       "Numeric" = numeric tier count fields only (multiple columns)
-      "All" = both text tier summary and numeric tier count fields
+      "Both" = both text tier summary and numeric tier count fields
+   :param out_field: New field to contain the tier text summary.
+   :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
    :return: in_Bounds
+   # Coulddo:
+      - add other summaries from sjEOs as needed. (Element names, unique elements, etc).
+      - make this compatible for summarizing ECS also
    """
    scratchGDB = "in_memory"
    # Field names: update these if the EO field names change
    tier_field = "EEO_TIER"
-   rank_field = "FinalRANK"
-
-   printMsg("Adding EO counts by tier within " + os.path.basename(in_Bounds) + "...")
+   # EO ID field (two options allowed)
+   eo_flds = GetFlds(in_EOs)
+   if "SF_EOID" in eo_flds:
+      eo_id = "SF_EOID"
+   else:
+      eo_id = "EO_ID"
+   # Exit if tier and/or EO field are not found
+   if not all(a in eo_flds for a in [tier_field, eo_id]):
+      printErr("The fields [" + ", ".join([tier_field, eo_id]) + "] must be present in the input EOs layer.")
+      return
+   # Handle fld_ID
+   fld_ID_orig = fld_ID
+   if fld_ID == GetFlds(in_Bounds, oid_only=True):
+      fld_ID = "JOIN_FID"
+   else:
+      # This handles the case where a (non-OID) field exists in both boundary and EOs
+      if fld_ID in eo_flds:
+         fld_ID += "_1"
+   
+   printMsg("Adding EO counts by tier to " + os.path.basename(in_Bounds) + "...")
    sjEOs = scratchGDB + os.sep + "sjEOs"
    arcpy.SpatialJoin_analysis(in_EOs, in_Bounds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
-   stats = scratchGDB + os.sep + "stats"
-   arcpy.analysis.Statistics(sjEOs, stats, [[tier_field, "COUNT"]], [rank_field, fld_ID, tier_field])
-   tiers = TabToDict(stats, rank_field, tier_field)
-   pt = scratchGDB + os.sep + "pt"
-   arcpy.management.PivotTable(stats, fld_ID, rank_field, "FREQUENCY", pt)
+   # NOTE: this is basically just re-creating FinalRank. Re-calculating here will ensure this is compatible with other EO data layers.
+   rank_field = "temprank"  # this is included so that it will correctly order the Tier fields
+   arcpy.AddField_management(sjEOs, rank_field, "SHORT")
+   codeblock = '''def calcRank(tier):
+      if tier == "Irreplaceable":
+         return 1
+      elif tier == "Critical":
+         return 2
+      elif tier == "Vital":
+         return 3
+      elif tier == "High Priority":
+         return 4
+      elif tier == "General":
+         return 5
+      else:
+         return 6'''
+   expression = "calcRank(!" + tier_field + "!)"
+   # Assign "Other" to those not falling in the 5 assigned tiers
+   arcpy.CalculateField_management(sjEOs, rank_field, expression, code_block=codeblock)
+   lyr = arcpy.MakeFeatureLayer_management(sjEOs, where_clause=rank_field + " = 6")
+   arcpy.CalculateField_management(lyr, tier_field, "'Other'")
+   del lyr
    
-   # Update names of fields to match tier names
+   # Calculate summary
+   stats = scratchGDB + os.sep + "stats"
+   arcpy.analysis.Statistics(sjEOs, stats, [[eo_id, "UNIQUE"]], [rank_field, fld_ID, tier_field]) # NOTE: rank_field should be first, so sorting is correct.
+   tiers = TabToDict(stats, rank_field, tier_field)
+   pivtab = scratchGDB + os.sep + "pt"
+   arcpy.management.PivotTable(stats, fld_ID, rank_field, "UNIQUE_" + eo_id, pivtab)
+   
+   # Update names of count fields to match tier names
    ct_flds = []
    for t in tiers:
-      fld = "EEOs_" + tiers[t].replace(" ", "")
-      NullToZero(pt, rank_field + str(t), new_field=fld)
+      fld = "ct_" + tiers[t].replace(" ", "")
+      NullToZero(pivtab, rank_field + str(t), new_field=fld)
       ct_flds.append(fld)
-   
+   # Calculate text summary
    if summary_type != "Numeric":
       # Field: EEO_SUMMARY
       codeblock = '''def fn(ir, cr, vi, hp, ge):
@@ -454,18 +498,17 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, slopFactor, out_field = "EEO_SUMMARY"
          else:
             return text[0]
       '''
-      call = "fn(!EEOs_Irreplaceable!, !EEOs_Critical!, !EEOs_Vital!, !EEOs_HighPriority!, !EEOs_General!)"
-      arcpy.CalculateField_management(pt, out_field, call, code_block=codeblock, field_type="TEXT")
-      
+      call = "fn(!ct_Irreplaceable!, !ct_Critical!, !ct_Vital!, !ct_HighPriority!, !ct_General!)"
+      arcpy.CalculateField_management(pivtab, out_field, call, code_block=codeblock, field_type="TEXT")
    # Add fields to in_Bounds
-   if summary_type == "All":
+   if summary_type == "Both":
       flds = [out_field] + ct_flds
    elif summary_type == "Numeric":
       flds = ct_flds
    else:
       flds = out_field
    arcpy.DeleteField_management(in_Bounds, flds)
-   arcpy.JoinField_management(in_Bounds, fld_ID, pt, fld_ID, flds)
+   arcpy.JoinField_management(in_Bounds, fld_ID_orig, pivtab, fld_ID, flds)
    return in_Bounds
 
 ### MAIN FUNCTIONS ###
@@ -1561,7 +1604,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
    
    # Field: EEO_SUMMARY (EO counts by tier in ConSites; text summary column)
-   tierSummary(in_ConSites, "SITEID", in_sortedEOs, slopFactor, out_field="EEO_SUMMARY", summary_type="Text")
+   tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor)
    
    # Create final outputs
    fldList = [
