@@ -404,16 +404,19 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
       - add other summaries from sjEOs as needed. (Element names, unique elements, etc).
       - make this compatible for summarizing ECS also
    """
+   # Fixed settings
    scratchGDB = "in_memory"
-   # Field names: update these if the EO field names change
+   # Tier field name
    tier_field = "EEO_TIER"
+   # All possible tier ranks, with names to use for count fields. 6: 'Other' is assigned to anything outside of the 5 named tiers.
+   tiers = {1: "Irreplaceable", 2: "Critical", 3: "Vital", 4: "High Priority", 5: "General", 6: "Other"}
+   
    # EO ID field (two options allowed)
    eo_flds = GetFlds(in_EOs)
    if "SF_EOID" in eo_flds:
       eo_id = "SF_EOID"
    else:
       eo_id = "EO_ID"
-   # Exit if tier and/or EO field are not found
    if not all(a in eo_flds for a in [tier_field, eo_id]):
       printErr("The fields [" + ", ".join([tier_field, eo_id]) + "] must be present in the input EOs layer.")
       return
@@ -422,7 +425,7 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    if fld_ID == GetFlds(in_Bounds, oid_only=True):
       fld_ID = "JOIN_FID"
    else:
-      # This handles the case where a (non-OID) field exists in both boundary and EOs
+      # This handles the case where a (non-OID) field exists in both the boundary layer and EOs layer
       if fld_ID in eo_flds:
          fld_ID += "_1"
    
@@ -452,25 +455,36 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    arcpy.CalculateField_management(lyr, tier_field, "'Other'")
    del lyr
    
-   # Calculate summary
+   # Calculate summary, pivot table
    stats = scratchGDB + os.sep + "stats"
    arcpy.analysis.Statistics(sjEOs, stats, [[eo_id, "UNIQUE"]], [rank_field, fld_ID, tier_field]) # NOTE: rank_field should be first, so sorting is correct.
-   tiers = TabToDict(stats, rank_field, tier_field)
    pivtab = scratchGDB + os.sep + "pt"
    arcpy.management.PivotTable(stats, fld_ID, rank_field, "UNIQUE_" + eo_id, pivtab)
    
-   # Update names of count fields to match tier names
-   ct_flds = []
+   # Convert nulls to zero and then calculate total Essential EOs
+   # this dictionary only includes tiers actually present in the dataset, and is used to build calculate field calls.
+   tiers_exist = [a for a in GetFlds(pivtab) if a.startswith(rank_field)]
+   [NullToZero(pivtab, t) for t in tiers_exist]
+   # Calculate total essential (top 4 tiers only)
+   calc = "int(" + "+".join(["!" + t + "!" for t in tiers_exist if int(t[-1]) in range(0, 5)]) + ")"
+   arcpy.CalculateField_management(pivtab, "ct_Essential", calc, field_type="SHORT")
+   ct_flds = ["ct_Essential"]
+   
+   # Add count fields for all individual tier values (creating a new field populated with 0 if it doesn't exist)
    for t in tiers:
       fld = "ct_" + tiers[t].replace(" ", "")
-      NullToZero(pivtab, rank_field + str(t), new_field=fld)
+      if rank_field + str(t) in tiers_exist:
+         arcpy.CalculateField_management(pivtab, fld, "!" + rank_field + str(t) + "!", field_type="SHORT")
+      else:
+         arcpy.CalculateField_management(pivtab, fld, 0, field_type="SHORT")
       ct_flds.append(fld)
-   # Calculate text summary
+      
+   # Text summary
    if summary_type != "Numeric":
       # Field: EEO_SUMMARY
-      codeblock = '''def fn(ir, cr, vi, hp, ge):
+      codeblock = '''def fn(ir=0, cr=0, vi=0, hi=0):
          text = []
-         total = int(ir + cr + vi + hp)
+         total = int(ir + cr + vi + hi)
          if total == 0:
             return
          if ir > 0:
@@ -488,18 +502,19 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
                text.append(str(int(vi)) + " Vital NHR")
             else:
                text.append(str(int(vi)) + " Vital NHRs")
-         if hp > 0:
-            if hp == 1:
-               text.append(str(int(hp)) + " High Priority NHR")
+         if hi > 0:
+            if hi == 1:
+               text.append(str(int(hi)) + " High Priority NHR")
             else:
-               text.append(str(int(hp)) + " High Priority NHRs")
+               text.append(str(int(hi)) + " High Priority NHRs")
          if len(text) > 1:
             return ", ".join(text[:-1]) + " and " + text[-1:][0]
          else:
             return text[0]
       '''
-      call = "fn(!ct_Irreplaceable!, !ct_Critical!, !ct_Vital!, !ct_HighPriority!, !ct_General!)"
+      call = "fn(!ct_Irreplaceable!, !ct_Critical!, !ct_Vital!, !ct_HighPriority!)"
       arcpy.CalculateField_management(pivtab, out_field, call, code_block=codeblock, field_type="TEXT")
+   
    # Add fields to in_Bounds
    if summary_type == "Both":
       flds = [out_field] + ct_flds
