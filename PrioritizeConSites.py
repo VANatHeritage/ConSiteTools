@@ -515,7 +515,7 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
       call = "fn(!ct_Irreplaceable!, !ct_Critical!, !ct_Vital!, !ct_HighPriority!)"
       arcpy.CalculateField_management(pivtab, out_field, call, code_block=codeblock, field_type="TEXT")
    
-   # Add fields to in_Bounds
+   printMsg("Joining summary fields...")
    if summary_type == "Both":
       flds = [out_field] + ct_flds
    elif summary_type == "Numeric":

@@ -6,27 +6,27 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-01):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-10):
 
 #### Version 2.2
 
 - Conservation Portfolio Tools:
-  - The assignment methods and names of several tier levels were updated. Portfolio remains unchanged.
-  - output files have numerous field name changes, and new fields added
+  - Tier assignments and names changed (inclusion in portfolio remains unchanged)
+  - numerous field name changes for output files, new fields added
   - overhaul of internal functions to speed up processing
-  - tools now auto-populate output locations
-  - output file name suffix parameter added, which auto-populates based on the site type
+  - tools auto-populate output locations, and output file name suffix parameter based on site type
+  - `EO Tier Summary` added as a standalone tool in Subroutines
 
 - SCS/SCU updates:
-  - Several changes for tool `2: Generate SCS Lines`:
-    - tool will look input Service Area layers in the HydroNet_ND geodatabase location, making it unnecessary to keep them in the map
-    - Added an internal function `FillLines_scs` to fill in small gaps between nearby scsLines
+  - `2: Generate SCS Lines`
+    - tool will look input Service Area layers in the HydroNet_ND geodatabase location, so they do not need to be in the map
+    - Added internal function `FillLines_scs` to fill in small gaps (~1 km) between nearby scsLines
 
 - TCS updates:
-  - Site delineation unchanged, but updates made to improve processing speed and usage, primarily for tool `3. Create Conservation Sites`
+  - Updates made to `3. Create Conservation Sites` to improve processing speed
 
 - Other:
-  - re-worked `Review Conservation Sites` tool to improve processing speed. Site names are now included in the output feature class.
+  - `Review Conservation Sites` now adds site name(s) to the output feature class
 
 #### Version 2.1
 
