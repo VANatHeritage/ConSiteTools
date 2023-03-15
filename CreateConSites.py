@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2022-11-04
+# Last Edit: 2023-03-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -118,8 +118,7 @@ def bmiFlatten(inConsLands, outConsLands, scratchGDB = None):
    arcpy.env.extent = 'MAXOF'
    
    if not scratchGDB:
-      # For some reason this function runs more slowly if "in_memory" is used for scratchGDB, at least on my dinosaur computer, so set to scratchGDB on disk.
-      scratchGDB = arcpy.env.scratchGDB
+      scratchGDB = "in_memory"
    
    for val in ["U", "5", "4", "3", "2", "1"]:
       # Make a subset feature layer
@@ -585,7 +584,7 @@ def prepInclusionZone(in_Zone1, in_Zone2, in_Score, out_Rast, truncVal = 9):
    print("Mission complete.")
    return out_Rast
    
-def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", scratchGDB = arcpy.env.scratchWorkspace):
+def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", fld_SiteName="SITENAME", scratchGDB = "in_memory"):
    '''Submits new (typically automated) Conservation Site features to a Quality Control procedure, comparing new to existing (old) shapes  from the previous production cycle. It determines which of the following applies to the new site:
    - N:  Site is new, not corresponding to any old site.
    - I:  Site is identical to an old site.
@@ -602,6 +601,9 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - ModType:  Text field indicating how the site has been modified, relative to existing old sites.  Values are "N". "M", "S", "I", or "B" as described above.
    - PercDiff:  Numeric field indicating the percent difference between old and new boundaries, as described above.  Applies only to sites where ModType = "B".
    - AssignID:  Long integer field containing the old SITEID associated with the new site.  This field is automatically populated only for sites where ModType is "B" or "I".  For other sites, the ID should be manually assigned during site review.  Attributes associated with this ID may be transferred, in whole or in part, from the old site to the new site.  
+   - AssignName: Text field, populated with the Site Name(s) of old site(s) that intersect the new site. For sites coded “B” or “I”, this will simply be the name of the old site 
+    that corresponds to the new site. For sites coded “M” or “C”, the multiple old site’s names are concatenated, using a semi-colon as a separator. For sites coded “S”, indicating that two or more 
+    new sites were split off from one old site, a dash and sequential number are appended to the end of the old site’s name, which ensures that the new site’s AssignName is unique. 
    - Flag:  Short integer field indicating whether the new site needs to be examined by a human (1) or not (0).  All sites where ModType is "N", "M", or "S" are flagged automatically.  Sites where ModType = "B" are flagged if the value in the PercDiff field is greater than the user-specified threshold.
    - Comment:  Text field to be used by site reviewers to enter comments.  Nothing is entered automatically.
 
@@ -611,7 +613,10 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    - cutVal: a cutoff percentage that will be used to flag features that represent significant boundary growth or reduction(e.g., 10%)
    - out_Sites: output new Conservation Sites feature class with QC information
    - fld_SiteID: the unique site ID field in the old CS feature class
-   - scratchGDB: scratch geodatabase for intermediate products'''
+   - fld_SiteName: the unique site name field in the old CS feature class
+   - scratchGDB: scratch geodatabase for intermediate products
+   '''
+   getScratchMsg(scratchGDB)
 
    # Recast cutVal as a number b/c for some reasons it's acting like text
    cutVal = float(cutVal)
@@ -619,7 +624,15 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
    # Determine how many old sites are overlapped by each automated site.  
    # Automated sites provide the output geometry
    printMsg("Performing first spatial join...")
-   fldmap = "Shape_Length \"Shape_Length\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Length,-1,-1;Shape_Area \"Shape_Area\" false true true 8 Double 0 0 ,First,#,auto_CS,Shape_Area,-1,-1"
+   
+   # Sort original CS by area, so the spatial join will list the largest CS first (for new sites which intersect multiple original sites)
+   arcpy.Sort_management(orig_CS, scratchGDB + os.sep + 'orig_CS', [["Shape_area", "DESCENDING"]])
+   orig_CS = scratchGDB + os.sep + 'orig_CS'
+   
+   # Use field map to add Site ID and Site Names to the output layer
+   fldmap1 = 'AssignID "AssignID" true true false 100 Text 0 0,Join,";",%s,%s,-1,-1' % (orig_CS, fld_SiteID)
+   fldmap2 = 'AssignName "AssignName" true true false 1000 Text 0 0,Join,"; ",%s,%s,-1,-1' % (orig_CS, fld_SiteName)
+   fldmap = """%s;%s""" % (fldmap1, fldmap2)
    arcpy.analysis.SpatialJoin(auto_CS, orig_CS, out_Sites, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldmap, "INTERSECT")
    
    # Add a field to indicate site type
@@ -677,120 +690,83 @@ def ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID = "SITEID", s
       arcpy.management.CalculateField("ssLyr", "ModType", '"B"')
       qry = "ModType = 'B'"
       bLyr = arcpy.management.MakeFeatureLayer(out_Sites, "bLyr", qry)
-      # Get the old site IDs to attach to SingleSites.  
-      # Single Sites provide the output geometry
-      printMsg("Attaching site IDs...")
-      Join3 = scratchGDB + os.sep + "Join3"
-      arcpy.analysis.SpatialJoin("bLyr", orig_CS, Join3, "JOIN_ONE_TO_ONE", "KEEP_COMMON", "", "INTERSECT")
-      arcpy.management.JoinField("ssLyr", "OBJECTID", Join3, "TARGET_FID", fld_SiteID)
-      arcpy.management.AlterField("ssLyr", fld_SiteID, "AssignID", "AssignID")
    else:
-      arcpy.management.AddField(out_Sites, "AssignID", "TEXT", "", "", 40)
       bLyr = None
    
    # Get the subset of single sites that are identical to old sites
-   if bLyr: 
+   if bLyr:
       arcpy.management.SelectLayerByLocation("bLyr", "ARE_IDENTICAL_TO", "NoSplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-      c = countSelectedFeatures("ssLyr")
+      c = countSelectedFeatures("bLyr")
       if c > 0:
          printMsg("%s sites are identical to the old ones..."%str(c))
-         arcpy.management.CalculateField("ssLyr", "ModType", '"I"')
+         arcpy.management.CalculateField("bLyr", "ModType", '"I"')
    else:
       pass
    
    # Get the combo split-merge sites
    printMsg("Separating out combo split-merge sites...")
    arcpy.management.SelectLayerByLocation("mergeLyr", "INTERSECT", "SplitLyr", "", "NEW_SELECTION", "NOT_INVERT")
-   # ComboSites = scratchGDB + os.sep + "ComboSites"
-   # arcpy.management.CopyFeatures("mergeLyr")
    c = countSelectedFeatures("mergeLyr")
    if c > 0:
       printMsg("There are %s combo split-merge sites"%str(c))
       arcpy.management.CalculateField("mergeLyr", "ModType", '"C"')
-
-   # Process:  Add Fields; Calculate Fields
+   
+   printMsg("Examining boundary changes for boundary change only sites...")
+   # Calculate PercDiff for Boundary Change only sites
+   qry = "ModType = 'B'"
+   newB = scratchGDB + os.sep + "newB"
+   arcpy.MakeFeatureLayer_management(out_Sites, "B_Lyr", where_clause=qry)
+   if countFeatures("B_Lyr") > 0:
+      arcpy.CopyFeatures_management("B_Lyr", newB)
+      arcpy.CalculateField_management(newB, "new_area", "!shape.area@squaremeters!", field_type="DOUBLE")
+      # Make layer for old sites, calculate area
+      arcpy.MakeFeatureLayer_management(orig_CS, "o_lyr")
+      arcpy.SelectLayerByLocation_management("o_lyr", "INTERSECT", newB)
+      oldB = scratchGDB + os.sep + "oldB"
+      arcpy.CopyFeatures_management("o_lyr", oldB)
+      arcpy.CalculateField_management(oldB, "old_area", "!shape.area@squaremeters!", field_type="DOUBLE")
+      # Calculate intersection
+      tmpInt = scratchGDB + os.sep + "tmpInt"
+      arcpy.PairwiseIntersect_analysis([newB, oldB], tmpInt)
+      # Sum the difference of the intersect area from both new/old sites, compare that to old site area. 
+      calc = "100 * ((!new_area! - !shape.area@squaremeters!) + (!old_area! - !shape.area@squaremeters!)) / !old_area!"
+      arcpy.CalculateField_management(tmpInt, "PercDiff", calc, field_type="DOUBLE")
+      arcpy.JoinField_management(out_Sites, "AssignID", tmpInt, "AssignID", "PercDiff")
+   
+   # Process: Add Fields; Calculate Flag Field
+   # Note that PercDiff would already be in the layer if there are "B" type sites, but ArcGIS will just ignore it in that case.
    printMsg("Calculating fields...")
    for fld in [("PercDiff", "DOUBLE", ""), ("Flag", "SHORT", ""), ("Comment", "TEXT", 1000)]:
-      arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2]) 
-   CodeBlock = """def Flag(ModType):
-      if ModType in ("N", "M", "C", "S", "B"):
+      arcpy.management.AddField(out_Sites, fld[0], fld[1], "", "", fld[2])
+   CodeBlock = """def Flag(ModType, percDiff):
+      if ModType in ("N", "M", "C", "S"):
          flg = 1
+      elif ModType == "B":
+         if percDiff >= %s:
+            flg = 1
+         else:
+            flg = 0
       else:
          flg = 0
-      return flg"""
-   Expression = "Flag(!ModType!)"
-   arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock) 
-      
-   # Loop through the individual Boundary Change sites and check for amount of change
-   qry = "ModType = 'B'"
-   arcpy.management.MakeFeatureLayer(out_Sites, "B_Lyr", qry)
-   myIndex = 1 # Set a counter index
-   printMsg("Examining boundary changes for boundary change only sites...")
-   with arcpy.da.UpdateCursor("B_Lyr", ["SHAPE@", "AssignID", "PercDiff", "Flag"]) as mySites: 
-      for site in mySites: 
-         try: # put all this in a TRY block so that even if one feature fails, script can proceed to next feature
-            # Extract the shape and ID from the data record
-            myShape = site[0]
-            myID = site[1]
-            printMsg("\nWorking on Site ID %s" %myID)
-            
-            qry = '"%s" = \'%s\'' %(fld_SiteID, myID)
-            tmpOldSite = arcpy.management.MakeFeatureLayer(orig_CS, "tmpLyr", qry)
-
-            # Get the area of the old site
-            OldArea = arcpy.SearchCursor(tmpOldSite).next().shape.area
-
-            # Process:  Symmetrical Difference (Analysis)
-            # Create features from the portions of the old and new sites that do NOT overlap
-            tmpSymDiff = "in_memory" + os.sep + "tmpSymDiff"
-            arcpy.analysis.SymDiff(tmpOldSite, myShape, tmpSymDiff, "ONLY_FID", "")
-
-            # Process:  Dissolve (Data Management)
-            # Dissolve the Symmetrical Difference polygons into a single (multi-part) polygon
-            tmpDissolve = "in_memory" + os.sep + "tmpDissolve"
-            arcpy.analysis.PairwiseDissolve(tmpSymDiff, tmpDissolve)
-
-            # Get the area of the difference shape
-            DiffArea = arcpy.SearchCursor(tmpDissolve).next().shape.area
-
-            # Calculate the percent difference from old shape, and set the value in the record
-            PercDiff = 100*DiffArea/OldArea
-            printMsg("The shapes differ by " + str(PercDiff) + " percent of original site area")
-            site[2] = PercDiff
-
-            # If the difference is greater than the cutoff, set the flag value to "Suspect", otherwise "Okay"
-            if PercDiff > cutVal:
-               printMsg("Shapes are significantly different; flagging record")
-               site[3] = 1
-            else:
-               printMsg("Shapes are similar; unflagging record")
-               site[3] = 0
-
-            # Update the data table
-            mySites.updateRow(site) 
-         
-         except:       
-            # Add failure message
-            printMsg("Failed to fully process feature " + str(myIndex))
-
-            # Error handling code swiped from "A Python Primer for ArcGIS"
-            tb = sys.exc_info()[2]
-            tbinfo = traceback.format_tb(tb)[0]
-            pymsg = "PYTHON ERRORS:\nTraceback Info:\n" + tbinfo + "\nError Info:\n " + str(sys.exc_info()[1])
-            msgs = "ARCPY ERRORS:\n" + arcpy.GetMessages(2) + "\n"
-
-            arcpy.AddError(msgs)
-            arcpy.AddError(pymsg)
-            printMsg(arcpy.GetMessages(1))
-
-            # Add status message
-            printMsg("\nMoving on to the next feature.  Note that the output will be incomplete.")
-         
-         finally:
-            # Increment the index by one, and clear the in_memory workspace before returning to beginning of the loop
-            myIndex += 1 
-            arcpy.Delete_management("in_memory")
-
+      return flg""" % (str(cutVal))
+   Expression = "Flag(!ModType!, !PercDiff!)"
+   arcpy.management.CalculateField(out_Sites, "Flag", Expression, "PYTHON3", CodeBlock)
+   
+   # Process: Update AssignID and Name for split sites, adding a sequential number based on area of new site. 
+   # This should ensure that AssignName is unique.
+   slyr = arcpy.MakeFeatureLayer_management(out_Sites, "slyr", "ModType IN ('S')")  # could add "C", but don't think it's necessary.
+   if countFeatures(slyr) > 0:
+      printMsg("Adding sequential numbers to IDs and names for split and combo sites...")
+      arcpy.CalculateField_management(slyr, "tmp_area", "!Shape.area@squaremeters!", field_type="FLOAT")
+      calcGrpSeq(slyr, [["tmp_area", "DESCENDING"]], "AssignID", "rnk_area")
+      # arcpy.CalculateField_management(slyr, "AssignID", "!AssignID! + '-' + str(!rnk_area!)")  # not doing this. AssignID's will be NULLed out later for splits
+      arcpy.CalculateField_management(slyr, "AssignName", "!AssignName! + '-' + str(!rnk_area!)")
+      arcpy.DeleteField_management(out_Sites, ["tmp_area", "rnk_area"])
+   
+   # set AssignID to Null, for anything not B or I (1 to 1 match)
+   mlyr = arcpy.MakeFeatureLayer_management(out_Sites, "mlyr", "ModType NOT IN ('B', 'I')")
+   arcpy.CalculateField_management(mlyr, "AssignID", "None")
+   
    return out_Sites
 
 
@@ -990,9 +966,6 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
 
 def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, searchDist, smthDist, scratchGDB = "in_memory"):
    '''Uses Erase Features to chop out sections of input features. Stitches non-trivial fragments back together only if within search distance of each other. Subsequently uses output to erase EraseFeats (so those EraseFeats are no longer used to cut out part of site).
-   
-   NOTE: I think this function is a bottleneck.
-   
    Parameters:
    - in_PF: input Procedural Features
    - in_Feats: input features to be chopped (typically SBBs)
@@ -1004,9 +977,9 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    - smthDist: dilation distance for smoothing
    '''
    # Use in_EraseFeats to chop out sections of PFs
-   printMsg('Running ChopMod...')
+   printMsg("Chopping PFs...")
    firstChopPF = scratchGDB + os.sep + 'firstChopPF'
-   arcpy.analysis.Erase(in_PF, in_EraseFeats, firstChopPF)
+   arcpy.PairwiseErase_analysis(in_PF, in_EraseFeats, firstChopPF)
 
    # NOTE: in rare cases, all PFs in a ProtoSite get erased (e.g. small island PFs covered by a hydrographic features). 
    # This will result in an error, returning nothing for this function.
@@ -1020,42 +993,50 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
 
    # Use in_EraseFeats to chop out sections of input features
    # Use regular Erase, not Clean Erase; multipart is good output at this point
+   printMsg("Chopping SBBs...")
    firstChop = scratchGDB + os.sep + 'firstChop'
-   arcpy.analysis.Erase(in_Feats, in_EraseFeats, firstChop)
+   arcpy.PairwiseErase_analysis(in_Feats, in_EraseFeats, firstChop)
+   arcpy.AlterField_management(firstChop, fld_ID, "feat_" + fld_ID)  # this distinguishes the chopped features ID field from the PF's ID field.
+   # Make a single-part version
+   explChop = scratchGDB + os.sep + 'explChop'
+   arcpy.management.MultipartToSinglepart(firstChop, explChop)
+   # Find SBB fragments intersecting associated PFs
+   partsSBB = scratchGDB + os.sep + "partsSBB"
+   arcpy.SpatialJoin_analysis(explChop, rtnPartsPF, partsSBB, "JOIN_ONE_TO_MANY", "KEEP_ALL", match_option="INTERSECT")
+   qry = "feat_" + fld_ID + " = " + fld_ID
+   # these features intersect PFs, so they will be kept. They already have keep = 1, which is joined from the PFs.
+   keepLyr = arcpy.MakeFeatureLayer_management(partsSBB, where_clause=qry)
 
    # Eliminate parts comprising less than 25% of total original feature size
    # Previously had this set to 5% but that threshold was too low 
    printMsg('Eliminating insignificant fragments...')
    rtnParts0 = scratchGDB + os.sep + 'rtnParts0'
-   arcpy.management.EliminatePolygonPart(firstChop, rtnParts0, 'PERCENT', '', 25, 'ANY')
+   arcpy.management.EliminatePolygonPart(firstChop, rtnParts0, 'PERCENT', '', 25, 'ANY')  # NOTE: this also fills in polygon holes.
    rtnParts = scratchGDB + os.sep + 'rtnParts'
    arcpy.MultipartToSinglepart_management(rtnParts0, rtnParts)
    arcpy.CalculateField_management(rtnParts, "keep", 0, field_type="SHORT")
+   # Add SBBs parts which intersect PFs
+   arcpy.Append_management(keepLyr, rtnParts, "NO_TEST")
    
-   # This loop adds back parts of SBBs intersecting retained PFs, then uses searchDist to mark fragments to keep.
-   explChop = scratchGDB + os.sep + 'explChop'
-   arcpy.management.MultipartToSinglepart(firstChop, explChop)
+   # Find "groups" of fragments within fld_ID groups
+   fragGrp = "fragGrp"  # field to hold group IDs
+   SpatialCluster_GrpFld(rtnParts, multiMeasure(searchDist, 0.5)[2], fragGrp, fldGrpBy='feat_' + fld_ID, chain=False)
+   # Mark to keep ALL fragments in a group which contain a keep=1 fragment (intersecting a PF)
+   grpKeep = [a[0] for a in arcpy.da.SearchCursor(rtnParts, [fragGrp, "keep"]) if a[1] == 1]
+   with arcpy.da.UpdateCursor(rtnParts, [fragGrp, "keep"]) as curs:
+      for r in curs:
+         if r[0] in grpKeep:
+            r[1] = 1
+         else:
+            r[1] = 0
+         curs.updateRow(r)
+   
+   # Check for PFs which were completely erased
    pfList = unique_values(in_PF, fld_ID)
-   pfErased = []
-   for id in pfList:
-      qry = "%s = '%s'"%(fld_ID, id) # This will fail if field is not a string type
-      arcpy.management.MakeFeatureLayer(rtnPartsPF, "pfLyr", qry)
-      if countFeatures("pfLyr") == 0:
-         # If no PF parts remain, the PF was completely erased. These are reported in a warning after the loop.
-         pfErased.append(id)
-         continue
-      arcpy.management.MakeFeatureLayer(explChop, "chopLyr", qry)
-      arcpy.management.SelectLayerByLocation("chopLyr", "INTERSECT", "pfLyr", "", "SUBSET_SELECTION")
-      arcpy.management.Append("chopLyr", rtnParts, "NO_TEST")
-      # Once the parts to retain are included (based on size and intersection with retained PFs), 
-      #  procedure below will mark fragments to keep, based on intersection with PFs and searchDist. 
-      #  This will remove the need for the Shrinkwrap loop and subsequent CullFrags, improving processing time.
-      rtnPartsLyr = arcpy.management.MakeFeatureLayer(rtnParts, "rtnPartsLyr", qry)
-      arcpy.management.SelectLayerByLocation(rtnPartsLyr, "INTERSECT", "pfLyr")
-      ExpandSelection(rtnPartsLyr, searchDist)
-      arcpy.CalculateField_management(rtnPartsLyr, "keep", 1)
+   pfErasedList = unique_values(rtnPartsPF, fld_ID)
+   pfErased = [p for p in pfList if p not in pfErasedList]
    if len(pfErased) > 0:
-      printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If this affects the final site delineation, you may want to edit the modification features or PFs.")
+      printWrng("One or more PFs [" + fld_ID + " IN ('" + "','".join(pfErased) + "')] were erased by modification features, so their SBBs were excluded. If you think this affected the final site delineation, you may want to edit the modification features or PFs and re-run.")
 
    # Append retained PFs to rtnParts
    arcpy.management.Append(rtnPartsPF, rtnParts, "NO_TEST")
@@ -1406,7 +1387,12 @@ def CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi = "NA", out_SBB = "sb
          try:
             nwiQry = "Rule%s = 1"%r
             nwi = arcpy.management.MakeFeatureLayer(in_nwi, "tmpNWI", nwiQry)
-            msg = CreateWetlandSBB("tmpLyr", fld_SFID, nwi, out_SBB, scratchGDB)
+            # Create a subset of NWI features within the maximum buffer distance. This helps speed processing in the CreateWetlandSBB function.
+            # Make sure that search_distance is the same as the maxBuff in that function (currently 500-m).
+            arcpy.SelectLayerByLocation_management(nwi, "WITHIN_A_DISTANCE", "tmpLyr", search_distance="500 Meters")
+            nwiSub = scratchGDB + os.sep + "nwiSub"
+            arcpy.CopyFeatures_management(nwi, nwiSub)
+            msg = CreateWetlandSBB("tmpLyr", fld_SFID, nwiSub, out_SBB, scratchGDB)
             warnMsgs = arcpy.GetMessages(1)
             if warnMsgs:
                printWrng("Finished processing Rule %s, but there were some problems."%r)
@@ -1940,8 +1926,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    descHydro = arcpy.Describe(in_hydroNet)
    nwDataset = descHydro.catalogPath
    catPath = os.path.dirname(nwDataset) # This is where hydro layers will be found
-   hydroDir = os.path.dirname(catPath)
-   hydroDir = os.path.dirname(hydroDir) # This is where output layer files will be saved
+   hydroDir = os.path.dirname(os.path.dirname(catPath)) # This is where output layer files will be saved
    downString = (str(downDist)).replace(".","_")
    upString = (str(upDist)).replace(".","_")
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyrx"%downString
@@ -2072,6 +2057,77 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    printMsg("Network point generation complete.")
    return out_Points
    
+def FillLines_scs(inLines, outFillLines, flowlines, max_flowline_length=500, barriers=None, scratchGDB ="in_memory"):
+   """
+   Using scsLine features and NHDFlowline, finds and returns flowline 'filler' segments which meet segment/ total length
+   criteria, which can be used to patch the gaps between inLines.
+   
+   The workflow for finding filler segments starts by selecting the following flowlines from NHDFlowline:
+      - primary: flowlines which overlap inLines. There is no length criteria for these flowlines.
+      - secondary: flowlines which intersect the primary selection and have length <= max_flowline length. Secondary
+         flowlines are only selected once, meaning a maximum of two secondary lines could be added to fill a given gap.
+   The two selections are merged and unsplit to create contiguous potential filler line features.
+   To be included in outFillLines, a filler line must:
+      - be less than a total length limit, currently set as (max_flowline_length * 2). This is arbitrary!
+      - intersect 2+ inLines (identified using a spatial join)
+   
+   :param inLines: Input line features, to find gaps between
+   :param outFillLines: Output filler line features which can be used to patch the gaps in inLines
+   :param flowlines: Original flowline layer (e.g. NHDFlowline)
+   :param max_flowline_length: Maximum length limit for a single non-intersecting flowline (flowSec), given as an
+      integer in NHDFlowline layer's coordinate system units (assumed meters).
+   :param barriers: Feature class of barriers (i.e. dams). If given, filler lines within 100-m of barriers will be excluded.
+   :param scratchGDB: geodatabase to hold intermediate products
+   :return: outFillLines
+   """
+   printMsg("Checking if any gaps can be patched...")
+   # First find flowlines overlapping with inLines.
+   flowPri = arcpy.MakeFeatureLayer_management(flowlines)
+   arcpy.SelectLayerByLocation_management(flowPri, "SHARE_A_LINE_SEGMENT_WITH", inLines)
+   # Add intersecting flowlines, if they are less than max_flowline_length.
+   flowSec = arcpy.MakeFeatureLayer_management(flowlines, where_clause="Shape_Length <= " + str(max_flowline_length))
+   arcpy.SelectLayerByLocation_management(flowSec, "BOUNDARY_TOUCHES", flowPri)
+   arcpy.SelectLayerByLocation_management(flowSec, "ARE_IDENTICAL_TO", flowPri, selection_type="REMOVE_FROM_SELECTION")
+   # Combine the selections
+   flow0 = scratchGDB + os.sep + 'flow0'
+   arcpy.Merge_management([flowPri, flowSec], flow0)
+   
+   # Erase inLines, so you are left with only the unincluded lines
+   flow1 = scratchGDB + os.sep + 'flow1'
+   arcpy.PairwiseErase_analysis(flow0, inLines, flow1)
+   flow1s = scratchGDB + os.sep + 'flow1s'
+   arcpy.MultipartToSinglepart_management(flow1, flow1s)
+   # Merge adjacent lines
+   flow2 = scratchGDB + os.sep + 'flow2'
+   UnsplitLines(flow1s, flow2, scratchGDB)
+   
+   # This section selects only gap segments with total length less than some defined value.
+   # Note this is a total length criteria, so it includes any tributary segments which may have been picked up. 
+   # That's why I'm using a multiple of the max flowline length here to define fill_max_length.
+   flow2b = scratchGDB + os.sep + 'flow2b'
+   fill_max_length = max_flowline_length * 2
+   arcpy.CalculateField_management(flow2, 'total_length', "!shape.length@meters!", field_type="FLOAT")
+   query = "total_length < " + str(fill_max_length)
+   lyr = arcpy.MakeFeatureLayer_management(flow2, where_clause=query)
+   if barriers is not None:
+      printMsg("Removing filler lines near barriers...")
+      # Use barriers to remove filler lines within 100-m
+      arcpy.SelectLayerByLocation_management(lyr, "WITHIN_A_DISTANCE", barriers, "100 Meters", "NEW_SELECTION", "INVERT")
+   arcpy.CopyFeatures_management(lyr, flow2b)
+   filler = flow2b
+   
+   # Find gap filler lines which intersect more than one of the inLines
+   flow3 = scratchGDB + os.sep + 'flow3'
+   arcpy.analysis.SpatialJoin(filler, inLines, flow3, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
+   fid = [a[0] for a in arcpy.da.SearchCursor(flow3, 'TARGET_FID')]
+   dup = set([x for x in fid if fid.count(x) > 1])
+   dup2 = [str(a) for a in dup] + ['-1']  # note: -1 is not a valid OID, so would select nothing. It is added to make sure the query is still valid when dup is an empty list.
+   oid = GetFlds(filler, oid_only=True)
+   query = oid + " IN (" + ",".join(dup2) + ")"
+   arcpy.Select_analysis(filler, outFillLines, query)
+   
+   return outFillLines
+
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): 
    """Loads SCS points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCS.
    
@@ -2086,6 +2142,12 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    - out_Scratch = Geodatabase to contain intermediate outputs"""
    
    arcpy.CheckOutExtension("Network")
+   
+   # Find path to NHDFlowline (which is used by FillLines_scs)
+   descHydro = arcpy.Describe(in_upTrace)
+   nwDataset = descHydro.network.catalogPath
+   catPath = os.path.dirname(nwDataset)
+   nhdFlow = catPath + os.sep + "NHDFlowline"
    
    # timestamp
    t0 = datetime.now()
@@ -2161,6 +2223,25 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
+   
+   # Get dam points from the upstream service area layer
+   if in_upTrace.endswith(".lyrx"):
+      na_lyr = arcpy.mp.LayerFile(inLyr)
+      damPts = na_lyr.listLayers("Point Barriers")[0]
+   else:
+      damPts = in_upTrace + "\Point Barriers"
+   
+   # This section finds small flowline gaps between scsLines. If any are found, it re-creates out_Lines, with gaps filled in
+   if countFeatures(out_Lines) > 1:
+      fillLines = out_Scratch + os.sep + "fillLines"
+      FillLines_scs(out_Lines, fillLines, nhdFlow, 500, damPts, out_Scratch)
+      if countFeatures(fillLines) > 0:
+         printMsg("Filling in small gaps...")
+         newLines = out_Scratch + os.sep + 'newLines'
+         arcpy.Merge_management([out_Lines, fillLines], newLines)
+         UnsplitLines(newLines, out_Lines)
+      else:
+         printMsg("No gaps to fill.")
    
    # timestamp
    t1 = datetime.now()
