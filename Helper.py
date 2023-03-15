@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2022-11-04
+# Last Edit: 2023-02-09
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -12,7 +12,7 @@
 
 # Import modules
 print("Initiating arcpy, which takes longer than it should...")
-import arcpy, os, sys, traceback, numpy
+import arcpy, os, sys, traceback, numpy, pandas
 from datetime import datetime as datetime
 
 # Set overwrite option so that existing data may be overwritten
@@ -78,12 +78,10 @@ def replaceLayer(dataPath, layerName=None):
       map = aprx.activeMap
       l = map.listLayers(layerName)
       if len(l) >= 1:
-         for i in l:
-            map.removeLayer(i)
+         [map.removeLayer(i) for i in l if i.longName == layerName]
       l = map.listTables(layerName)
       if len(l) >= 1:
-         for i in l:
-            map.removeTable(i)
+         [map.removeTable(i) for i in l if i.longName == layerName]
       map.addDataFromPath(dataPath).name = layerName
    except:
       print("Could not add data `" + dataPath + "` to current map.")
@@ -283,6 +281,13 @@ def unique_values(table, field):
    https://arcpy.wordpress.com/2012/02/01/create-a-list-of-unique-field-values/'''
    with arcpy.da.SearchCursor(table, [field]) as cursor:
       return sorted({row[0] for row in cursor})
+
+def GetFlds(table, oid_only=False):
+   if oid_only:
+      flds = [a.name for a in arcpy.ListFields(table) if a.type == 'OID'][0]  # Returns a single string
+   else:
+      flds = [a.name for a in arcpy.ListFields(table)]  # Returns a list
+   return flds
    
 def TabToDict(inTab, fldKey, fldValue):
    '''Converts two fields in a table to a dictionary'''
@@ -457,12 +462,14 @@ def ShrinkWrap(inFeats, searchDist, outFeats, smthDist, scratchGDB = "in_memory"
    arcpy.analysis.PairwiseDissolve(inFeats, dissFeats, "", "", "SINGLE_PART")
    trashList.append(dissFeats)
    
-   cleanFeats = scratchGDB + os.sep + "cleanFeats"
-   CleanFeatures(dissFeats, cleanFeats)
-   trashList.append(cleanFeats)
+   # This is redundant to dissolve to single part. Not using.
+   # cleanFeats = scratchGDB + os.sep + "cleanFeats"
+   # CleanFeatures(dissFeats, cleanFeats)
+   # trashList.append(cleanFeats)
    
    # Make feature layer
-   inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr") 
+   # inFeats_lyr = arcpy.management.MakeFeatureLayer(cleanFeats, "inFeats_lyr")
+   inFeats_lyr = arcpy.management.MakeFeatureLayer(dissFeats, "inFeats_lyr")
 
    # Aggregate features
    # printMsg("Aggregating features...")
@@ -839,7 +846,7 @@ def shiftAlignToFlow(inFeats, outFeats, fldID, in_hydroNet, in_Catch, scratchGDB
    
    return (outFeats, clipWideWater, mergeLines)
    
-def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
+def UnsplitLines(inLines, outLines, scratchGDB = "in_memory"):
    '''Does what it seems the arcpy.UnsplitLine_management function SHOULD do, but doesn't.
    
    Parameters:
@@ -849,15 +856,16 @@ def UnsplitLines(inLines, outLines, scratchGDB = arcpy.env.scratchGDB):
    '''
    printMsg("Buffering segments...")
    buffLines = scratchGDB + os.sep + "buffLines"
-   arcpy.Buffer_analysis(inLines, buffLines, "1 Meters", "FULL", "ROUND", "ALL") 
+   arcpy.PairwiseBuffer_analysis(inLines, buffLines, "1 Meters", dissolve_option="ALL")
    
    printMsg("Exploding buffers...")
    explBuff = scratchGDB + os.sep + "explBuff"
    arcpy.MultipartToSinglepart_management(buffLines, explBuff)
+   oid = GetFlds(explBuff, oid_only=True)
    
    printMsg("Grouping segments...")
    arcpy.AddField_management(explBuff, "grpID", "LONG")
-   arcpy.CalculateField_management(explBuff, "grpID", "!OBJECTID!", "PYTHON")
+   arcpy.CalculateField_management(explBuff, "grpID", "!" + oid + "!", "PYTHON")
    
    joinLines = scratchGDB + os.sep + "joinLines"
    fldMap = 'grpID "grpID" true true false 4 Long 0 0, First, #, %s, grpID, -1, -1' % explBuff
@@ -886,3 +894,161 @@ def BuildFieldMappings(in_FCs, in_Flds):
             print("Couldn't add field " + f + " from feature class " + fc + ".")
       fms.addFieldMap(fm)
    return fms.exportToString()
+
+def NullToZero(in_Table, field, new_field=None):
+   if new_field is None:
+      new_field = field
+   codeblock = '''def valUpd(val):
+   if val == None:
+      return 0
+   else:
+      return val
+   '''
+   expression = "valUpd(!%s!)" % field
+   arcpy.CalculateField_management(in_Table, new_field, expression, "PYTHON", codeblock, field_type="FLOAT")
+   return in_Table
+
+def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
+   """
+   Adds a field to in_Table, representing the sequential order in the group over one or more sorting columns.
+   Note that this is not necessarily a 'rank', because the sequence will increment regardless of ties in the sorting 
+   fields. This means that the seq_field will contain unique values within a group.
+   :param in_Table: Input table
+   :param sort_field: List of sorting columns (use same convention as Sort_management tool). Do not add the grp_field, this is done in the function.
+   :param grp_field: The grouping field
+   :param seq_field: The new sequence field, to add to in_Table
+   :return: in_Table
+   """
+   printMsg("Calculating group sequences by " + grp_field + "...")
+   tmpSrt = "in_memory/grpsrt"
+   # Add group field to sorting fields
+   final_sort = [[grp_field, "ASCENDING"]] + sort_field
+   arcpy.DeleteField_management(in_Table, seq_field)  # removes existing field, has no effect if it doesn't exist
+   arcpy.Sort_management(in_Table, tmpSrt, final_sort)
+   oid = GetFlds(tmpSrt, oid_only=True)
+   join_fld = GetFlds(tmpSrt)[-1]  # this should be the TARGET_FID field
+   # Add sequence field
+   arcpy.AddField_management(tmpSrt, seq_field, "LONG")
+   grp0 = [a[0] for a in arcpy.da.SearchCursor(tmpSrt, grp_field, where_clause=oid + "= 1")][0]
+   ct = 0
+   
+   # calculate sequence
+   with arcpy.da.UpdateCursor(tmpSrt, [grp_field, seq_field]) as curs:
+      for r in curs:
+         grp = r[0]
+         if grp != grp0:
+            ct = 1
+            grp0 = grp
+         else:
+            ct += 1
+         r[1] = ct
+         curs.updateRow(r)
+   # join sequence field to original table
+   arcpy.JoinField_management(in_Table, oid, tmpSrt, join_fld, seq_field)
+   return in_Table
+
+def fc2df(feature_class, field_list, skip_nulls=True):
+   """
+   Load data into a Pandas Data Frame for subsequent analysis.
+   :param feature_class: Input ArcGIS Feature Class.
+   :param field_list: Fields for input.
+   :return: Pandas DataFrame object.
+   """
+   if not skip_nulls:
+      return pandas.DataFrame(
+         arcpy.da.FeatureClassToNumPyArray(
+            in_table=feature_class,
+            field_names=field_list,
+            skip_nulls=False,
+            null_value=-99999
+         )
+      )
+   else:
+      return pandas.DataFrame(
+         arcpy.da.FeatureClassToNumPyArray(
+            in_table=feature_class,
+            field_names=field_list,
+            skip_nulls=True
+         )
+      )
+
+def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, chain=True, scratchGDB="in_memory"):
+   """Clusters features based on specified search distance, with optional group-by field. Features within twice
+   the search distance of each other will be assigned to the same group. Use 'fldGrpBy' to only group features
+   having the save value in the `fldGrpBy` field.
+   This function converts the input to single-part, and will return single-part features. However, if the input includes
+   multi-part features, the `chain` option affects final groupings, if chain=True, the multiple parts of the original
+   input feature will be assigned to the same output group, regardless of their separation distance.
+
+   inFeats = The input features to group
+   searchDist = The search distance to use for clustering. This should be half of the max distance allowed to include
+      features in the same cluster. E.g., if you want features within 500 m of each other to cluster, enter "250 METERS"
+   fldGrpID = The desired name for the output grouping field. If not specified, it will be "grpID".
+   fldGrpBy = (optional) Field to group features by; only features with the same value in this column will be grouped,
+      if within the search distance.
+   chain = Should the single parts of the input multi-part features always be assigned to the same group? Only relevant 
+      for inFeats containing multiple-part features. If your input is single-part, you should use chain=False.
+   scratchGDB = geodatabase to hold intermediate products
+   """
+
+   # Delete the GrpID field from the input features, if it already exists.
+   arcpy.DeleteField_management(inFeats, fldGrpID)
+
+   # Buffer input features
+   print('Buffering input features...')
+   if fldGrpBy is not None:
+      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='LIST', dissolve_field=fldGrpBy)
+   else:
+      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='ALL')
+
+   # Make unique group polygons, associate with original features
+   tmpGrp = scratchGDB + os.sep + "tmp_groups"
+   arcpy.MultipartToSinglepart_management(scratchGDB + os.sep + "tmp_groups0", tmpGrp)
+   arcpy.CalculateField_management(tmpGrp, fldGrpID, '!' + GetFlds(tmpGrp, oid_only=True) + '!', field_type="LONG")
+   print('Intersecting to find groups...')
+   arcpy.PairwiseIntersect_analysis([inFeats, tmpGrp], scratchGDB + os.sep + 'tmp_flat_group0')
+
+   if fldGrpBy is not None:
+      arcpy.Select_analysis(scratchGDB + os.sep + 'tmp_flat_group0', scratchGDB + os.sep + 'tmp_flat_group', where_clause=fldGrpBy + ' = ' + fldGrpBy + '_1')
+      grpTab = scratchGDB + os.sep + 'tmp_flat_group'
+   else:
+      grpTab = scratchGDB + os.sep + 'tmp_flat_group0'
+
+   if chain:
+      print('Updating group IDs using original FIDs...')
+      orid = 'FID_' + os.path.basename(inFeats)
+      # orig groups
+      go = {a[0]: [] for a in arcpy.da.SearchCursor(grpTab, fldGrpID)}
+      [go[a[0]].append(a[1]) for a in arcpy.da.SearchCursor(grpTab, [fldGrpID, orid])]
+      # fids
+      fo = {a[0]: [] for a in arcpy.da.SearchCursor(grpTab, orid)}
+      [fo[a[0]].append(a[1]) for a in arcpy.da.SearchCursor(grpTab, [orid, fldGrpID])]
+      # for re-assigning groups
+      go2 = {a[0]: -1 for a in arcpy.da.SearchCursor(grpTab, fldGrpID)}
+      # Re-group using original FIDS
+      for g in go:
+         # g is the original group id
+         # get fids by group
+         fids = go[g]
+         # get groups by fids
+         grps = []
+         g0 = 0
+         g1 = 1
+         while g0 != g1:
+            g0 = len(grps)
+            grps = list(set(grps + [i for s in [fo.get(f) for f in fids] for i in s]))
+            fids = list(set(fids + [i for s in [go.get(g) for g in grps] for i in s]))
+            g1 = len(grps)
+         ng = min(grps)
+         for a in grps:
+            go2[a] = ng
+      # update rows with final group
+      with arcpy.da.UpdateCursor(grpTab, [fldGrpID]) as curs:
+         for r in curs:
+            r[0] = go2[r[0]]
+            curs.updateRow(r)
+
+   print('Joining ' + fldGrpID + ' to ' + os.path.basename(inFeats) + '...')
+   arcpy.JoinField_management(inFeats, 'OBJECTID', grpTab, 'FID_' + os.path.basename(inFeats), [fldGrpID])
+
+   return inFeats

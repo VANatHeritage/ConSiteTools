@@ -1,7 +1,32 @@
 # ConSite Toolbox
-ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites. Additional tools for prioritization.
+ArcGIS toolbox and associated scripts for automated delineation of Virginia Natural Heritage Conservation Sites, with additional tools for prioritization.
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2022-11-04):
+## Getting started:
+This toolbox works best with ArcGIS Pro version 3+, though it may work with earlier versions. To use:
+1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
+2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
+
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-15):
+
+#### Version 2.2
+
+- Conservation Portfolio Tools:
+  - tier assignments and names changed, but portfolio assignment methods remain unchanged
+  - numerous field name changes for output files, new fields added
+  - overhaul of internal functions to speed up processing
+  - tools auto-populate output locations, and output file name suffix parameter based on site type
+  - `EO Tier Summary` added as a standalone tool to `Subroutines` toolset
+
+- SCS/SCU updates:
+  - `2: Generate SCS Lines`
+    - Added internal function `FillLines_scs` to fill in small gaps (~1 km) between nearby scsLines
+    - Service Area Layer paths will auto-populate based on the HydroNet_ND geodatabase location
+
+- TCS updates:
+  - several updates to improve processing speed, primarily for `3. Create Conservation Sites` 
+
+- Other:
+  - `Review Conservation Sites` now adds site name(s) to the output feature class
 
 #### Version 2.1
 

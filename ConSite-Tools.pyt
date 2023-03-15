@@ -1,18 +1,15 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.1.1  # version scheme: major.minor.bugfix
-tbx_version = "2.1.1"  # headsup: the toolbox version here is appended to the Toolbox label. Make sure to update this before you commit changes.
+# Toolbox version: 2.2  # version scheme: major.minor.bugfix
+tbx_version = "2.2"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-01-10
+# Last Edit: 2023-03-15
 # Creator:  Kirsten R. Hazler
 
 # Summary:
 # A toolbox for automatic delineation and prioritization of Natural Heritage Conservation Sites
-
-# Usage Notes:
-# Some tools are set to run in foreground only, otherwise service layers would not update in map. 
 # ----------------------------------------------------------------------------------------
 
 import CreateConSites
@@ -47,6 +44,18 @@ def declareParams(params):
    # Added logging settings below, as this is most convenient place to run pre-execution setting.
    disableLog()
    return 
+
+def paramFields(param, fields_from, field_filter=['Short', 'Long', 'Text']):
+   """ Updates field type parameter, to list fields from another parameter.
+   :param param: Field parameter which depends on another parameters
+   :param fields_from: The parameter to take fields from (generally a feature class or layer)
+   :param field_filter: Type of fields to list.
+   :return: Nothing
+   List of allowable field types: Short, Long, Single, Double, Text, Date, OID, Geometry, Blob, Raster, GUID, GlobalID, and XML.
+   """
+   param.filter.list = field_filter
+   param.parameterDependencies = [fields_from.name]
+   return
 
 def getViewExtent(set=True):
    '''Gets the extent of the active view, optionally applying it as the processing extent (set=True).
@@ -95,7 +104,7 @@ class Toolbox(object):
       self.alias = "ConSiteToolbox"
 
       # List of tool classes associated with this toolbox
-      Subroutine_Tools = [coalesceFeats, shrinkwrapFeats]
+      Subroutine_Tools = [coalesceFeats, shrinkwrapFeats, eeo_summary]
       Biotics_Tools = [extract_biotics, parse_siteTypes]
       PrepReview_Tools = [copy_layers, rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands, tabulate_exclusions]
       TCS_AHZ_Tools = [expand_selection, create_sbb, expand_sbb, create_consite]
@@ -459,11 +468,15 @@ class review_consite(object):
       else:
          parm03.value = "%s_QC"%parm00.value
       
-      parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "String", "Required", "Input", "SITEID")
-      
-      parm05 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+      parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "Field", "Required", "Input", "SITEID")
+      paramFields(parm04, parm01, ['Short', 'Long', 'Text'])
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      parm05 = defineParam("fld_SiteName", "Conservation Site Name field", "Field", "Required", "Input", "SITENAME")
+      paramFields(parm05, parm01, ['Text'])
+      
+      parm06 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -474,10 +487,6 @@ class review_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[1].altered:
-         fc = parameters[1].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc) if f.type != 'OID']  # Does not work with OBJECTID, so don't allow it.
-         parameters[4].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -493,9 +502,9 @@ class review_consite(object):
       if scratch_GDB != 'None':
          scratchParm = scratch_GDB
       else:
-         scratchParm = arcpy.env.scratchWorkspace 
+         scratchParm = "in_memory"
 
-      ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, scratchParm)
+      ReviewConSites(auto_CS, orig_CS, cutVal, out_Sites, fld_SiteID, fld_SiteName, scratchParm)
       arcpy.MakeFeatureLayer_management(out_Sites, "QC_lyr")
 
       return out_Sites
@@ -600,7 +609,9 @@ class calc_bmi(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_Feats", "Input polygon features", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam("fld_ID", "Polygon ID field", "String", "Required", "Input")
+      parm1 = defineParam("fld_ID", "Polygon ID field", "Field", "Required", "Input")
+      paramFields(parm1, parm0, ['Short', 'Long', 'Text'])
+      
       parm2 = defineParam("in_BMI", "Input BMI Polygons", "GPFeatureLayer", "Required", "Input")
       parm3 = defineParam("fld_Basename", "Base name for output fields", "String", "Required", "Input", "PERCENT_BMI_")
       
@@ -615,10 +626,6 @@ class calc_bmi(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[1].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -680,9 +687,7 @@ class tabulate_exclusions(object):
       self.label = "Create Element Exclusion List"
       self.description = ""
       self.canRunInBackground = True
-      # self.category = "Conservation Portfolio Tools"
       self.category = "Preparation and Review Tools"
-      # TODO: move this function to the proper section
 
    def getParameterInfo(self):
       """Define parameter definitions"""
@@ -715,8 +720,63 @@ class tabulate_exclusions(object):
       declareParams(parameters)
 
       MakeExclusionList(in_Tabs, out_Tab)
+      replaceLayer(out_Tab)
 
       return (out_Tab)
+
+
+class eeo_summary(object):
+   def __init__(self):
+      """Define the tool (tool name is the name of the class)."""
+      self.label = "EO Tier Summary"
+      self.description = ""
+      self.canRunInBackground = True
+      self.category = "Subroutines"
+
+   def getParameterInfo(self):
+      """Define parameter definitions"""
+      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
+      parm01 = defineParam("fld_ID", "Boundary ID field", "Field", "Required", "Input")
+      paramFields(parm01, parm00, ['Short', 'Long', 'Text'])
+      parm02 = defineParam("in_EOs", "Input EOs", "GPFeatureLayer", "Required", "Input")
+      parm03 = defineParam("summary_type", "Summary type", "String", "Required", "Input", "Both")
+      parm03.filter.list = ['Text', 'Numeric', 'Both']
+      parm04 = defineParam("out_field", "Output text summary field name", "String", "Required", "Input", "EEO_SUMMARY")
+      parm05 = defineParam("slopFactor", "Search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
+      
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      return parms
+
+   def isLicensed(self):
+      """Set whether tool is licensed to execute."""
+      return True
+
+   def updateParameters(self, parameters):
+      """Modify the values and properties of parameters before internal
+      validation is performed.  This method is called whenever a parameter
+      has been changed."""
+      if parameters[3].altered:
+         if parameters[3].valueAsText != "Numeric":
+            parameters[4].enabled = True
+         else:
+            parameters[4].enabled = False
+      return
+
+   def updateMessages(self, parameters):
+      """Modify the messages created by internal validation for each tool
+      parameter.  This method is called after internal validation."""
+      return
+
+   def execute(self, parameters, messages):
+      """The source code of the tool."""
+      # Set up parameter names and values
+      declareParams(parameters)
+
+      # Run function
+      tierSummary(in_Bounds, fld_ID, in_EOs, summary_type, out_field, slopFactor)
+
+      return (in_Bounds)
+
 
 # TCS/AHZ Delineation Tools 
 
@@ -804,11 +864,14 @@ class create_sbb(object):
       else:
          pass
 
-      parm1 = defineParam('fld_SFID', "Source Feature ID field", "String", "Required", "Input", 'SFID')
+      parm1 = defineParam('fld_SFID', "Source Feature ID field", "Field", "Required", "Input", 'SFID')
+      paramFields(parm1, parm0, ['Short', 'Long', 'Text'])
       
-      parm2 = defineParam('fld_Rule', "SBB Rule field", "String", "Required", "Input", 'RULE')
+      parm2 = defineParam('fld_Rule', "SBB Rule field", "Field", "Required", "Input", 'RULE')
+      paramFields(parm2, parm0, ['Short', 'Long', 'Text'])
       
-      parm3 = defineParam('fld_Buff', "SBB Buffer field", "String", "Required", "Input", 'BUFFER')
+      parm3 = defineParam('fld_Buff', "SBB Buffer field", "Field", "Required", "Input", 'BUFFER')
+      paramFields(parm3, parm0, ['Short', 'Long', 'Text', 'Double'])
       
       parm4 = defineParam('in_nwi', "Input Wetlands", "GPFeatureLayer", "Optional", "Input")
       if map.name == "TCS": 
@@ -841,11 +904,6 @@ class create_sbb(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         for i in [1,2,3]:
-            parameters[i].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -901,7 +959,8 @@ class expand_sbb(object):
       else:
          pass
       
-      parm3 = defineParam('joinFld', "Source Feature ID field", "String", "Required", "Input", 'SFID')
+      parm3 = defineParam('joinFld', "Source Feature ID field", "Field", "Required", "Input", 'SFID')
+      paramFields(parm3, parm1, ['Short', 'Long', 'Text'])
       
       parm4 = defineParam('out_SBB', "Output Expanded Site Building Blocks", "DEFeatureClass", "Required", "Output", "expanded_sbb_tcs")
       
@@ -918,10 +977,6 @@ class expand_sbb(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[1].altered:
-         fc = parameters[1].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[3].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -975,7 +1030,8 @@ class create_consite(object):
       else:
          pass
       
-      parm02 = defineParam("joinFld", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      parm02 = defineParam("joinFld", "Source Feature ID field", "Field", "Required", "Input", "SFID")
+      paramFields(parm02, parm00)
       
       parm03 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "csTerrestrial" in lnames:
@@ -1042,11 +1098,6 @@ class create_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[2].filter.list = field_names
-      
       if parameters[4].altered:
          type = parameters[4].value 
          if type == "TERRESTRIAL":
@@ -1060,8 +1111,7 @@ class create_consite(object):
             parameters[6].parameterType = "Optional"
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
-            # parameters[8].value = "consites_ahz"
-            
+            # parameters[8].value = "consites_ahz" 
       return
 
    def updateMessages(self, parameters):
@@ -1158,10 +1208,10 @@ class servLyrs_scs(object):
       (lyrDownTrace, lyrUpTrace, lyrTidalTrace) = MakeServiceLayers_scs(in_hydroNet, in_dams)
 
       # Update the derived parameters.
-      # This enables layers to be displayed automatically if running tool from ArcMap.
-      parameters[2].value = lyrDownTrace
-      parameters[3].value = lyrUpTrace
-      parameters[4].value = lyrTidalTrace
+      # This enables layers to be added to the current map. Turned this off! These layers are not necessary in the map and can slow things down.
+      # parameters[2].value = lyrDownTrace
+      # parameters[3].value = lyrUpTrace
+      # parameters[4].value = lyrTidalTrace
       
       return (lyrDownTrace, lyrUpTrace, lyrTidalTrace)
       
@@ -1203,9 +1253,11 @@ class ntwrkPts_scs(object):
       else:
          pass
       
-      parm5 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      parm5 = defineParam("fld_SFID", "Source Feature ID field", "Field", "Required", "Input", "SFID")
+      paramFields(parm5, parm0)
       
-      parm6 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      parm6 = defineParam("fld_Tidal", "NWI Tidal field", "Field", "Required", "Input", "Tidal")
+      paramFields(parm6, parm4, ["Short", "Long"])
       
       parm7 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
@@ -1221,10 +1273,6 @@ class ntwrkPts_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[4].altered:
-         fc = parameters[4].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[6].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -1261,6 +1309,13 @@ class lines_scs(object):
    def getParameterInfo(self):
       """Define parameters"""
       map, lnames = getMapLayers()
+      # Find containing folder of HydroNet_ND. This will allow for finding the service area layer files, without having them in the Map.
+      if "HydroNet_ND" in lnames:
+         descHydro = arcpy.Describe("HydroNet_ND")
+         # Folder containing NA layers (this is fixed, see MakeServiceLayers_scs). If the NA layers are not in the map, this will be used to generate their paths.
+         hydroDir = os.path.dirname(os.path.dirname(descHydro.path))
+      else:
+         hydroDir = None
       
       parm0 = defineParam("in_Points", "Input Network Points", "GPFeatureLayer", "Required", "Input")
       if "scsPoints" in lnames:
@@ -1271,24 +1326,37 @@ class lines_scs(object):
       parm1 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
       
       parm2 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
-      if "naDownTrace" in lnames:
-         parm2.value = "naDownTrace"
-      else:
+      try:
+         if "naDownTrace" in lnames:
+            parm2.value = "naDownTrace"
+         else:
+            if hydroDir:
+               parm2.value = hydroDir + os.sep + 'naDownTrace_500.lyrx'
+      except:
          pass
-         
+            
       parm3 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
-      if "naUpTrace" in lnames:
-         parm3.value = "naUpTrace"
-      else:
+      try:
+         if "naUpTrace" in lnames:
+            parm3.value = "naUpTrace"
+         else:
+            if hydroDir:
+               parm3.value = hydroDir + os.sep + 'naUpTrace_3000.lyrx'
+      except:
          pass
       
       parm4 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
-      if "naTidalTrace" in lnames:
-         parm4.value = "naTidalTrace"
-      else:
+      try:
+         if "naTidalTrace" in lnames:
+            parm4.value = "naTidalTrace"
+         else:
+            if hydroDir:
+               parm4.value = hydroDir + os.sep + 'naTidalTrace_3000.lyrx'
+      except:
          pass
       
-      parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      parm5 = defineParam("fld_Tidal", "NWI Tidal field", "Field", "Required", "Input", "Tidal")
+      paramFields(parm5, parm0, ["Short", "Long"])
       
       parm6 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
@@ -1303,15 +1371,18 @@ class lines_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[5].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
       parameter.  This method is called after internal validation."""
+      for p in [parameters[2], parameters[3], parameters[4]]:
+         if p.altered and arcpy.Exists(p.valueAsText):
+            try:
+               d = arcpy.Describe(p.valueAsText)
+               d.network.catalogPath
+            except:
+               p.SetErrorMessage("Error accessing service area layer. You may need to re-run `0: Make Network Analyst Service Layers`")
       return
 
    def execute(self, parameters, messages):
@@ -1322,7 +1393,8 @@ class lines_scs(object):
       if out_Scratch != 'None':
          scratchParm = out_Scratch 
       else:
-         scratchParm = arcpy.env.scratchGDB 
+         # scratchParm = arcpy.env.scratchGDB 
+         scratchParm = "in_memory"
       
       # Run the function
       (scsLines, lyrDownTrace, lyrUpTrace, lyrTidalTrace) = CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal, scratchParm)
@@ -1386,7 +1458,8 @@ class sites_scs(object):
       else: 
          pass
          
-      parm7 = defineParam("fld_Rule", "Site rule field", "String", "Required", "Input", "RULE")
+      parm7 = defineParam("fld_Rule", "Site rule field", "Field", "Required", "Input", "RULE")
+      paramFields(parm7, parm0)
       
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
@@ -1406,11 +1479,6 @@ class sites_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[7].filter.list = field_names
-      
       if parameters[9].altered and not parameters[9].hasBeenValidated:
          if parameters[9].value == "SCU":
             parameters[2].value = "scuPolys"
@@ -1457,33 +1525,16 @@ class make_ecs_dir(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      # aprx = arcpy.mp.ArcGISProject("CURRENT")
-      # map = aprx.activeMap
-      # lyrs = map.listLayers()
-      # lnames = [l.name for l in lyrs]
+      parm00 = defineParam("output_path", "ECS Run Folder", "DEFolder", "Required", "Input")
+      parm01 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
+      parm02 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
+      # The function can also take Biotics PFs and Consites as input, which it then parses.
+      parm03 = defineParam("in_PF", "Input Procedural Features", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ProcFeats")
+      parm04 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Optional", "Input", "BIOTICS_DLINK.ConSites")
 
-      parm00 = defineParam("output_path", "Project directory", "DEFolder", "Required", "Input")
-      parm01 = defineParam("in_elExclude", "Input Element Exclusion Table(s)", "GPTableView", "Required", "Input", multiVal=True)
-      parm02 = defineParam("in_conslands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input")
-      parm03 = defineParam("in_ecoreg", "Input Eco-regions", "GPFeatureLayer", "Required", "Input")
-
-      # The function could also take the copies of Biotics PFs and Consites as input, which it then parses. Not using
-      # in the toolbox, as it doesn't match the Biotics workflow.
-      # parm02 = defineParam("in_PF", "Input procedural features", "GPFeatureLayer", "Required", "Input")
-      # if "Biotics ProcFeats" in lnames:
-      #    parm02.value = "Biotics ProcFeats"
-      # else:
-      #    pass
-      # parm03 = defineParam("in_ConSites", "Input conservation sites", "GPFeatureLayer", "Required", "Input")
-      # if "Biotics ConSites" in lnames:
-      #    parm03.value = "Biotics ConSites"
-      # else:
-      #    pass
-
-      # This could be a multivalue of outputs, all to be added to map.
-      parm04 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
-
-      parms = [parm00, parm01, parm02, parm03, parm04]
+      # This is a list of layer paths, all to be added to map.
+      parm05 = defineParam("out_feat", "Output feature classes", "DEFeatureClass", "Derived", "Output", multiVal=True)
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
 
    def isLicensed(self):
@@ -1505,11 +1556,11 @@ class make_ecs_dir(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      
       in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(output_path, in_elExclude_ls, in_conslands, in_ecoreg)
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_conslands, in_elExclude_ls, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
-      printMsg("Make sure to add fresh copies of Biotics data to the input geodatabase: `" + ig + "`.")
       return lyrs
 
 class attribute_eo(object):
@@ -1524,18 +1575,18 @@ class attribute_eo(object):
       """Define parameter definitions"""
       parm00 = defineParam("in_ProcFeats", "Input Procedural Features", "GPFeatureLayer", "Required", "Input")
       parm01 = defineParam("in_elExclude", "Input Elements Exclusion Table", "GPTableView", "Required", "Input", "ElementExclusions")
-      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_lam")
+      parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands")
       parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
-      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "tncEcoRegions_lam")
-      parm05 = defineParam("fld_RegCode", "Ecoregion ID field", "String", "Required", "Input", "GEN_REG")
-      parm06 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
-      parm07 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
-      parm08 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
-      parm08.filter.list = ["Local Database"]
-      # parm09 = defineParam("out_folder", "Project output folder", "DEFolder", "Required", "Input")
+      parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "ecoregions")
+      parm05 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
+      parm06 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
 
-      # parm08 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
-      # parm09 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab")
+      # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
+      # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
+      
+      parm07 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
+      parm07.filter.list = ["Local Database"]
+      parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
       return parms
@@ -1548,26 +1599,56 @@ class attribute_eo(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[4].altered:
-         fc = parameters[4].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[5].filter.list = field_names
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
+            in_nm = os.path.basename(fc)
+            # set default naming suffix based on PF layer
+            if in_nm == "pfTerrestrial":
+               suf = '_tcs'
+            elif in_nm == "pfKarst":
+               suf = '_kcs'
+            elif in_nm == "pfStream":
+               suf = '_scs'
+            elif in_nm == "pfAnthro":
+               suf = '_ahz'
+            else:
+               suf = ''
+            parameters[8].value = suf
+            # parameters[7].value = "attribEOs" + suf
+            # parameters[8].value = "elementSummary" + suf
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            out_gdb = fold + os.sep + gdb
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
+               parameters[7].value = out_gdb
       return
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
       parameter.  This method is called after internal validation."""
+      if parameters[4].altered:
+         fc = parameters[4].valueAsText
+         if arcpy.Exists(fc):
+            field_names = GetFlds(fc)
+            if "GEN_REG" not in field_names:
+               parameters[4].setErrorMessage("Ecoregions layer must contain the field 'GEN_REG', with generalized ecoregion names.")
       return
 
    def execute(self, parameters, messages):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_procEOs = os.path.join(out_gdb, "attribEOs")
-      out_sumTab = os.path.join(out_gdb, "sumTab")
+      # headsup: The 'suf' parameter is optional, and has the value "None" when left empty. However it produced errors in logical tests.
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      # Set output names
+      out_procEOs = os.path.join(out_gdb, "attribEOs" + suf2)
+      out_sumTab = os.path.join(out_gdb, "elementSummary" + suf2)
 
       # Run function
-      AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, fld_RegCode, cutYear, flagYear, out_procEOs, out_sumTab)
+      AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
       replaceLayer(out_procEOs)
       replaceLayer(out_sumTab)
 
@@ -1584,14 +1665,17 @@ class score_eo(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_procEOs", "Input Attributed Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "attribEOs")
-      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
+      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
+      
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
-      parm02 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      parm02 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm02.filter.list = ["Local Database"]
-      parm03 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
-      parm04 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+      parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04]
+      parm04 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
+      parm05 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
       return parms
 
    def isLicensed(self):
@@ -1602,6 +1686,23 @@ class score_eo(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            # parameters[2].value = "scoredEOs" + suf
+            # Set output parameters
+            parameters[3].value = suf
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            out_gdb = fold + os.sep + gdb
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
+               parameters[2].value = out_gdb
       return
 
    def updateMessages(self, parameters):
@@ -1613,7 +1714,9 @@ class score_eo(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs')
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      # Set output names
+      out_sortedEOs = os.path.join(out_gdb, 'scoredEOs' + suf2)
 
       # Run function
       ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
@@ -1634,20 +1737,21 @@ class build_portfolio(object):
       parm00 = defineParam("build", "Portfolio Build Option", "String", "Required", "Input", "NEW")
       parm00.filter.list = ["NEW", "NEW_EO", "NEW_CS", "UPDATE"]
       parm01 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "scoredEOs")
-      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab")
+      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
       parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
       parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
-
-      parm05 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      
+      parm05 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm05.filter.list = ["Local Database"]
-      parm06 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
-
+      parm06 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
-      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "sumTab_upd")
+      # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
       # parm07 = defineParam("out_ConSites", "Output Prioritized Conservation Sites", "DEFeatureClass", "Required", "Output", "priorConSites")
-      # parm08 = defineParam("out_ConSites_XLS", "Output Prioritized Conservation Sites Spreadsheet", "DEFile", "Required", "Output", "priorConSites.xls")
+      # parm08 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
 
    def isLicensed(self):
@@ -1658,6 +1762,28 @@ class build_portfolio(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
+      if parameters[1].altered:
+         fc = parameters[1].valueAsText
+         if not parameters[1].hasBeenValidated and arcpy.Exists(fc):
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            parameters[7].value = suf
+            # parameters[5].value = "priorEOs" + suf
+            # parameters[6].value = "elementSummary_upd" + suf
+            # parameters[7].value = "priorConSites" + suf
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            out_gdb = fold + os.sep + gdb
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
+               parameters[5].value = out_gdb
+               subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+               out_fold = fold + os.sep + subf
+               if arcpy.Exists(out_fold):
+                  parameters[6].value = out_fold
       return
 
    def updateMessages(self, parameters):
@@ -1669,13 +1795,14 @@ class build_portfolio(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_sortedEOs = os.path.join(out_gdb, 'priorEOs')
-      out_sumTab = os.path.join(out_gdb, 'sumTab_upd')
-      out_ConSites = os.path.join(out_gdb, 'priorConSites')
-      out_ConSites_XLS = os.path.join(out_folder, 'priorConSites.xls')
+      # Set output names
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      out_sortedEOs = os.path.join(out_gdb, 'priorEOs' + suf2)
+      out_sumTab = os.path.join(out_gdb, 'elementSummary_upd' + suf2)
+      out_ConSites = os.path.join(out_gdb, 'priorConSites' + suf2)
 
       # Run function
-      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_ConSites_XLS, in_consLands_flat, build)
+      BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSites, out_ConSites, out_folder, in_consLands_flat, build)
       replaceLayer(out_sortedEOs)
       replaceLayer(out_sumTab)
       replaceLayer(out_ConSites)
@@ -1693,22 +1820,23 @@ class build_element_lists(object):
    def getParameterInfo(self):
       """Define parameter definitions"""
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
-      parm01 = defineParam("fld_ID", "Boundary ID field", "String", "Required", "Input", "SITENAME")
+      parm01 = defineParam("fld_ID", "Boundary ID field(s)", "Field", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
-      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "sumTab_upd")
-      # For some reason this is not working if you input a table view...
-      # try:
-      #    parm03.value = "sumTab_upd"
-      # except:
-      #    pass
-      # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output", "elementList")
-      # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output", "elementList.xls")
+      parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
 
-      parm04 = defineParam("out_gdb", "Project output geodatabase", "DEWorkspace", "Required", "Input", arcpy.mp.ArcGISProject("CURRENT").defaultGeodatabase)
+      # parm04 = defineParam("out_Tab", "Output Element-Boundary Summary Table", "DETable", "Required", "Output")
+      # parm05 = defineParam("out_Excel", "Output Excel File", "DEFile", "Optional", "Output")
+      
+      parm04 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm04.filter.list = ["Local Database"]
-      parm05 = defineParam("out_folder", "Project output spreadsheet folder", "DEFolder", "Required", "Input")
+      parm05 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      # This will set up the list of fields for boundary ID
+      parm01.filter.list = ['Short', 'Long', 'Text']
+      parm01.parameterDependencies = [parm00.name]
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06]
       return parms
 
    def isLicensed(self):
@@ -1720,12 +1848,36 @@ class build_element_lists(object):
       validation is performed.  This method is called whenever a parameter
       has been changed."""
       if parameters[0].altered:
+         # generally this is ConSites, only use this to update the field list.
          fc = parameters[0].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc)]
-         parameters[1].filter.list = field_names
-      # if parameters[5].valueAsText is not None:
-      #    if not parameters[5].valueAsText.endswith('xls'):
-      #       parameters[5].value = parameters[5].valueAsText.split('.')[0] + '.xls'
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
+            field_names = GetFlds(fc)
+            if "SITENAME" in field_names:
+               parameters[1].value = "SITENAME"
+            else:
+               parameters[1].value = None
+      if parameters[2].altered:
+         # This will be EOs. Take naming and set output parameters based on this layer.
+         fc = parameters[2].valueAsText
+         if not parameters[2].hasBeenValidated and arcpy.Exists(fc):
+            in_nm = os.path.basename(fc)
+            suf = in_nm[-4:]
+            if not suf.startswith("_"):
+               suf = ""
+            # parameters[4].value = "elementList" + suf
+            # parameters[5].value = "elementList" + suf + ".xls"
+            parameters[6].value = suf
+            # Set output parameters
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            out_gdb = fold + os.sep + gdb
+            if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
+               parameters[4].value = out_gdb
+               subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
+               out_fold = fold + os.sep + subf
+               if arcpy.Exists(out_fold):
+                  parameters[5].value = out_fold
       return
 
    def updateMessages(self, parameters):
@@ -1737,11 +1889,16 @@ class build_element_lists(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
-      out_Tab = os.path.join(out_gdb, 'elementList')
-      out_Excel = os.path.join(out_folder, 'elementList.xls')
+      # Set output names
+      suf2 = suf.replace("None", "").replace(" ", "_")
+      out_Tab = os.path.join(out_gdb, 'elementList' + suf2)
+      out_Excel = os.path.join(out_folder, 'elementList' + suf2 + '.xls')
+
+      # Convert polygon ID field(s) to list
+      fld_IDs = fld_ID.split(';')
 
       # Run function
-      BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out_Excel)
+      BuildElementLists(in_Bounds, fld_IDs, in_procEOs, in_elementTab, out_Tab, out_Excel)
       replaceLayer(out_Tab)
 
       return (out_Tab)
