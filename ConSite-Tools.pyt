@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.2  # version scheme: major.minor.bugfix
-tbx_version = "2.2"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
+# Toolbox version: 2.3-dev  # version scheme: major.minor.bugfix
+tbx_version = "2.3-dev"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
