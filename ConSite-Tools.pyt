@@ -1601,7 +1601,7 @@ class attribute_eo(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         if not parameters[0].hasBeenValidated:
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             # set default naming suffix based on PF layer
             if in_nm == "pfTerrestrial":
@@ -1688,7 +1688,7 @@ class score_eo(object):
       has been changed."""
       if parameters[0].altered:
          fc = parameters[0].valueAsText
-         if not parameters[0].hasBeenValidated:
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[-4:]
             if not suf.startswith("_"):
@@ -1764,7 +1764,7 @@ class build_portfolio(object):
       has been changed."""
       if parameters[1].altered:
          fc = parameters[1].valueAsText
-         if not parameters[1].hasBeenValidated:
+         if not parameters[1].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[-4:]
             if not suf.startswith("_"):
@@ -1850,7 +1850,7 @@ class build_element_lists(object):
       if parameters[0].altered:
          # generally this is ConSites, only use this to update the field list.
          fc = parameters[0].valueAsText
-         if not parameters[0].hasBeenValidated:
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             field_names = GetFlds(fc)
             if "SITENAME" in field_names:
                parameters[1].value = "SITENAME"
@@ -1859,7 +1859,7 @@ class build_element_lists(object):
       if parameters[2].altered:
          # This will be EOs. Take naming and set output parameters based on this layer.
          fc = parameters[2].valueAsText
-         if not parameters[2].hasBeenValidated:
+         if not parameters[2].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[-4:]
             if not suf.startswith("_"):
