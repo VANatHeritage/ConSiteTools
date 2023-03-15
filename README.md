@@ -6,24 +6,24 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-10):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-15):
 
 #### Version 2.2
 
 - Conservation Portfolio Tools:
-  - Tier assignments and names changed (inclusion in portfolio remains unchanged)
+  - tier assignments and names changed, but portfolio assignment methods remain unchanged
   - numerous field name changes for output files, new fields added
   - overhaul of internal functions to speed up processing
   - tools auto-populate output locations, and output file name suffix parameter based on site type
-  - `EO Tier Summary` added as a standalone tool in Subroutines
+  - `EO Tier Summary` added as a standalone tool to `Subroutines` toolset
 
 - SCS/SCU updates:
   - `2: Generate SCS Lines`
-    - tool will look input Service Area layers in the HydroNet_ND geodatabase location, so they do not need to be in the map
     - Added internal function `FillLines_scs` to fill in small gaps (~1 km) between nearby scsLines
+    - Service Area Layer paths will auto-populate based on the HydroNet_ND geodatabase location
 
 - TCS updates:
-  - Updates made to `3. Create Conservation Sites` to improve processing speed
+  - several updates to improve processing speed, primarily for `3. Create Conservation Sites` 
 
 - Other:
   - `Review Conservation Sites` now adds site name(s) to the output feature class

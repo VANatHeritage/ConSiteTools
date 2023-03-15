@@ -45,6 +45,18 @@ def declareParams(params):
    disableLog()
    return 
 
+def paramFields(param, fields_from, field_filter=['Short', 'Long', 'Text']):
+   """ Updates field type parameter, to list fields from another parameter.
+   :param param: Field parameter which depends on another parameters
+   :param fields_from: The parameter to take fields from (generally a feature class or layer)
+   :param field_filter: Type of fields to list.
+   :return: Nothing
+   List of allowable field types: Short, Long, Single, Double, Text, Date, OID, Geometry, Blob, Raster, GUID, GlobalID, and XML.
+   """
+   param.filter.list = field_filter
+   param.parameterDependencies = [fields_from.name]
+   return
+
 def getViewExtent(set=True):
    '''Gets the extent of the active view, optionally applying it as the processing extent (set=True).
    I'm using this to set the processing extent for every tool function that is using feature services as inputs. This way, processing is limited to only the features in the active view. This can save TONS of processing time!!! But the user needs to be careful that the view is big enough to encompass everything needed.
@@ -456,8 +468,11 @@ class review_consite(object):
       else:
          parm03.value = "%s_QC"%parm00.value
       
-      parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "String", "Required", "Input", "SITEID")
-      parm05 = defineParam("fld_SiteName", "Conservation Site Name field", "String", "Required", "Input", "SITENAME")
+      parm04 = defineParam("fld_SiteID", "Conservation Site ID field", "Field", "Required", "Input", "SITEID")
+      paramFields(parm04, parm01, ['Short', 'Long', 'Text'])
+
+      parm05 = defineParam("fld_SiteName", "Conservation Site Name field", "Field", "Required", "Input", "SITENAME")
+      paramFields(parm05, parm01, ['Text'])
       
       parm06 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
@@ -472,11 +487,6 @@ class review_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[1].altered:
-         fc = parameters[1].valueAsText
-         field_names = [f.name for f in arcpy.ListFields(fc) if f.type != 'OID']  # Does not work with OBJECTID, so don't allow it.
-         parameters[4].filter.list = field_names
-         parameters[5].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -599,7 +609,9 @@ class calc_bmi(object):
    def getParameterInfo(self):
       """Define parameters"""
       parm0 = defineParam("in_Feats", "Input polygon features", "GPFeatureLayer", "Required", "Input")
-      parm1 = defineParam("fld_ID", "Polygon ID field", "String", "Required", "Input")
+      parm1 = defineParam("fld_ID", "Polygon ID field", "Field", "Required", "Input")
+      paramFields(parm1, parm0, ['Short', 'Long', 'Text'])
+      
       parm2 = defineParam("in_BMI", "Input BMI Polygons", "GPFeatureLayer", "Required", "Input")
       parm3 = defineParam("fld_Basename", "Base name for output fields", "String", "Required", "Input", "PERCENT_BMI_")
       
@@ -614,10 +626,6 @@ class calc_bmi(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         parameters[1].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -729,8 +737,7 @@ class eeo_summary(object):
       """Define parameter definitions"""
       parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
       parm01 = defineParam("fld_ID", "Boundary ID field", "Field", "Required", "Input")
-      parm01.filter.list = ['Short', 'Long', 'Text']
-      parm01.parameterDependencies = [parm00.name]
+      paramFields(parm01, parm00, ['Short', 'Long', 'Text'])
       parm02 = defineParam("in_EOs", "Input EOs", "GPFeatureLayer", "Required", "Input")
       parm03 = defineParam("summary_type", "Summary type", "String", "Required", "Input", "Both")
       parm03.filter.list = ['Text', 'Numeric', 'Both']
@@ -857,11 +864,14 @@ class create_sbb(object):
       else:
          pass
 
-      parm1 = defineParam('fld_SFID', "Source Feature ID field", "String", "Required", "Input", 'SFID')
+      parm1 = defineParam('fld_SFID', "Source Feature ID field", "Field", "Required", "Input", 'SFID')
+      paramFields(parm1, parm0, ['Short', 'Long', 'Text'])
       
-      parm2 = defineParam('fld_Rule', "SBB Rule field", "String", "Required", "Input", 'RULE')
+      parm2 = defineParam('fld_Rule', "SBB Rule field", "Field", "Required", "Input", 'RULE')
+      paramFields(parm2, parm0, ['Short', 'Long', 'Text'])
       
-      parm3 = defineParam('fld_Buff', "SBB Buffer field", "String", "Required", "Input", 'BUFFER')
+      parm3 = defineParam('fld_Buff', "SBB Buffer field", "Field", "Required", "Input", 'BUFFER')
+      paramFields(parm3, parm0, ['Short', 'Long', 'Text', 'Double'])
       
       parm4 = defineParam('in_nwi', "Input Wetlands", "GPFeatureLayer", "Optional", "Input")
       if map.name == "TCS": 
@@ -894,11 +904,6 @@ class create_sbb(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         for i in [1,2,3]:
-            parameters[i].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -954,7 +959,8 @@ class expand_sbb(object):
       else:
          pass
       
-      parm3 = defineParam('joinFld', "Source Feature ID field", "String", "Required", "Input", 'SFID')
+      parm3 = defineParam('joinFld', "Source Feature ID field", "Field", "Required", "Input", 'SFID')
+      paramFields(parm3, parm1, ['Short', 'Long', 'Text'])
       
       parm4 = defineParam('out_SBB', "Output Expanded Site Building Blocks", "DEFeatureClass", "Required", "Output", "expanded_sbb_tcs")
       
@@ -971,10 +977,6 @@ class expand_sbb(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[1].altered:
-         fc = parameters[1].valueAsText
-         field_names = GetFlds(fc)
-         parameters[3].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -1028,7 +1030,8 @@ class create_consite(object):
       else:
          pass
       
-      parm02 = defineParam("joinFld", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      parm02 = defineParam("joinFld", "Source Feature ID field", "Field", "Required", "Input", "SFID")
+      paramFields(parm02, parm00)
       
       parm03 = defineParam("in_ConSites", "Input Current Conservation Sites", "GPFeatureLayer", "Required", "Input")
       if map.name == "TCS" and "csTerrestrial" in lnames:
@@ -1095,11 +1098,6 @@ class create_consite(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         parameters[2].filter.list = field_names
-      
       if parameters[4].altered:
          type = parameters[4].value 
          if type == "TERRESTRIAL":
@@ -1113,8 +1111,7 @@ class create_consite(object):
             parameters[6].parameterType = "Optional"
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
-            # parameters[8].value = "consites_ahz"
-            
+            # parameters[8].value = "consites_ahz" 
       return
 
    def updateMessages(self, parameters):
@@ -1256,9 +1253,11 @@ class ntwrkPts_scs(object):
       else:
          pass
       
-      parm5 = defineParam("fld_SFID", "Source Feature ID field", "String", "Required", "Input", "SFID")
+      parm5 = defineParam("fld_SFID", "Source Feature ID field", "Field", "Required", "Input", "SFID")
+      paramFields(parm5, parm0)
       
-      parm6 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      parm6 = defineParam("fld_Tidal", "NWI Tidal field", "Field", "Required", "Input", "Tidal")
+      paramFields(parm6, parm4, ["Short", "Long"])
       
       parm7 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
@@ -1274,10 +1273,6 @@ class ntwrkPts_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[4].altered:
-         fc = parameters[4].valueAsText
-         field_names = GetFlds(fc)
-         parameters[6].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
@@ -1314,7 +1309,7 @@ class lines_scs(object):
    def getParameterInfo(self):
       """Define parameters"""
       map, lnames = getMapLayers()
-      # Find containing folder of HydroNet_ND. This will allow for finding the service area layer files, without having to have them in the Map.
+      # Find containing folder of HydroNet_ND. This will allow for finding the service area layer files, without having them in the Map.
       if "HydroNet_ND" in lnames:
          descHydro = arcpy.Describe("HydroNet_ND")
          # Folder containing NA layers (this is fixed, see MakeServiceLayers_scs). If the NA layers are not in the map, this will be used to generate their paths.
@@ -1331,27 +1326,37 @@ class lines_scs(object):
       parm1 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
       
       parm2 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
-      if "naDownTrace" in lnames:
-         parm2.value = "naDownTrace"
-      else:
-         if hydroDir:
-            parm2.value = hydroDir + os.sep + 'naDownTrace_500.lyrx'
-         
+      try:
+         if "naDownTrace" in lnames:
+            parm2.value = "naDownTrace"
+         else:
+            if hydroDir:
+               parm2.value = hydroDir + os.sep + 'naDownTrace_500.lyrx'
+      except:
+         pass
+            
       parm3 = defineParam("in_upTrace", "Upstream Service Layer", "GPNALayer", "Required", "Input")
-      if "naUpTrace" in lnames:
-         parm3.value = "naUpTrace"
-      else:
-         if hydroDir:
-            parm3.value = hydroDir + os.sep + 'naUpTrace_3000.lyrx'
+      try:
+         if "naUpTrace" in lnames:
+            parm3.value = "naUpTrace"
+         else:
+            if hydroDir:
+               parm3.value = hydroDir + os.sep + 'naUpTrace_3000.lyrx'
+      except:
+         pass
       
       parm4 = defineParam("in_tidalTrace", "Tidal Service Layer", "GPNALayer", "Required", "Input")
-      if "naTidalTrace" in lnames:
-         parm4.value = "naTidalTrace"
-      else:
-         if hydroDir:
-            parm4.value = hydroDir + os.sep + 'naTidalTrace_3000.lyrx'
+      try:
+         if "naTidalTrace" in lnames:
+            parm4.value = "naTidalTrace"
+         else:
+            if hydroDir:
+               parm4.value = hydroDir + os.sep + 'naTidalTrace_3000.lyrx'
+      except:
+         pass
       
-      parm5 = defineParam("fld_Tidal", "NWI Tidal field", "String", "Required", "Input", "Tidal")
+      parm5 = defineParam("fld_Tidal", "NWI Tidal field", "Field", "Required", "Input", "Tidal")
+      paramFields(parm5, parm0, ["Short", "Long"])
       
       parm6 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
 
@@ -1366,15 +1371,18 @@ class lines_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         parameters[5].filter.list = field_names
       return
 
    def updateMessages(self, parameters):
       """Modify the messages created by internal validation for each tool
       parameter.  This method is called after internal validation."""
+      for p in [parameters[2], parameters[3], parameters[4]]:
+         if p.altered and arcpy.Exists(p.valueAsText):
+            try:
+               d = arcpy.Describe(p.valueAsText)
+               d.network.catalogPath
+            except:
+               p.SetErrorMessage("Error accessing service area layer. You may need to re-run `0: Make Network Analyst Service Layers`")
       return
 
    def execute(self, parameters, messages):
@@ -1450,7 +1458,8 @@ class sites_scs(object):
       else: 
          pass
          
-      parm7 = defineParam("fld_Rule", "Site rule field", "String", "Required", "Input", "RULE")
+      parm7 = defineParam("fld_Rule", "Site rule field", "Field", "Required", "Input", "RULE")
+      paramFields(parm7, parm0)
       
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
@@ -1470,11 +1479,6 @@ class sites_scs(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[0].altered:
-         fc = parameters[0].valueAsText
-         field_names = GetFlds(fc)
-         parameters[7].filter.list = field_names
-      
       if parameters[9].altered and not parameters[9].hasBeenValidated:
          if parameters[9].value == "SCU":
             parameters[2].value = "scuPolys"
@@ -1627,9 +1631,10 @@ class attribute_eo(object):
       parameter.  This method is called after internal validation."""
       if parameters[4].altered:
          fc = parameters[4].valueAsText
-         field_names = GetFlds(fc)
-         if "GEN_REG" not in field_names:
-            parameters[4].setErrorMessage("Ecoregions layer must contain the field 'GEN_REG', with generalized ecoregion names.")
+         if arcpy.Exists(fc):
+            field_names = GetFlds(fc)
+            if "GEN_REG" not in field_names:
+               parameters[4].setErrorMessage("Ecoregions layer must contain the field 'GEN_REG', with generalized ecoregion names.")
       return
 
    def execute(self, parameters, messages):
