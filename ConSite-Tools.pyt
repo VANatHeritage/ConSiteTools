@@ -43,6 +43,8 @@ def declareParams(params):
 
    # Added logging settings below, as this is most convenient place to run pre-execution setting.
    disableLog()
+   # Print Toolbox version!
+   printMsg("Using ConSite Toolbox v" + tbx_version)
    return 
 
 def paramFields(param, fields_from, field_filter=['Short', 'Long', 'Text']):
