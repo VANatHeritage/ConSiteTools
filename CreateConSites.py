@@ -1934,6 +1934,9 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyrx"%upString
    #r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
    
+   # Make layer with dams to include
+   lyr_dams = arcpy.MakeFeatureLayer_management(in_dams, where_clause="NH_IGNORE IS NULL OR NH_IGNORE = 0")
+   
    printMsg("Creating upstream, downstream, and tidal service layers...")
    for sl in [["naDownTrace", downDist, "SCS Downstream", lyrDownTrace], ["naUpTrace", upDist, "SCS Upstream", lyrUpTrace], ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace]]:
       #restrictions = r + ";" + sl[2]
@@ -1962,7 +1965,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
       # Add dam barriers
       arcpy.na.AddLocations(in_network_analysis_layer = saLyr, 
          sub_layer = "Point Barriers", 
-         in_table = in_dams, 
+         in_table = lyr_dams, 
          field_mappings = "Name NIDID #", 
          search_tolerance = "100 Meters", 
          sort_field = "", 
