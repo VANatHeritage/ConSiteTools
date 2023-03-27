@@ -872,7 +872,7 @@ def UnsplitLines(inLines, outLines, scratchGDB = "in_memory"):
    arcpy.SpatialJoin_analysis(inLines, explBuff, joinLines, "JOIN_ONE_TO_ONE", "KEEP_ALL", fldMap, "INTERSECT")
    
    printMsg("Dissolving segments by group...")
-   arcpy.Dissolve_management(joinLines, outLines, "grpID", "", "MULTI_PART", "DISSOLVE_LINES")
+   arcpy.PairwiseDissolve_analysis(joinLines, outLines, "grpID", multi_part="MULTI_PART")
    
    return outLines
 

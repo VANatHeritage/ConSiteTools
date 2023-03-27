@@ -539,7 +539,7 @@ def getBRANK(in_PF, in_ConSites):
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = "in_memory" + os.sep + "EOs"
-   arcpy.Dissolve_management(in_PF, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
+   arcpy.PairwiseDissolve_analysis(in_PF, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
    
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
@@ -1688,7 +1688,7 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    # Dissolve boundaries on the specified ID field, retaining only that field.
    printMsg("Dissolving...")
    dissBnds = scratchGDB + os.sep + "dissBnds"
-   arcpy.Dissolve_management(in_Bounds, dissBnds, fld_ID, "", "MULTI_PART")
+   arcpy.PairwiseDissolve_analysis(in_Bounds, dissBnds, fld_ID, multi_part="MULTI_PART")
    
    # Make feature layer containing only eligible EOs
    where_clause = '"FinalRANK" < 6'
