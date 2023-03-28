@@ -6,7 +6,16 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-15):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-28):
+
+#### Version 2.2.x
+
+- General
+  - changed remaining Dissolve to PairwiseDissolve
+
+- Tweaks to SCS workflow:
+  - ignore dams where `NH_IGNORE = 1` in dams layer
+  - DelinSite_scs: added step to also use PFs to select catchments to create clipping buffer
 
 #### Version 2.2
 

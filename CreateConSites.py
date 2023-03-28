@@ -960,7 +960,7 @@ def AddCoreAreaToSBBs(in_PF, in_SBB, fld_SFID, in_Core, out_SBB, BuffDist = "100
    # Merge, then dissolve to get final shapes
    sbbMerge = scratchGDB + os.sep + "sbbMerge"
    arcpy.Merge_management([sbbSub, sbbRtn], sbbMerge)
-   arcpy.Dissolve_management(sbbMerge, out_SBB, [fld_SFID, "intRule"], "")
+   arcpy.PairwiseDissolve_analysis(sbbMerge, out_SBB, [fld_SFID, "intRule"])
    
    return out_SBB
 
@@ -1238,7 +1238,7 @@ def CreateWetlandSBB(in_PF, fld_SFID, in_NWI, out_SBB, scratchGDB = "in_memory")
 
                      # Dissolve features into a single polygon
                      # printMsg("Dissolving buffered PF and NWI features into a single feature...")
-                     arcpy.management.Dissolve("tmpMerged", "tmpDissolved", "", "", "", "")
+                     arcpy.PairwiseDissolve_analysis("tmpMerged", "tmpDissolved")
 
                      # Step 7: Clip the dissolved feature to the maximum buffer
                      # printMsg("Clipping dissolved feature to maximum buffer...")
@@ -1483,7 +1483,7 @@ def ExpandSBBs(in_Cores, in_SBB, in_PF, fld_SFID, out_SBB, scratchGDB = "in_memo
    # headsup: Removed the dissolve here, to retain the original SBB polygons in out_SBB. This allows the ChopMod procedure to
    #  work on both the original and expanded SBBs, making for consistent delineation regardless if SBB was expanded to core.
    # dissSBB = scratchGDB + os.sep + "dissSBB"
-   # arcpy.Dissolve_management(sbbAll, dissSBB, [fld_SFID, "intRule"], "")
+   # arcpy.PairwiseDissolve_analysis(sbbAll, dissSBB, [fld_SFID, "intRule"])
    arcpy.cartography.SmoothPolygon(sbbAll, out_SBB, "PAEK", "120 METERS")
    
    printMsg('SBB expansion complete')
@@ -1679,7 +1679,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             # Dissolve Hydro Erase Features
             hydroDiss = scratchGDB + os.sep + 'hydroDiss'
-            arcpy.Dissolve_management(hydroClp, hydroDiss, "Hydro", "", "SINGLE_PART", "")
+            arcpy.PairwiseDissolve_analysis(hydroClp, hydroDiss, "Hydro", multi_part="SINGLE_PART")
             
             # Cull Hydro Erase Features
             hydroRtn = scratchGDB + os.sep + 'hydroRtn'
@@ -1787,7 +1787,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             #  than one split site. Dissolve tmpSS_grp to single-part polygons in tmpSS_grp2
             tmpSS_grp2 = scratchGDB + os.sep + 'tmpSS_grp2'
             fldDiss = [a.name for a in arcpy.ListFields(tmpSS_grp) if a.type != "OID" and not a.name.lower().startswith('shape')]
-            arcpy.management.Dissolve(tmpSS_grp, tmpSS_grp2, fldDiss, multi_part="SINGLE_PART")
+            arcpy.PairwiseDissolve_analysis(tmpSS_grp, tmpSS_grp2, fldDiss, multi_part="SINGLE_PART")
             arcpy.management.CalculateField(tmpSS_grp2, 'ss_length', '!shape.length@meters!', field_type="FLOAT")
 
             # Rejoin split sites very near each other for substantial stretches
@@ -1842,7 +1842,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
                         mergeFrags = scratchGDB + os.sep + "mergeFrags%s"%str(counter)
                         arcpy.management.Merge([finalPatch, tmpSS_grp2], mergeFrags)
                         dissFrags = scratchGDB + os.sep + "dissFrags%s"%str(counter)
-                        arcpy.management.Dissolve(mergeFrags, dissFrags, "", "", "SINGLE_PART")
+                        arcpy.PairwiseDissolve_analysis(mergeFrags, dissFrags, multi_part="SINGLE_PART")
                      else:
                         dissFrags = tmpSS_grp2
                   else:
@@ -2312,7 +2312,7 @@ def BufferLines_scs(in_Lines, in_StreamRiver, in_LakePond, in_Catch, out_Buffers
    arcpy.Merge_management([StreamRiverBuff, LakePondBuff, LineBuff], mergeBuff)
    
    printMsg("Dissolving...")
-   arcpy.Dissolve_management(mergeBuff, dissBuff, "", "", "SINGLE_PART")
+   arcpy.PairwiseDissolve_analysis(mergeBuff, dissBuff, multi_part="SINGLE_PART")
    
    # Clip buffers to catchment
    printMsg("Clipping buffer zone to catchments...")
@@ -2380,6 +2380,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       qry = "FType = 390" # LakePond only
       lyrLakePond = arcpy.MakeFeatureLayer_management(nhdWaterbody, "LakePond_Poly", qry)
       catch = arcpy.MakeFeatureLayer_management(in_Catch, "lyr_Catchments")
+      lyrPF = arcpy.MakeFeatureLayer_management(in_PF)
       
       # Create empty feature class to store flow buffers
       printMsg("Creating empty feature class for flow buffers")
@@ -2402,10 +2403,15 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                # Select catchments intersecting SCS Line
                printMsg("Selecting catchments containing SCS line...")
                arcpy.SelectLayerByLocation_management(catch, "INTERSECT", lineShp)
+               
+               # find PFs intersecting catchments (PFs sometimes extend outside of initial catchment selection, generally in widewater areas)
+               arcpy.SelectLayerByLocation_management(lyrPF, "INTERSECT", catch)
+               # now add to selection the catchments intersecting PFs
+               arcpy.SelectLayerByLocation_management(catch, "INTERSECT", lyrPF, selection_type="ADD_TO_SELECTION")
    
                # Dissolve catchments
                printMsg("Dissolving catchments...")
-               arcpy.Dissolve_management(catch, dissCatch, "", "", "SINGLE_PART", "")
+               arcpy.PairwiseDissolve_analysis(catch, dissCatch, multi_part="SINGLE_PART")
             
                # Create clipping buffer
                printMsg("Creating clipping buffer...")
@@ -2420,7 +2426,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                if scuSwitch:
                   printMsg("Eliminating fragments...")
                   dissFlow = out_Scratch + os.sep + "dissFlow"
-                  arcpy.management.Dissolve(flowPoly, dissFlow)
+                  arcpy.PairwiseDissolve_analysis(flowPoly, dissFlow)
                   flowPoly2 = out_Scratch + os.sep + "flowPoly2"
                   arcpy.EliminatePolygonPart_management(dissFlow, flowPoly2, "AREA", part_area="500 SQUAREMETERS", part_option="ANY")
                   flowPoly = flowPoly2
@@ -2432,7 +2438,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                printMsg("Process failure for feature %s. Passing..." %lineID)
                tback()
 
-      arcpy.env.extent = "MAXOF"
+      arcpy.env.extent = flowBuff  # "MAXOF"
       # Burn in full catchments for alternate-process PFs
       qry = "%s = 'SCS2'"%fld_Rule
       altPF = arcpy.MakeFeatureLayer_management(in_PF, "lyr_altPF", qry)
@@ -2463,7 +2469,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    # Dissolve adjacent/overlapping features and fill in gaps 
    printMsg("Dissolving adjacent/overlapping features...")
    dissPolys = out_Scratch + os.sep + "dissPolys"
-   arcpy.Dissolve_management(in_Polys, dissPolys, "", "", "SINGLE_PART")
+   arcpy.PairwiseDissolve_analysis(in_Polys, dissPolys, multi_part="SINGLE_PART")
 
    if not scuSwitch:
       # Smooth SCS polygons

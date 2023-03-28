@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.3-dev  # version scheme: major.minor.bugfix
-tbx_version = "2.3-dev"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
+# Toolbox version: 2.2.2  # version scheme: major.minor.bugfix
+tbx_version = "2.2.2"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -385,7 +385,7 @@ class copy_layers(object):
       
       parm0 = defineParam("in_Layers", "Layers to Copy", "GPValueTable", "Required", "Input")
       parm0.columns = [["GPFeatureLayer","Layers"]]
-      mstrList = ["HydrographicFeatures", "ExclusionFeatures", "VirginiaRailSurfaces", "VirginiaRoadSurfaces", "Cores123", "VA_Wetlands", "NID_damsVA", "FlowBuff150"]
+      mstrList = ["HydrographicFeatures", "ExclusionFeatures", "VirginiaRailSurfaces", "VirginiaRoadSurfaces", "Cores123", "VA_Wetlands", "NID_damsVA"]
       lyrList = []
       for l in mstrList:
          if l in lnames: 
@@ -1465,9 +1465,9 @@ class sites_scs(object):
       
       parm8 = defineParam("out_Scratch", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
-      parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCU")
+      parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCS")
       parm9.filter.type = "ValueList"
-      parm9.filter.list = ["SCU", "SCS"]
+      parm9.filter.list = ["SCS", "SCU"]
 
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9]
       
