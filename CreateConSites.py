@@ -2380,6 +2380,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       qry = "FType = 390" # LakePond only
       lyrLakePond = arcpy.MakeFeatureLayer_management(nhdWaterbody, "LakePond_Poly", qry)
       catch = arcpy.MakeFeatureLayer_management(in_Catch, "lyr_Catchments")
+      lyrPF = arcpy.MakeFeatureLayer_management(in_PF)
       
       # Create empty feature class to store flow buffers
       printMsg("Creating empty feature class for flow buffers")
@@ -2402,6 +2403,11 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                # Select catchments intersecting SCS Line
                printMsg("Selecting catchments containing SCS line...")
                arcpy.SelectLayerByLocation_management(catch, "INTERSECT", lineShp)
+               
+               # find PFs intersecting catchments (PFs sometimes extend outside of initial catchment selection, generally in widewater areas)
+               arcpy.SelectLayerByLocation_management(lyrPF, "INTERSECT", catch)
+               # now add to selection the catchments intersecting PFs
+               arcpy.SelectLayerByLocation_management(catch, "INTERSECT", lyrPF, selection_type="ADD_TO_SELECTION")
    
                # Dissolve catchments
                printMsg("Dissolving catchments...")
