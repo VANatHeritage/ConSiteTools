@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
-# Toolbox version: 2.2.2  # version scheme: major.minor.bugfix
-tbx_version = "2.2.2"  # headsup: the toolbox version here is appended to the Toolbox label, which can be viewed in ArcPro (right click toolbox -> Properties).
+# Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
+tbx_version = "2.2.2"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -43,9 +43,10 @@ def declareParams(params):
 
    # Added logging settings below, as this is most convenient place to run pre-execution setting.
    disableLog()
-   # Print Toolbox version!
-   printMsg("Using ConSite Toolbox v" + tbx_version)
-   return 
+   # Print Arc and Toolbox versions!
+   arc_info = arcpy.GetInstallInfo()
+   printMsg("Using ConSite Toolbox v" + tbx_version + " in " + arc_info["ProductName"] + " " + arc_info["Version"])
+   return
 
 def paramFields(param, fields_from, field_filter=['Short', 'Long', 'Text']):
    """ Updates field type parameter, to list fields from another parameter.

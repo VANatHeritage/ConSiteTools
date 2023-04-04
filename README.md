@@ -11,11 +11,11 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 #### Version 2.2.x
 
 - General
-  - changed remaining Dissolve to PairwiseDissolve
+  - changed all remaining Dissolve to PairwiseDissolve
 
 - Tweaks to SCS workflow:
-  - ignore dams where `NH_IGNORE = 1` in dams layer
-  - DelinSite_scs: added step to also use PFs to select catchments to create clipping buffer
+  - Service area layers now ignore dams where `NH_IGNORE = 1` in dams layer
+  - DelinSite_scs: added step to also use PFs to select catchments for clipping buffer
 
 #### Version 2.2
 
