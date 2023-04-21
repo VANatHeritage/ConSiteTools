@@ -527,19 +527,23 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    return in_Bounds
 
 ### MAIN FUNCTIONS ###
-def getBRANK(in_PF, in_ConSites):
+def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    '''Automates the assignment of Biodiversity Ranks to conservation sites
-   NOTE: Should only be run on one site type at a time, with type-specific inputs. Needs to run in foreground so tables update attributes. Best to close attribute tables prior to running.
+   NOTE: Should only be run on one site type at a time, with type-specific inputs.
    
    Parameters:
    - in_PF = Input site-worthy procedural features for a specific site type
    - in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
+   - slopFactor = search_distance to apply for associating PFs with Sites (added so it would work for SCUs).
    '''
+   printMsg("Selecting PFs intersecting sites...")
+   pf_lyr = arcpy.MakeFeatureLayer_management(in_PF)
+   arcpy.SelectLayerByLocation_management(pf_lyr, "INTERSECT", in_ConSites, search_distance=slopFactor)
    
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = "in_memory" + os.sep + "EOs"
-   arcpy.PairwiseDissolve_analysis(in_PF, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
+   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
    
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
@@ -635,13 +639,14 @@ def getBRANK(in_PF, in_ConSites):
    # Calculate B-rank scores 
    printMsg('Calculating biodiversity rank sums and maximums in loop...')
    arcpy.MakeFeatureLayer_management(in_EOs, "eo_lyr")
-   # arcpy.MakeFeatureLayer_management (in_ConSites, "cs_lyr")
    arcpy.management.CalculateField(in_ConSites, "tmpID", "!OBJECTID!", "PYTHON3")
-   if "SITEID" in oldFlds:
+   # Check if SITEID is populated
+   id_check = any([i is None for i in unique_values(in_ConSites, "SITEID")])
+   if "SITEID" in oldFlds and not id_check:
       fld_ID = "SITEID"
    else:
       fld_ID = "tmpID"
-      printMsg("No SITEID field found. Using OID as unique identifier instead.")
+      printMsg("SITEID field not found or not populated. Using OID as unique identifier instead.")
    tmpSites = "in_memory" + os.sep + "tmpSites"
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
@@ -651,7 +656,7 @@ def getBRANK(in_PF, in_ConSites):
       for row in cursor:
          myShp = row[0]
          siteID = row[1]
-         arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, "", "NEW_SELECTION")
+         arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
          c = countSelectedFeatures("eo_lyr")
          if c > 0:
             arr = arcpy.da.TableToNumPyArray("eo_lyr",["IBR_SCORE"], skip_nulls=True)
@@ -660,7 +665,6 @@ def getBRANK(in_PF, in_ConSites):
             row[3] = arr["IBR_SCORE"].max() 
 
             cursor.updateRow(row)
-            # printMsg("Site %s: Completed"%siteID)
          else:
             printMsg("Site %s: Failed"%siteID)
             failList.append(siteID)
@@ -715,7 +719,7 @@ def getBRANK(in_PF, in_ConSites):
    '''
    if "BRANK" in oldFlds:
       expression = "flag(!BRANK!, !AUTO_BRANK!)"
-      arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "LONG")
+      arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "SHORT")
    else:
       printMsg("No existing B-ranks available for comparison.")
 
