@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.2.2"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.2.3"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.0.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -526,8 +526,10 @@ class assign_brank(object):
       parm0 = defineParam("in_PF", "Input site-worthy Procedural Features", "GPFeatureLayer", "Required", "Input")
       
       parm1 = defineParam("in_CS", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
+      
+      parm2 = defineParam("slopFactor", "Search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
-      parms = [parm0, parm1]
+      parms = [parm0, parm1, parm2]
       return parms
 
    def isLicensed(self):
@@ -550,7 +552,7 @@ class assign_brank(object):
       # Set up parameter names and values
       declareParams(parameters)
       
-      getBRANK(in_PF, in_CS)
+      getBRANK(in_PF, in_CS, slopFactor)
 
       return (in_CS)
 
@@ -1090,7 +1092,10 @@ class create_consite(object):
       
       parm09 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09]
+      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", False)
+      parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
+
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09, parm10, parm11]
       return parms
 
    def isLicensed(self):
@@ -1115,6 +1120,10 @@ class create_consite(object):
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
             # parameters[8].value = "consites_ahz" 
+      if parameters[10].value:
+         parameters[11].enabled = True
+      else:
+         parameters[11].enabled = False
       return
 
    def updateMessages(self, parameters):
@@ -1149,6 +1158,14 @@ class create_consite(object):
       getViewExtent()
       CreateConSites(in_SBB, in_PF, joinFld, in_ConSites, out_ConSites, site_Type, in_Hydro, Trans, in_Exclude, scratchParm)
       arcpy.env.extent = "MAXOF"
+
+      # Calculate B-ranks
+      if brank == "true":
+         printMsg("Calculating B-ranks...")
+         try:
+            getBRANK(in_PF, out_ConSites, slopFactor)
+         except:
+            printWrng("Sites created, but there was an error while calculating B-ranks.")
 
       return out_ConSites
 
@@ -1469,8 +1486,11 @@ class sites_scs(object):
       parm9 = defineParam("siteType", "Site Type", "String", "Required", "Input", "SCS")
       parm9.filter.type = "ValueList"
       parm9.filter.list = ["SCS", "SCU"]
+      
+      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", False)
+      parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
-      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9]
+      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9, parm10, parm11]
       
       return parms
 
@@ -1487,6 +1507,10 @@ class sites_scs(object):
             parameters[2].value = "scuPolys"
          else:
             parameters[2].value = "scsPolys"
+      if parameters[10].value:
+         parameters[11].enabled = True
+      else:
+         parameters[11].enabled = False
       return
 
    def updateMessages(self, parameters):
@@ -1514,7 +1538,14 @@ class sites_scs(object):
       scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, trim, buffDist, scratchParm)
       arcpy.env.extent = "MAXOF"
       parameters[2].value = out_ConSites
-
+      
+      # Calculate B-ranks
+      if brank == "true":
+         printMsg("Calculating B-ranks...")
+         try:
+            getBRANK(in_PF, out_ConSites, slopFactor)
+         except:
+            printWrng("Sites created, but there was an error calculating B-ranks.")
       return scsPolys
       
 # Conservation Portfolio Tools
