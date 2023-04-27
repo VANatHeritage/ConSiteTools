@@ -6,9 +6,9 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-03-28):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-04-27):
 
-#### Version 2.2.2
+#### Version 2.2.x
 
 - General updates
   - changed all uses of Dissolve function to PairwiseDissolve
@@ -16,7 +16,9 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 - Tweaks to SCS workflow:
   - Service area layers now ignore dams where `NH_IGNORE = 1` in dams layer
+  - FillLines_scs: updated to use Network Analyst approach. A new service area layer for this is created in the MakeServiceLayers_scs tool.
   - DelinSite_scs: added step to also use PFs to select catchments for clipping buffer
+  - other updates to improve processing speed
 
 #### Version 2.2
 
