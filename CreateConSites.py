@@ -2037,9 +2037,10 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    c = countSelectedFeatures(lyrPts)
    if c == 0:
       printMsg("No points intersect tidal wetlands.")
-   arcpy.CalculateField_management(lyrPts, fld_Tidal, 1, field_type="SHORT")
+   else:
+      arcpy.CalculateField_management(lyrPts, fld_Tidal, 1, field_type="SHORT")
    arcpy.SelectLayerByAttribute_management(lyrPts, "SWITCH_SELECTION")
-   arcpy.CalculateField_management(lyrPts, fld_Tidal, 0)
+   arcpy.CalculateField_management(lyrPts, fld_Tidal, 0, field_type="SHORT")
    del lyrPts, lyrNWI
    
    # timestamp
