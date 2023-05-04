@@ -6,13 +6,14 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-04-27):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-05-04):
 
 #### Version 2.2.x
 
 - General updates
   - changed all uses of Dissolve function to PairwiseDissolve
-  - added slopFactor to getBRANK function. Added option to calculate B-ranks in site creation tools
+  - added slopFactor to getBRANK function, and a new output field summarizing EOs
+  - Added option to calculate B-ranks in site creation tools
 
 - Tweaks to SCS workflow:
   - Service area layers now ignore dams where `NH_IGNORE = 1` in dams layer

@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-02-09
+# Last Edit: 2023-05-04
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -630,7 +630,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    ### For the ConSites, calculate the B-rank and flag if it conflicts with previous B-rank
    # printMsg('Adding several fields to ConSites...')
    oldFlds = GetFlds(in_ConSites)
-   for fld in ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK"]:
+   for fld in ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK", "FLAG_BRANK", "IBR_MAX_EOS"]:
       if fld in oldFlds:
          arcpy.management.DeleteField(in_ConSites, fld)
       else:
@@ -640,30 +640,39 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    printMsg('Calculating biodiversity rank sums and maximums in loop...')
    arcpy.MakeFeatureLayer_management(in_EOs, "eo_lyr")
    arcpy.management.CalculateField(in_ConSites, "tmpID", "!OBJECTID!", "PYTHON3")
+   fld_ID = "tmpID"
    # Check if SITEID is populated
-   id_check = any([i is None for i in unique_values(in_ConSites, "SITEID")])
-   if "SITEID" in oldFlds and not id_check:
-      fld_ID = "SITEID"
-   else:
-      fld_ID = "tmpID"
+   if "SITEID" in oldFlds:
+      id_check = any([i is None for i in [a[0] for a in arcpy.da.SearchCursor(in_ConSites, "SITEID")]])
+      if not id_check:
+         fld_ID = "SITEID"
+   if fld_ID == "tmpID":
       printMsg("SITEID field not found or not populated. Using OID as unique identifier instead.")
    tmpSites = "in_memory" + os.sep + "tmpSites"
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
+   arcpy.management.AddField(tmpSites, "IBR_MAX_EOS", "TEXT", field_length=255)
    failList = []
-   with arcpy.da.UpdateCursor(tmpSites, ["SHAPE@", fld_ID, "IBR_SUM", "IBR_MAX"]) as cursor:
+   # Summarize sum, max, and ranks of best-ranked EOs
+   with arcpy.da.UpdateCursor(tmpSites, ["SHAPE@", fld_ID, "IBR_SUM", "IBR_MAX", "IBR_MAX_EOS"]) as cursor:
       for row in cursor:
          myShp = row[0]
          siteID = row[1]
          arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
          c = countSelectedFeatures("eo_lyr")
          if c > 0:
-            arr = arcpy.da.TableToNumPyArray("eo_lyr",["IBR_SCORE"], skip_nulls=True)
-            
-            row[2] = arr["IBR_SCORE"].sum() 
-            row[3] = arr["IBR_SCORE"].max() 
-
+            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR_SCORE", "RNDGRNK", "EORANK"], skip_nulls=True)
+            mx = arr["IBR_SCORE"].max()
+            row[2] = arr["IBR_SCORE"].sum()
+            row[3] = mx
+            # Add rank summary (counts for each unique G/EO rank for EOs with the IBR_MAX in the site)
+            ls0 = arr.tolist()
+            ls = [i[1] + '/' + i[2] for i in ls0 if i[0] == mx]
+            lsu = list(set(ls))
+            lsu.sort()
+            lsu_ct = [str(ls.count(l)) + ' ' + l for l in lsu]
+            row[4] = ", ".join(lsu_ct)
             cursor.updateRow(row)
          else:
             printMsg("Site %s: Failed"%siteID)
@@ -701,11 +710,11 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
       else:
          return sumRank
       '''
-   
    expression= "brank(!IBR_SUM!,!IBR_MAX!)"
    arcpy.management.CalculateField(tmpSites, "AUTO_BRANK", expression, "PYTHON3", codeblock, "TEXT")
-      
-   arcpy.management.JoinField(in_ConSites, "tmpID", tmpSites, "tmpID", ["IBR_SUM", "IBR_MAX", "AUTO_BRANK"])
+   
+   # Join rank fields
+   arcpy.management.JoinField(in_ConSites, "tmpID", tmpSites, "tmpID", ["IBR_SUM", "IBR_MAX", "IBR_MAX_EOS", "AUTO_BRANK"])
    arcpy.management.DeleteField(in_ConSites, "tmpID")
    
    printMsg('Calculating flag status...')
