@@ -1908,11 +1908,22 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
 def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
-   """Creates three Network Analyst service layers needed for SCS delineation.
-   This tool only needs to be run the first time you run the suite of SCS delineation tools. After that, the output layers can be reused repeatedly for the subsequent tools in the SCS delineation sequence.
+   """Creates four Network Analyst service layers needed for SCS delineation.
+   This tool only needs to be run the first time you run the suite of SCS delineation tools. After that, the output
+   layers can be reused repeatedly for the subsequent tools in the SCS delineation sequence.
    
-   NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually). If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
+   NOTE: The restrictions (contained in "r" variable) for traversing the network must have been defined in the HydroNet itself (manually).
+   If any additional restrictions are added, the HydroNet must be rebuilt or they will not take effect. I originally set a restriction of
+   NoEphemeralOrIntermittent, but on testing I discovered that this eliminated some stream segments that actually might be needed. I set the
+   restriction to NoEphemeral instead. We may find that we need to remove the NoEphemeral restriction as well, or that users will need to edit
+    attributes of the NHDFlowline segments on a case-by-case basis. I also previously included NoConnectors as a restriction, but in some cases
+    I noticed with INSTAR data, it seems necessary to allow connectors, so I have removed that restriction. The NoCanalDitch exclusion was also
+    removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
       - UPDATE: Restrictions are set in Travel Modes now, which are defined in the Network Dataset.
+
+   New 2023: A new "naFillTrace" layer is created. This is an all-directions trace with `downDist` distance. It is used
+   in FillLines_scs to fill in small gaps (i.e., where distance along flowlines is less than downDist * 2, currently 1000-m)
+   between initially-delineated scsLines.
    
    Parameters:
    - in_hydroNet = Input hydrological network dataset
@@ -1932,7 +1943,7 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyrx"%downString
    lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyrx"%upString
    lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyrx"%upString
-   # lyrFillTrace is used by FillLines_scs function to fill gaps between scsLines. It has a fixed name and is not returned by this function.
+   # lyrFillTrace has a fixed name and is not returned by this function
    lyrFillTrace = hydroDir + os.sep + "naFillTrace.lyrx"
    #r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
    
@@ -1940,8 +1951,10 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    lyr_dams = arcpy.MakeFeatureLayer_management(in_dams, where_clause="NH_IGNORE IS NULL OR NH_IGNORE = 0")
    
    printMsg("Creating upstream, downstream, tidal, and gap-fill service layers...")
-   for sl in [["naDownTrace", downDist, "SCS Downstream", lyrDownTrace], ["naUpTrace", upDist, "SCS Upstream", lyrUpTrace], ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace],
-              ["naFillTrace", 1000, "SCS Downstream", lyrFillTrace]]:
+   for sl in [["naDownTrace", downDist, "SCS Downstream", lyrDownTrace],
+              ["naUpTrace", upDist, "SCS Upstream", lyrUpTrace],
+              ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace],
+              ["naFillTrace", downDist, "SCS All Directions", lyrFillTrace]]:
       #restrictions = r + ";" + sl[2]
       saLyr = sl[0]
       cutDist = sl[1]
@@ -2051,18 +2064,19 @@ def MakeNetworkPts_scs(in_PF, in_hydroNet, in_Catch, in_NWI, out_Points, fld_SFI
    printMsg("Network point generation complete.")
    return out_Points
 
-def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=1000, scratchGDB="in_memory"):
+def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratchGDB="in_memory"):
    """
    Using scsLine features and a downstream service area layer, finds and returns 'filler' segments
    which meet a length criteria, which can be used to patch the gaps between inLines.
    :param inLines: Input line features, to find gaps between
    :param outFillLines: Output filler line features which can be used to patch the gaps in inLines
    :param inFillTrace: A downstream-only service area layer used to generate filler lines
-   :param maxFillLength: Maximum length limit for filler segments
+   :param maxFillLength: Maximum total shape length limit for filler segments.
+      deprecated, not recommended to use; inFillTrace defines the fill distance.
    :param scratchGDB: geodatabase to hold intermediate products
    :return: outFillLines
    """
-   printMsg("Checking if any gaps can be patched...")
+   printMsg("Checking if any SCS line gaps can be filled...")
    # Run filler lines network trace
    danglePts = scratchGDB + os.sep + 'danglePts'
    arcpy.FeatureVerticesToPoints_management(inLines, danglePts, "DANGLE")
@@ -2076,27 +2090,29 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=1000, scratc
    else:
       fillTrace = inFillTrace + "\Lines"
    printMsg("Finding filler segments <= " + str(maxFillLength) + " meters...")
-   # combine, dissolve, erase, find intersection with inLines
+   # copy, erase inLines from filler segments
    fill0 = scratchGDB + os.sep + 'fill0'
    arcpy.CopyFeatures_management(fillTrace, fill0)
    fill1 = scratchGDB + os.sep + 'fill1'
-   UnsplitLines(fill0, fill1)
-   # arcpy.PairwiseDissolve_analysis(fill0, fill1, "FacilityID")
+   arcpy.PairwiseErase_analysis(fill0, inLines, fill1)
+   # Dissolve lines
    fill2 = scratchGDB + os.sep + 'fill2'
-   arcpy.PairwiseErase_analysis(fill1, inLines, fill2)
-   fill3 = scratchGDB + os.sep + 'fill3'
-   arcpy.MultipartToSinglepart_management(fill2, fill3)
-   arcpy.CalculateField_management(fill3, "total_length", "!shape.length@meters!", field_type="FLOAT")
-   fill3sj = scratchGDB + os.sep + 'fill3_sj'
-   arcpy.analysis.SpatialJoin(fill3, inLines, fill3sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
+   UnsplitLines(fill1, fill2)
+   # Calculate total length of filler segments
+   arcpy.CalculateField_management(fill2, "total_length", "!shape.length@meters!", field_type="FLOAT")
    
-   # Find filler lines intersecting more than one inLines, and <= maxFillLength
-   fid = [a[0] for a in arcpy.da.SearchCursor(fill3sj, 'TARGET_FID')]
+   # Find filler lines which intersect more than one inLines
+   fill2sj = scratchGDB + os.sep + 'fill2_sj'
+   arcpy.analysis.SpatialJoin(fill2, inLines, fill2sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
+   fid = [a[0] for a in arcpy.da.SearchCursor(fill2sj, 'TARGET_FID')]
    dup = set([x for x in fid if fid.count(x) > 1])
    dup2 = [str(a) for a in dup] + ['-1']  # note: -1 is not a valid OID, so would select nothing. It is added to make sure the query is still valid when dup is an empty list.
-   oid = GetFlds(fill3, oid_only=True)
-   query = oid + " IN (" + ",".join(dup2) + ") AND total_length <= " + str(maxFillLength)
-   arcpy.Select_analysis(fill3, outFillLines, query)
+   oid = GetFlds(fill2, oid_only=True)
+   if maxFillLength is not None:
+      query = oid + " IN (" + ",".join(dup2) + ") AND total_length <= " + str(maxFillLength)
+   else:
+      query = oid + " IN (" + ",".join(dup2) + ")"
+   arcpy.Select_analysis(fill2, outFillLines, query)
    
    return outFillLines
 
