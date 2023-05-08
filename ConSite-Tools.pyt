@@ -1,8 +1,8 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.2.4"  # scheme: major.minor[.bugfix/feature]
-# ArcGIS version: Pro 3.0.x
+tbx_version = "2.2.5"  # scheme: major.minor[.bugfix/feature]
+# ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
 # Last Edit: 2023-03-15
@@ -223,6 +223,59 @@ class shrinkwrapFeats(object):
       # ShrinkWrap(in_Feats, searchDist, out_Feats, multiParm, scratchParm)
 
       return out_Feats
+
+class eeo_summary(object):
+   def __init__(self):
+      """Define the tool (tool name is the name of the class)."""
+      self.label = "EO Tier Summary"
+      self.description = ""
+      self.canRunInBackground = True
+      self.category = "Subroutines"
+
+   def getParameterInfo(self):
+      """Define parameter definitions"""
+      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
+      parm01 = defineParam("fld_ID", "Boundary ID field", "Field", "Required", "Input")
+      paramFields(parm01, parm00, ['Short', 'Long', 'Text'])
+      parm02 = defineParam("in_EOs", "Input EOs", "GPFeatureLayer", "Required", "Input")
+      parm03 = defineParam("summary_type", "Summary type", "String", "Required", "Input", "Both")
+      parm03.filter.list = ['Text', 'Numeric', 'Both']
+      parm04 = defineParam("out_field", "Output text summary field name", "String", "Required", "Input", "EEO_SUMMARY")
+      parm05 = defineParam("slopFactor", "Search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
+      
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      return parms
+
+   def isLicensed(self):
+      """Set whether tool is licensed to execute."""
+      return True
+
+   def updateParameters(self, parameters):
+      """Modify the values and properties of parameters before internal
+      validation is performed.  This method is called whenever a parameter
+      has been changed."""
+      if parameters[3].altered:
+         if parameters[3].valueAsText != "Numeric":
+            parameters[4].enabled = True
+         else:
+            parameters[4].enabled = False
+      return
+
+   def updateMessages(self, parameters):
+      """Modify the messages created by internal validation for each tool
+      parameter.  This method is called after internal validation."""
+      return
+
+   def execute(self, parameters, messages):
+      """The source code of the tool."""
+      # Set up parameter names and values
+      declareParams(parameters)
+
+      # Run function
+      tierSummary(in_Bounds, fld_ID, in_EOs, summary_type, out_field, slopFactor)
+
+      return (in_Bounds)
+
 
 # Biotics Data Extraction Tools
 class extract_biotics(object):
@@ -728,59 +781,6 @@ class tabulate_exclusions(object):
       replaceLayer(out_Tab)
 
       return (out_Tab)
-
-
-class eeo_summary(object):
-   def __init__(self):
-      """Define the tool (tool name is the name of the class)."""
-      self.label = "EO Tier Summary"
-      self.description = ""
-      self.canRunInBackground = True
-      self.category = "Subroutines"
-
-   def getParameterInfo(self):
-      """Define parameter definitions"""
-      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
-      parm01 = defineParam("fld_ID", "Boundary ID field", "Field", "Required", "Input")
-      paramFields(parm01, parm00, ['Short', 'Long', 'Text'])
-      parm02 = defineParam("in_EOs", "Input EOs", "GPFeatureLayer", "Required", "Input")
-      parm03 = defineParam("summary_type", "Summary type", "String", "Required", "Input", "Both")
-      parm03.filter.list = ['Text', 'Numeric', 'Both']
-      parm04 = defineParam("out_field", "Output text summary field name", "String", "Required", "Input", "EEO_SUMMARY")
-      parm05 = defineParam("slopFactor", "Search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
-      
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
-      return parms
-
-   def isLicensed(self):
-      """Set whether tool is licensed to execute."""
-      return True
-
-   def updateParameters(self, parameters):
-      """Modify the values and properties of parameters before internal
-      validation is performed.  This method is called whenever a parameter
-      has been changed."""
-      if parameters[3].altered:
-         if parameters[3].valueAsText != "Numeric":
-            parameters[4].enabled = True
-         else:
-            parameters[4].enabled = False
-      return
-
-   def updateMessages(self, parameters):
-      """Modify the messages created by internal validation for each tool
-      parameter.  This method is called after internal validation."""
-      return
-
-   def execute(self, parameters, messages):
-      """The source code of the tool."""
-      # Set up parameter names and values
-      declareParams(parameters)
-
-      # Run function
-      tierSummary(in_Bounds, fld_ID, in_EOs, summary_type, out_field, slopFactor)
-
-      return (in_Bounds)
 
 
 # TCS/AHZ Delineation Tools 
