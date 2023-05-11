@@ -12,7 +12,7 @@
 
 # Import modules
 print("Initiating arcpy, which takes longer than it should...")
-import arcpy, os, sys, traceback, numpy, pandas
+import arcpy, os, sys, traceback, numpy, pandas, time
 from datetime import datetime as datetime
 
 # Set overwrite option so that existing data may be overwritten
