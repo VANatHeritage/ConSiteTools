@@ -647,6 +647,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
+   arcpy.management.AddField(tmpSites, "AUTO_BRANK", "TEXT", field_length=2)
    arcpy.management.AddField(tmpSites, "AUTO_BRANK_COMMENT", "TEXT", field_length=255)
    failList = []
    dt = time.strftime('%Y-%m-%d')
@@ -659,34 +660,37 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
          arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
          c = countSelectedFeatures("eo_lyr")
          if c > 0:
-            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR_SCORE", "BIODIV_GRANK", "BIODIV_EORANK", "IBR"], skip_nulls=True)
+            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE"], skip_nulls=True)
             sm = arr["IBR_SCORE"].sum()
             mx = arr["IBR_SCORE"].max()
             row[2] = sm
             row[3] = mx
             # Add rank summary
             ls0 = arr.tolist()
-            ls0.sort(reverse=True)  # will sort by IBR_SCORE descending
-            run = list(numpy.cumsum([a[0] for a in ls0]))
+            # Sort ascending based on IBR, G-rank, EO-rank. IBR_SCORE will not factor into sort.
+            ls0.sort(reverse=False)
+            run = list(numpy.cumsum([a[3] for a in ls0]))  # running sum of IBR_SCORE
             # Find IBR_SCORES which contribute to the final rank
             if sm >= mx*4:
                rnks = []
                for (n, i) in enumerate(run):
-                  rnks.append(ls0[n][0])
+                  rnks.append(ls0[n][3])
                   if i >= mx*4:
                      break
             else:
                rnks = [mx]
-            # Add rank summary (counts for each unique G/EO rank for EOs which contributed to the final B-rank of the site)
-            g_eo = [i[1] + '/' + i[2] for i in ls0 if i[0] in rnks]
-            lsu = list(set(g_eo))
-            lsu.sort()
-            lsu_mx = [str(g_eo.count(l)) + ' ' + l for l in lsu]
+            # Add rank summary for EO(s) which contribute to the final B-rank of the site
+            # decide: summarize by G/EO ranks or IBR ranks of EOs
+            summ_by = [i[1] + '/' + i[2] for i in ls0 if i[3] in rnks]  # G-/EO-rank combinations
+            # summ_by = [i[0] for i in ls0 if i[3] in rnks]  # Individual EO b-ranks
+            lsu = []
+            [lsu.append(i) for i in summ_by if i not in lsu]  # this will retain sort order of original list. Do not use set().
+            lsu_ct = [str(summ_by.count(l)) + ' ' + l for l in lsu]
             # IBR Summary
-            if len(lsu_mx) == 1 and lsu_mx[0][0] == "1":
-               mx_text = "Site supports " + ", ".join(lsu_mx) + " occurrence."
+            if len(lsu_ct) == 1 and lsu_ct[0][0] == "1":
+               mx_text = "EO contributing to site B-rank: " + lsu_ct[0] + "."
             else:
-               mx_text = "Site supports " + ", ".join(lsu_mx) + " occurrences."
+               mx_text = "EOs contributing to site B-rank: " + ", ".join(lsu_ct) + "."
             ibr_text = "IBR_SUM = " + str(sm) + "."
             date_text = "[" + dt + "]:"
             row[4] = date_text + " " + mx_text + " " + ibr_text
