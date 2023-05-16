@@ -670,8 +670,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
             # Sort ascending based on IBR, G-rank, EO-rank. IBR_SCORE will not factor into sort.
             ls0.sort(reverse=False)
             run = list(numpy.cumsum([a[3] for a in ls0]))  # running sum of IBR_SCORE
-            # Find IBR_SCORES which contribute to the final rank
-            if sm >= mx*4:
+            # Find IBR_SCORES which contribute to the final rank. Only applies to situations where the max IBR < 256 (B1 rank)
+            if mx < 256 and sm >= mx*4:
                rnks = []
                for (n, i) in enumerate(run):
                   rnks.append(ls0[n][3])
