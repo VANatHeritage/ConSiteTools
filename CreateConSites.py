@@ -1921,15 +1921,15 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
     removed, after finding some INSTAR sites on this type of flowline, and with CanalDitch immediately upstream.
       - UPDATE: Restrictions are set in Travel Modes now, which are defined in the Network Dataset.
 
-   New 2023: A new "naFillTrace" layer is created. This is an all-directions trace with `downDist` distance. It is used
-   in FillLines_scs to fill in small gaps (i.e., where distance along flowlines is less than downDist * 2, currently 1000-m)
-   between initially-delineated scsLines.
+   Update 2023: Change naDownTrace to use SCS All Directions instead of SCS Downstream. This makes for a cleaner
+   delineation just downstream of PFs. It also allows naDownTrace to be used in FillLines_scs(), to fill in gaps up 
+   to 2 * downDist (i.e. 1000m) between the initially-delineated scsLines.
    
    Parameters:
    - in_hydroNet = Input hydrological network dataset
    - in_dams = Input dams (use National Inventory of Dams)
    - upDist = The distance (in map units) to traverse upstream from a point along the network
-   - downDist = The distance (in map units) to traverse downstream from a point along the network
+   - downDist = The distance (in map units) to traverse downstream (all-directions) from a point along the network
    """
    arcpy.CheckOutExtension("Network")
    
@@ -1943,18 +1943,15 @@ def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
    lyrDownTrace = hydroDir + os.sep + "naDownTrace_%s.lyrx"%downString
    lyrUpTrace = hydroDir + os.sep + "naUpTrace_%s.lyrx"%upString
    lyrTidalTrace = hydroDir + os.sep + "naTidalTrace_%s.lyrx"%upString
-   # lyrFillTrace has a fixed name and is not returned by this function
-   lyrFillTrace = hydroDir + os.sep + "naFillTrace.lyrx"
    #r = "NoPipelines;NoUndergroundConduits;NoEphemeral;NoCoastline"
    
    # Make layer with dams to include
    lyr_dams = arcpy.MakeFeatureLayer_management(in_dams, where_clause="NH_IGNORE IS NULL OR NH_IGNORE = 0")
    
-   printMsg("Creating upstream, downstream, tidal, and gap-fill service layers...")
-   for sl in [["naDownTrace", downDist, "SCS Downstream", lyrDownTrace],
+   printMsg("Creating upstream, downstream, and tidal service layers...")
+   for sl in [["naDownTrace", downDist, "SCS All Directions", lyrDownTrace],   # ["naDownTrace", downDist, "SCS Downstream", lyrDownTrace],
               ["naUpTrace", upDist, "SCS Upstream", lyrUpTrace],
-              ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace],
-              ["naFillTrace", downDist, "SCS All Directions", lyrFillTrace]]:
+              ["naTidalTrace", upDist, "SCS All Directions", lyrTidalTrace]]:
       #restrictions = r + ";" + sl[2]
       saLyr = sl[0]
       cutDist = sl[1]
@@ -2070,9 +2067,11 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
    which meet a length criteria, which can be used to patch the gaps between inLines.
    :param inLines: Input line features, to find gaps between
    :param outFillLines: Output filler line features which can be used to patch the gaps in inLines
-   :param inFillTrace: A downstream-only service area layer used to generate filler lines
-   :param maxFillLength: Maximum total shape length limit for filler segments.
-      deprecated, not recommended to use; inFillTrace defines the fill distance.
+   :param inFillTrace: A service area layer used to generate filler lines
+   :param maxFillLength: Maximum total shape length limit for filler segments. Note filler segments often include 
+      tributaries, which contribute to the shape length.
+      - deprecated, not recommended to use. Length is determined by the 'inFillTrace' service area trace distance, 
+         so gaps up to 2x that distance will get filled.
    :param scratchGDB: geodatabase to hold intermediate products
    :return: outFillLines
    """
@@ -2080,8 +2079,7 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
    # Run filler lines network trace
    danglePts = scratchGDB + os.sep + 'danglePts'
    arcpy.FeatureVerticesToPoints_management(inLines, danglePts, "DANGLE")
-   arcpy.AddLocations_na(inFillTrace, "Facilities", danglePts, append="CLEAR")
-   printMsg("Solving service area for " + inFillTrace + "...")
+   arcpy.AddLocations_na(inFillTrace, "Facilities", danglePts, search_tolerance="5 Meters", append="CLEAR")
    arcpy.Solve_na(inFillTrace, "SKIP", "TERMINATE")
    # Get lines layer
    if inFillTrace.endswith(".lyrx"):
@@ -2089,7 +2087,6 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
       fillTrace = na_lyr.listLayers("Lines")[0]
    else:
       fillTrace = inFillTrace + "\Lines"
-   printMsg("Finding filler segments <= " + str(maxFillLength) + " meters...")
    # copy, erase inLines from filler segments
    fill0 = scratchGDB + os.sep + 'fill0'
    arcpy.CopyFeatures_management(fillTrace, fill0)
@@ -2101,7 +2098,7 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
    # Calculate total length of filler segments
    arcpy.CalculateField_management(fill2, "total_length", "!shape.length@meters!", field_type="FLOAT")
    
-   # Find filler lines which intersect more than one inLines
+   # Filler lines are those which intersect >1 inLines
    fill2sj = scratchGDB + os.sep + 'fill2_sj'
    arcpy.analysis.SpatialJoin(fill2, inLines, fill2sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="BOUNDARY_TOUCHES")
    fid = [a[0] for a in arcpy.da.SearchCursor(fill2sj, 'TARGET_FID')]
@@ -2117,7 +2114,7 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
    return outFillLines
 
 def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal = "Tidal", out_Scratch = "in_memory"): 
-   """Loads SCS points derived from Procedural Features, solves the upstream,  downstream, and tidal service layers, and combines network segments to create linear SCS.
+   """Loads SCS points derived from Procedural Features, solves the upstream, downstream, and tidal service layers, and combines network segments to create linear SCS.
    
    Parameters:
    
@@ -2128,15 +2125,7 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    - out_Lines = Output lines representing Stream Conservation Units
    - fld_Tidal = field in in_Points indicating tidal status
    - out_Scratch = Geodatabase to contain intermediate outputs"""
-   
    arcpy.CheckOutExtension("Network")
-   
-   # Find path to NHDFlowline (which is used by FillLines_scs)
-   descHydro = arcpy.Describe(in_upTrace)
-   nwDataset = descHydro.network.catalogPath
-   catPath = os.path.dirname(nwDataset)
-   nhdFlow = catPath + os.sep + "NHDFlowline"
-   
    # timestamp
    t0 = datetime.now()
 
@@ -2212,11 +2201,11 @@ def CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Line
    # Unsplit lines
    UnsplitLines(comboLines, out_Lines)
    
-   # This section finds small flowline gaps (up to 1-km) between scsLines. If any are found, it re-creates out_Lines, with gaps filled in
+   # This section generates filler segments where there are small flowline gaps (up to 1-km) between scsLines. 
+   # If any are found, it re-creates out_Lines with gaps filled in.
    if countFeatures(out_Lines) > 1:
-      in_fillTrace = os.path.join(descHydro.path, "naFillTrace.lyrx")
       fillLines = out_Scratch + os.sep + "fillLines"
-      FillLines_scs(out_Lines, fillLines, in_fillTrace, scratchGDB=out_Scratch)
+      FillLines_scs(out_Lines, fillLines, in_downTrace, scratchGDB=out_Scratch)
       if countFeatures(fillLines) > 0:
          printMsg("Filling in small gaps...")
          newLines = out_Scratch + os.sep + 'newLines'
