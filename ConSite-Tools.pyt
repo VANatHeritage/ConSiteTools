@@ -107,20 +107,18 @@ class Toolbox(object):
       self.alias = "ConSiteToolbox"
 
       # List of tool classes associated with this toolbox
-      Subroutine_Tools = [coalesceFeats, shrinkwrapFeats, eeo_summary]
+      Subroutine_Tools = [coalesce_feats, shrinkwrap_feats, eeo_summary]
       Biotics_Tools = [extract_biotics, parse_siteTypes]
       PrepReview_Tools = [copy_layers, rules2nwi, review_consite, assign_brank, calc_bmi, flat_conslands, tabulate_exclusions]
       TCS_AHZ_Tools = [expand_selection, create_sbb, expand_sbb, create_consite]
       SCS_Tools = [servLyrs_scs, ntwrkPts_scs, lines_scs, sites_scs] 
       Portfolio_Tools = [make_ecs_dir, attribute_eo, score_eo, build_portfolio, build_element_lists]
       
-      #self.tools = Subroutine_Tools + PrepReview_Tools + NWI_Proc_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
-      
       self.tools = Subroutine_Tools + Biotics_Tools + PrepReview_Tools + TCS_AHZ_Tools + SCS_Tools + Portfolio_Tools
 
 ### Define the tools
 # Subroutine Tools
-class coalesceFeats(object):
+class coalesce_feats(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
       self.label = "Coalesce"
@@ -168,7 +166,7 @@ class coalesceFeats(object):
       
       return out_Feats
 
-class shrinkwrapFeats(object):
+class shrinkwrap_feats(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
       self.label = "Shrinkwrap"

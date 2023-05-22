@@ -2301,6 +2301,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    - in_FlowBuff: Input polygons derived from raster where the flow distances shorter than a specified truncation distance are coded 1; output from the prepFlowBuff function. The flow buffers have been further split by catchments. Ignored if trim = "false", in which case "None" can be entered.
    - fld_Rule = field containing assigned processing rule (should be "SCS1" for features getting standard process or "SCS2" for alternate process)
    - trim: Indicates whether sites should be restricted to buffers ("true"; default) or encompass entire catchments ("false")
+      - NOTE: not currently in use.
    - buffDist: Buffer distance used to make clipping buffers
    - out_Scratch: Geodatabase to contain output products 
    """
@@ -2338,8 +2339,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
       ### Variables used repeatedly in loop
       dissCatch = out_Scratch + os.sep + "dissCatch"
       clipBuff = out_Scratch + os.sep + "clipBuff"
-      # clipFlow = out_Scratch + os.sep + "clipFlow"
-      flowPoly = out_Scratch + os.sep + "flowPoly"
             
       # Make feature layers
       printMsg("Making feature layers...")
@@ -2388,16 +2387,27 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
                # Clip the flow buffer to the clipping buffer 
                printMsg("Clipping the flow buffer ...")
                arcpy.env.extent = clipBuff
-               arcpy.Clip_analysis(in_FlowBuff, clipBuff, flowPoly)
+               flowPoly0 = out_Scratch + os.sep + "flowPoly0"
+               arcpy.PairwiseClip_analysis(in_FlowBuff, clipBuff, flowPoly0)
                
-               # For SCUs, Eliminate any dangling pieces which may have resulted from clip. These can result becuase the flow buffers/catchments do not always perfectly align with flowlines
+               # This section cleans up artifacts specific to SCU or SCS.
                if scuSwitch:
+                  # For SCUs, Eliminate small dangling pieces which may have resulted from clip. 
+                  #  These can result becuase the flow buffers and catchments do not always perfectly align with 
+                  #  flowlines, which rarely can spill over into a neighboring catchment/flow buffer.
                   printMsg("Eliminating fragments...")
                   dissFlow = out_Scratch + os.sep + "dissFlow"
-                  arcpy.PairwiseDissolve_analysis(flowPoly, dissFlow)
-                  flowPoly2 = out_Scratch + os.sep + "flowPoly2"
-                  arcpy.EliminatePolygonPart_management(dissFlow, flowPoly2, "AREA", part_area="500 SQUAREMETERS", part_option="ANY")
-                  flowPoly = flowPoly2
+                  arcpy.PairwiseDissolve_analysis(flowPoly0, dissFlow)
+                  flowPoly = out_Scratch + os.sep + "flowPoly"
+                  arcpy.EliminatePolygonPart_management(dissFlow, flowPoly, "AREA", part_area="500 SQUAREMETERS", part_option="ANY")
+               else:
+                  # For SCS, select using line shape and PFs. This will exclude non-hydro-connected 
+                  #  pieces of flow buffer which were picked up by a line buffer that extends beyond its catchment. 
+                  flowPoly1 = out_Scratch + os.sep + "flowPoly1"
+                  arcpy.MultipartToSinglepart_management(flowPoly0, flowPoly1)
+                  flowPoly = arcpy.MakeFeatureLayer_management(flowPoly1)
+                  arcpy.SelectLayerByLocation_management(flowPoly, "INTERSECT", lineShp)
+                  arcpy.SelectLayerByLocation_management(flowPoly, "INTERSECT", lyrPF, selection_type="ADD_TO_SELECTION")
                
                printMsg("Appending feature %s..." %lineID)
                arcpy.Append_management(flowPoly, flowBuff, "NO_TEST")
@@ -2415,6 +2425,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
          arcpy.SelectLayerByLocation_management(catch, "INTERSECT", altPF, "", "NEW_SELECTION")
          printMsg("Appending full catchments for selected features...")
          if scuSwitch:
+            # For SCUs: smooth catchments only. Note that for SCS, smoothing is applied to the final SCS feature only.
             # Note: have to dissolve catchments before smoothing, otherwise you'll get weird incisions/slivers
             fullCatch = out_Scratch + os.sep + "fullCatch"
             arcpy.PairwiseDissolve_analysis(catch, fullCatch, multi_part="SINGLE_PART")
@@ -2422,11 +2433,8 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
             arcpy.cartography.SmoothPolygon(fullCatch, fullCatchSmth, "PAEK", "50 METERS")
             arcpy.Append_management(fullCatchSmth, flowBuff, "NO_TEST")
          else:
-            # headsup: In this case, smoothing happens after the buffers and catchments are merged/dissolved
             arcpy.Append_management(catch, flowBuff, "NO_TEST")
-
       in_Polys = flowBuff
-   
    else:
       # Select catchments intersecting SCS Lines
       printMsg("Selecting catchments containing SCS lines...")
@@ -2452,7 +2460,6 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
 
    printMsg("Filling in holes...")
    fillPolys = out_Scratch + os.sep + "fillPolys"
-   # arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "PERCENT", "", 99, "CONTAINED_ONLY")
    arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
 
    # Append final shapes to template
