@@ -1341,7 +1341,7 @@ class lines_scs(object):
       else:
          pass
       
-      parm1 = defineParam("out_Lines", "Output Linear SCUs", "DEFeatureClass", "Required", "Output", "scsLines")
+      parm1 = defineParam("out_Lines", "Output SCS lines", "DEFeatureClass", "Required", "Output", "scsLines")
       
       parm2 = defineParam("in_downTrace", "Downstream Service Layer", "GPNALayer", "Required", "Input")
       try:
