@@ -543,14 +543,19 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = "in_memory" + os.sep + "EOs"
-   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
+   # arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
+   # decide: what is NUMEOS (total EOs, extant EOs, site-worthy EOs, ?)
+   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs,  ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "NUMEOS"], [["SFID", "COUNT"]], "MULTI_PART")
    
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
-   arcpy.AddField_management(in_EOs, "IBR", "TEXT", 2)
+   arcpy.AddField_management(in_EOs, "IBR", "TEXT", 3)
    # Searches elcodes for "CEGL" so it can treat communities a little differently than species.
    # Should it do the same for "ONBCOLONY" bird colonies?
-   codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode):
+   # Includes exceptions for "only known occurrence of element", which will return the "B1E" rank. This exception excludes Healthy Waters EOs ("CAQU").
+   codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode, endem, numeo):
+      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
+         return "B1E"
       if eorank == "A":
          if grank == "G1":
             return "B1"
@@ -604,14 +609,14 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
       else:
          return "BU"
    '''
-   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!)"
+   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !NUMEOS!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
    
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
    codeblock = '''def score(ibr):
-      if ibr == "B1":
+      if ibr == "B1" or ibr == "B1E":
          return 256
       elif ibr == "B2":
          return 64
@@ -681,16 +686,22 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
                rnks = [mx]
             # Add rank summary for EO(s) which contribute to the final B-rank of the site
             # decide: summarize by G/EO ranks or IBR ranks of EOs
-            summ_by = [i[1] + '/' + i[2] for i in ls0 if i[3] in rnks]  # G-/EO-rank combinations
-            # summ_by = [i[0] for i in ls0 if i[3] in rnks]  # Individual EO b-ranks
+            summ_by_a = [i[1] + '/' + i[2] for i in ls0 if i[3] in rnks]  # G-/EO-rank combinations
+            summ_by_b = [i[0] for i in ls0 if i[3] in rnks]  # Individual EO b-ranks
             lsu = []
-            [lsu.append(i) for i in summ_by if i not in lsu]  # this will retain sort order of original list. Do not use set().
-            lsu_ct = [str(summ_by.count(l)) + ' ' + l for l in lsu]
+            [lsu.append(i) for i in summ_by_a if i not in lsu]  # this will retain sort order of original list. Do not use set().
+            lsu_ct = [str(summ_by_a.count(l)) + ' ' + l for l in lsu]
             # IBR Summary
             if len(lsu_ct) == 1 and lsu_ct[0][0] == "1":
                mx_text = "EO contributing to site B-rank: " + lsu_ct[0] + "."
             else:
                mx_text = "EOs contributing to site B-rank: " + ", ".join(lsu_ct) + "."
+            if "B1E" in summ_by_b:
+               b1e_ct = summ_by_b.count("B1E")
+               if b1e_ct > 1:
+                  mx_text += " Site contains the only known occurrences of " + str(b1e_ct) + " elements."
+               else:
+                  mx_text += " Site contains the only known occurrence of an element."
             ibr_text = "IBR_SUM = " + str(sm) + "."
             date_text = "[" + dt + "]:"
             row[4] = date_text + " " + mx_text + " " + ibr_text
