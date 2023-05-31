@@ -62,7 +62,12 @@ def main():
    in_hydroNet = os.path.join(in_netGDB, "HydroNet", "HydroNet_ND")
    in_Catch = os.path.join(in_netGDB, "NHDPlusCatchment")
    in_FlowBuff = os.path.join(in_netGDB, "FlowBuff150")
-
+   
+   # optional: re-use existing network layers
+   lyrDownTrace = os.path.dirname(in_netGDB) + os.sep + 'naDownTrace_500.lyrx'
+   lyrUpTrace = os.path.dirname(in_netGDB) + os.sep + 'naUpTrace_3000.lyrx'
+   lyrTidalTrace = os.path.dirname(in_netGDB) + os.sep + 'naTidalTrace_3000.lyrx'
+   
    # SCU/SCS trim setting
    trim = "true"
    

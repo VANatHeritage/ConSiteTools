@@ -2083,10 +2083,21 @@ def FillLines_scs(inLines, outFillLines, inFillTrace, maxFillLength=None, scratc
    :return: outFillLines
    """
    printMsg("Checking if any SCS line gaps can be filled...")
-   # Run filler lines network trace
-   danglePts = scratchGDB + os.sep + 'danglePts'
-   arcpy.FeatureVerticesToPoints_management(inLines, danglePts, "DANGLE")
-   arcpy.AddLocations_na(inFillTrace, "Facilities", danglePts, search_tolerance="5 Meters", append="CLEAR")
+   # Generate starting points for fill trace using flowlines. This method should generate points at intersections 
+   # with un-included flowlines (i.e. edges). Best to limit the amount of points generated.
+   desc = arcpy.Describe(inFillTrace)
+   nhdFlow = os.path.dirname(desc.network.catalogPath) + os.sep + "NHDFlowline"
+   nhdFlow_lyr = arcpy.MakeFeatureLayer_management(nhdFlow)
+   arcpy.management.SelectLayerByLocation(nhdFlow_lyr, "INTERSECT", inLines)
+   flowErase = scratchGDB + os.sep + "flowErase"
+   arcpy.analysis.PairwiseErase(nhdFlow_lyr, inLines, flowErase)
+   flowInt0 = scratchGDB + os.sep + "flowInt0"
+   arcpy.analysis.PairwiseIntersect([inLines, flowErase], flowInt0, "ONLY_FID", output_type="POINT")
+   flowInt = scratchGDB + os.sep + "flowInt"
+   arcpy.management.MultipartToSinglepart(flowInt0, flowInt)
+   # Add locations and solve   
+   arcpy.AddLocations_na(inFillTrace, "Facilities", flowInt, append="CLEAR")
+   printMsg("Solving service area for " + inFillTrace + "...")
    arcpy.Solve_na(inFillTrace, "SKIP", "TERMINATE")
    # Get lines layer
    if inFillTrace.endswith(".lyrx"):
