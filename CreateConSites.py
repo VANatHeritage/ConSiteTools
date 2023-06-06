@@ -52,7 +52,7 @@ def ExtractBiotics(BioticsPF, BioticsCS, outGDB):
    arcpy.Project_management(unprjPF, outPF, outCoordSyst, transformMethod, inCoordSyst, "PRESERVE_SHAPE", "")
    printMsg('Procedural Features successfully exported to %s' %outPF)
    
-   # decide: summarize number of EOs by element for use in B-rank automation
+   # Summarize number of EOs by element for use in B-rank automation
    printMsg("Counting number of EOs by Element...")
    n_eos = r"in_memory\n_eos"
    arcpy.Statistics_analysis(outPF, n_eos, [["SF_EOID", "UNIQUE"]], ["ELCODE"])

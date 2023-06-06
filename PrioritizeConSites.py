@@ -543,9 +543,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = "in_memory" + os.sep + "EOs"
-   # arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], [["SFID", "COUNT"]], "MULTI_PART")
-   # decide: what is NUMEOS (total EOs, extant EOs, site-worthy EOs, ?)
-   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs,  ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "NUMEOS"], [["SFID", "COUNT"]], "MULTI_PART")
+   dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "ELEMENT_EOS"]
+   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"]], "MULTI_PART")
    
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
@@ -609,7 +608,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
       else:
          return "BU"
    '''
-   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !NUMEOS!)"
+   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
    
    ### For the EOs, calculate the IBR score
