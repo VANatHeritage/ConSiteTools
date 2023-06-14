@@ -1090,9 +1090,10 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    # decide: Option to only include eligible EO elements in sumTab.
    # arcpy.Statistics_analysis("lyr_EO", out_sumTab, statsList, ["ELCODE", "SNAME", "NEW_GRANK"])
    # option below is for when sumTab includes ALL elements. In that case, fields are joined.
-   arcpy.Statistics_analysis("lyr_EO", scratchGDB + os.sep + "eo_stats", statsList, ["ELCODE"])
+   eo_stats = scratchGDB + os.sep + "eo_stats"
+   arcpy.Statistics_analysis("lyr_EO", eo_stats, statsList, ["ELCODE"])
    jfld = [a[1] + "_" + a[0] for a in statsList]
-   arcpy.JoinField_management(out_sumTab, "ELCODE", scratchGDB + os.sep + "eo_stats", "ELCODE", jfld)
+   arcpy.JoinField_management(out_sumTab, "ELCODE", eo_stats, "ELCODE", jfld)
    
    # Rename count field
    arcpy.AlterField_management(out_sumTab, "COUNT_SF_EOID", "COUNT_ELIG_EO", "COUNT_ELIG_EO")
@@ -1117,10 +1118,10 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    cmdString = 'c = 0'
    for code in ecoregions:
       cmdString += '''
-      if %s >0:
-         c +=1
-      else:
-         pass'''%str(code)
+      if %s is not None:
+         if %s >0:
+            c +=1
+      ''' % (str(code), str(code))
    codeblock = '''def numReg(%s):
       %s
       return c
@@ -1135,17 +1136,18 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    printMsg("Determining conservation targets...")
    arcpy.AddField_management(out_sumTab, "TARGET", "SHORT")
    codeblock = '''def target(grank, count):
-      if grank == 'G1':
-         initTarget = 10
-      elif grank == 'G2':
-         initTarget = 5
-      else:
-         initTarget = 2
-      if count < initTarget:
-         target = count
-      else:
-         target = initTarget
-      return target'''
+      if count is not None:
+         if grank == 'G1':
+            initTarget = 10
+         elif grank == 'G2':
+            initTarget = 5
+         else:
+            initTarget = 2
+         if count < initTarget:
+            target = count
+         else:
+            target = initTarget
+         return target'''
    expression = "target(!NEW_GRANK!, !COUNT_ELIG_EO!)"
    arcpy.CalculateField_management(out_sumTab, "TARGET", expression, "PYTHON_9.3", codeblock)
    
