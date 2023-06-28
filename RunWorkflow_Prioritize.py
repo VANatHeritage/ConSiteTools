@@ -73,7 +73,11 @@ def main():
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_conslands, src_elExclude, src_PF, src_CS)
-      
+   # For testing only
+   # in_GDB = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb'
+   # out_GDB = r'D:\projects\EssentialConSites\testing\testing_rawRank_20230628\ECS_rawrank_test.gdb'
+   # out_DIR = os.path.dirname(out_GDB)
+   
    # Input standard variables which are the same for all site types
    # No need to change this if in_GDB is valid and naming conventions maintained
    in_elExclude = in_GDB + os.sep + 'ElementExclusions'

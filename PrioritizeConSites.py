@@ -191,7 +191,9 @@ def updateTiers(in_procEOs, targetDict, rankFld):
    returns updated targetDict, which can be fed into this function for the next tier update.
    
    Same basic workflow as updateSlots, except this function updates TIER, and sets lower-ranked rows to General.
-   headsup: this uses pandas data frames, which are WAY faster than ArcGIS table queries.
+   headsup:
+      - this uses pandas data frames, which are WAY faster than ArcGIS table queries.
+      - the Vital tier is not assigned in this function, it is assigned directly in ScoreEOs.
    '''
    printMsg("Updating tiers using " + rankFld + "...")
    df = fc2df(in_procEOs, ["ELCODE", "TIER", "SF_EOID", rankFld])
@@ -201,12 +203,13 @@ def updateTiers(in_procEOs, targetDict, rankFld):
    for elcode in targetDict:
       try:
          availSlots = targetDict[elcode]
+         rnks = list(set(df[df["ELCODE"] == elcode][rankFld]))  # this allows function to work even if ranks values are not sequential
          # print(elcode)
          r = 1
-         while availSlots > 0:
+         while availSlots > 0 and r <= len(rnks):
             # pandas queries; note different operators from base python
-            where_clause1 = "ELCODE=='%s' & TIER=='Unassigned' & %s <= %s" %(elcode, rankFld, str(r))
-            where_clause2 = "ELCODE=='%s' & TIER=='Unassigned' & %s > %s" %(elcode, rankFld, str(r))
+            where_clause1 = "ELCODE=='%s' & TIER=='Unassigned' & %s <= %s" %(elcode, rankFld, str(rnks[r-1]))
+            where_clause2 = "ELCODE=='%s' & TIER=='Unassigned' & %s > %s" %(elcode, rankFld, str(rnks[r-1]))
             q1 = df.query(where_clause1)
             c = len(q1)
             if c == 0:
@@ -265,10 +268,11 @@ def updateSlots(in_procEOs, slotDict, rankFld):
    
    for elcode in slotDict:
       availSlots = slotDict[elcode]
+      rnks = list(set(df[df["ELCODE"] == elcode][rankFld]))
       r = 1
-      while availSlots > 0:
+      while availSlots > 0 and r <= len(rnks):
          # pandas queries; note different operators from base python
-         where_clause = "ELCODE=='%s' & TIER=='Unassigned' & PORTFOLIO==0 & %s <= %s" % (elcode, rankFld, str(r))
+         where_clause = "ELCODE=='%s' & TIER=='Unassigned' & PORTFOLIO==0 & %s <= %s" % (elcode, rankFld, str(rnks[r-1]))
          q1 = df.query(where_clause)
          c = len(q1)
          #printMsg('Current rank: %s' % str(r))
@@ -551,62 +555,64 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    arcpy.AddField_management(in_EOs, "IBR", "TEXT", 3)
    # Searches elcodes for "CEGL" so it can treat communities a little differently than species.
    # Should it do the same for "ONBCOLONY" bird colonies?
-   # Includes exceptions for "only known occurrence of element", which will return the "B1E" rank. This exception excludes Healthy Waters EOs ("CAQU").
+   # Includes exceptions for "only known occurrence of element", which will return a "[B-rank]E" rank. This exception excludes Healthy Waters EOs ("CAQU").
    codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode, endem, numeo):
-      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
-         return "B1E"
       if eorank == "A":
          if grank == "G1":
-            return "B1"
+            b = "B1"
          elif grank in ("G2", "G3"):
-            return "B2"
+            b = "B2"
          else:
             if srank == "S1":
-               return "B3"
+               b = "B3"
             elif srank == "S2":
-               return "B4"
+               b = "B4"
             else:
-               return "B5"
+               b = "B5"
       elif eorank == "B":
          if grank in ("G1", "G2"):
-            return "B2"
+            b = "B2"
          elif grank == "G3":
-            return "B3"
+            b = "B3"
          else:
             if srank == "S1":
-               return "B4"
+               b = "B4"
             else:
-               return "B5"
+               b = "B5"
       elif eorank == "C":
          if grank == "G1":
-            return "B2"
+            b = "B2"
          elif grank == "G2":
-            return "B3"
+            b = "B3"
          elif grank == "G3":
-            return "B4"
+            b = "B4"
          else:
             if srank in ("S1", "S2"):
-               return "B5"
+               b = "B5"
             elif elcode[:4] == "CEGL":
-               return "B5"
+               b = "B5"
             else:
-               return "BU"
+               b = "BU"
       elif eorank == "D":
          if grank == "G1":
-            return "B2"
+            b = "B2"
          elif grank == "G2":
-            return "B3"
+            b = "B3"
          elif grank == "G3":
-            return "B4"
+            b = "B4"
          else:
             if (fstat in ("LT%", "LE%") or sstat in ("LT", "LE")) and (srank in ("S1", "S2")):
-               return "B5"
+               b = "B5"
             elif elcode[:4] == "CEGL":
-               return "B5"
+               b = "B5"
             else:
-               return "BU"
+               b = "BU"
       else:
-         return "BU"
+         b = "BU"
+      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
+         return b + "E"
+      else:
+         return b
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
@@ -614,8 +620,12 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
-   codeblock = '''def score(ibr):
-      if ibr == "B1" or ibr == "B1E":
+   # todo: uncomment the section to assign 256 points to only-known locations when ready
+   codeblock = '''def score(ibr1):
+      # if ibr1.endswith("E"):
+      #    return 256
+      ibr = ibr1[0:2]
+      if ibr == "B1":
          return 256
       elif ibr == "B2":
          return 64
@@ -685,8 +695,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
                rnks = [mx]
             # Add rank summary for EO(s) which contribute to the final B-rank of the site
             # decide: summarize by G/EO ranks or IBR ranks of EOs
-            summ_by_a = [i[1] + '/' + i[2] for i in ls0 if i[3] in rnks]  # G-/EO-rank combinations
-            summ_by_b = [i[0] for i in ls0 if i[3] in rnks]  # Individual EO b-ranks
+            summ_by_a = [i[1] + '/' + i[2] for i in ls0 if i[3] in rnks]  # G-/EO-rank combinations of top EOs
+            # summ_by_b = [i[0] for i in ls0 if i[3] in rnks]  # Individual EO b-ranks of top EOs  # not using
             lsu = []
             [lsu.append(i) for i in summ_by_a if i not in lsu]  # this will retain sort order of original list. Do not use set().
             lsu_ct = [str(summ_by_a.count(l)) + ' ' + l for l in lsu]
@@ -695,16 +705,14 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
                mx_text = "EO contributing to site B-rank: " + lsu_ct[0] + "."
             else:
                mx_text = "EOs contributing to site B-rank: " + ", ".join(lsu_ct) + "."
-            if "B1E" in summ_by_b:
-               b1e_ct = summ_by_b.count("B1E")
-               if b1e_ct > 1:
-                  mx_text += " Site contains the only known occurrences of " + str(b1e_ct) + " elements."
-               else:
-                  mx_text += " Site contains the only known occurrence of an element."
+            endem_ct = sum(a.endswith("E") for a in arr["IBR"])
+            if endem_ct == 1:
+               mx_text += " Site contains the only known occurrence of an element."
+            elif endem_ct > 1:
+               mx_text += " Site contains the only known occurrences of " + str(endem_ct) + " elements."
             ibr_text = "IBR_SUM = " + str(sm) + "."
             date_text = "[" + dt + "]:"
             row[4] = date_text + " " + mx_text + " " + ibr_text
-            
             cursor.updateRow(row)
          else:
             printMsg("Site %s: Failed"%siteID)
@@ -1022,14 +1030,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    arcpy.AddField_management(TabInter_mil, "PERCENT_MIL", "DOUBLE")
    arcpy.CalculateField_management(TabInter_mil, "PERCENT_MIL", "round(!PERCENTAGE!, 2)", "PYTHON")
    arcpy.JoinField_management(out_procEOs, "SF_EOID", TabInter_mil, "SF_EOID", "PERCENT_MIL")
-   codeblock = '''def updateMil(mil):
-      if mil == None:
-         return 0
-      else:
-         return mil'''
-   expression = "updateMil(!PERCENT_MIL!)"
-   arcpy.CalculateField_management(out_procEOs, "PERCENT_MIL", expression, "PYTHON_9.3", codeblock)
-   
+   NullToZero(out_procEOs, "PERCENT_MIL")
    # Tabulate Intersection of EOs with conservation lands of specified BMI values
    ScoreBMI(out_procEOs, "SF_EOID", in_consLands_flat, "PERCENT_BMI_")
    
@@ -1046,16 +1047,28 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    # Indicate presence of EOs in ecoregions
    printMsg('Indicating presence of EOs in ecoregions...')
    ecoregions = unique_values(in_ecoReg, fld_RegCode)
+   # Find ecoregion with the most overlap. Could be used for stratifying by eco-region.
+   tabint = scratchGDB + os.sep + "tabint"
+   arcpy.analysis.TabulateIntersection(out_procEOs, "SF_EOID", in_ecoReg, tabint, fld_RegCode)
+   # Generate table with one row per EO (largest intersection)
+   tabint2 = scratchGDB + os.sep + "tabint2"
+   arcpy.Sort_management(tabint, tabint2, [["SF_EOID", "ASCENDING"], ["PERCENTAGE", "DESCENDING"]])
+   arcpy.DeleteIdentical_management(tabint2, ["SF_EOID"])
+   arcpy.JoinField_management(out_procEOs, "SF_EOID", tabint2, "SF_EOID", fld_RegCode)
+   # Add one field per eco-region
    for code in ecoregions:
       arcpy.AddField_management(out_procEOs, code, "SHORT")
-      where_clause = '"%s" = \'%s\''%(fld_RegCode, code)
-      arcpy.MakeFeatureLayer_management(in_ecoReg, "lyr_ecoReg", where_clause)
-      arcpy.SelectLayerByLocation_management("lyr_EO", "INTERSECT", "lyr_ecoReg", "", "NEW_SELECTION", "NOT_INVERT")
-      arcpy.CalculateField_management("lyr_EO", code, 1, "PYTHON")
-      arcpy.SelectLayerByLocation_management("lyr_EO", "INTERSECT", "lyr_ecoReg", "", "NEW_SELECTION", "INVERT")
-      arcpy.CalculateField_management("lyr_EO", code, 0, "PYTHON")
+      eo_ids = [a[0] for a in arcpy.da.SearchCursor(tabint, ["SF_EOID", fld_RegCode]) if a[1] == code]
+      with arcpy.da.UpdateCursor(out_procEOs, ["SF_EOID", code]) as curs:
+         for r in curs:
+            if r[0] in eo_ids:
+               r[1] = 1
+            else:
+               r[1] = 0
+            curs.updateRow(r)
    
    # decide: below is an option to include ALL elements to this table, along with total and ineligible counts.
+   printMsg("Summarizing...")
    arcpy.analysis.Frequency(out_procEOs, scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK", "EXCLUSION"])
    arcpy.management.PivotTable(scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK"], "EXCLUSION", "FREQUENCY", out_sumTab)
    pfld = [a.replace(" ", "_") for a in unique_values(out_procEOs, "EXCLUSION")]
@@ -1082,7 +1095,6 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    arcpy.MakeFeatureLayer_management(out_procEOs, "lyr_EO", where_clause)
    
    # Summarize to get count of included EOs per element, and counts in ecoregions
-   printMsg("Summarizing...")
    statsList = [["SF_EOID", "COUNT"]]
    for code in ecoregions:
       statsList.append([str(code), "SUM"])
@@ -1111,26 +1123,11 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    # Add more info to summary table
    # Field: NUM_REG
    printMsg("Determining the number of regions in which each element occurs...")
-   arcpy.AddField_management(out_sumTab, "NUM_REG", "SHORT")
-   varString = str(ecoregions[0])
-   for code in ecoregions[1:]:
-      varString += ', %s' %str(code)
-   cmdString = 'c = 0'
-   for code in ecoregions:
-      cmdString += '''
-      if %s is not None:
-         if %s >0:
-            c +=1
-      ''' % (str(code), str(code))
-   codeblock = '''def numReg(%s):
-      %s
-      return c
-   '''%(varString, cmdString)
-   expString = '!SUM_%s!' %str(ecoregions[0])
-   for code in ecoregions[1:]:
-      expString += ', !SUM_%s!' %str(code)
-   expression = 'numReg(%s)'%expString
-   arcpy.CalculateField_management(out_sumTab, "NUM_REG", expression, "PYTHON_9.3", codeblock)
+   # Convert nulls to zero
+   eco_fld = ["SUM_" + e for e in ecoregions]
+   [NullToZero(out_sumTab, e) for e in eco_fld]
+   expression = " + ".join(["min(!" + e + "!, 1)" for e in eco_fld])
+   arcpy.CalculateField_management(out_sumTab, "NUM_REG", expression, "PYTHON_9.3", codeblock, field_type="SHORT")
    
    # Field: TARGET
    printMsg("Determining conservation targets...")
@@ -1244,7 +1241,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
    printMsg("Trying to find Vital tier EO for " + str(len(elcodes_list)) + " elements using EO-Rank...")
    q = "ELCODE IN ('" + "','".join(elcodes_list) + "')"
    lyr = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause=q)
-   addRanks(lyr, "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")  # these ranks should already exist, but safer to re-calculate
+   addRanks(lyr, "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")  # re-calculate rank so ranking includes only HP EOs
    arcpy.SelectLayerByAttribute_management(lyr, "NEW_SELECTION", "RANK_eo = 1")
    # Find top-rank ELCODEs only occurring once. These are the 'Vital' EOs
    lis = [a[0] for a in arcpy.da.SearchCursor(lyr, ['ELCODE'])]
@@ -1270,7 +1267,7 @@ def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "
       elcodes_list = [i for i in elcodes_list if i not in elcodes]
    
    # Now update in_procEOs using EO IDs
-   printMsg("Could not select a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
+   printMsg("Did not select a Vital tier EO for " + str(len(elcodes_list)) + " elements.")
    vital = arcpy.MakeFeatureLayer_management(rnkEOs, where_clause="TIER = 'Vital'")
    eoids = unique_values(vital, 'SF_EOID')
    q = "SF_EOID IN (" + ",".join([str(int(i)) for i in eoids]) + ")"
@@ -1410,6 +1407,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
    scratchGDB = "in_memory"
+   eoImportance = False  # Switch for calculating a numeric within-element rank for EOs, based on final rank and all individual ranking factors.
+   fld_RegCode = "GEN_REG"  # Used for calculating within-ecoregion EO ranks by element
 
    # Make copies of inputs
    printMsg('Making temporary copies of inputs...')
@@ -1669,13 +1668,15 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor)
    
    # Create final outputs
+   # Set up rank/sorting fields
    fldList = [
-   ["ELCODE", "ASCENDING"], 
    ["FinalRANK", "ASCENDING"], 
+   ["ChoiceRANK", "ASCENDING"],
    ["RANK_mil", "ASCENDING"], 
    ["RANK_eo", "ASCENDING"], 
    ["EORANK_NUM", "ASCENDING"],
    ["RANK_year", "ASCENDING"], 
+   # ["bycatch", "DESCENDING"], # not necessary, since EOs elevated through bycatch will have a higher FinalRANK
    ["RANK_bmi", "ASCENDING"], 
    ["RANK_nap", "ASCENDING"], 
    ["RANK_csVal", "ASCENDING"], 
@@ -1683,7 +1684,29 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ["RANK_eoArea", "ASCENDING"], 
    ["PORTFOLIO", "DESCENDING"]
    ]
-   arcpy.Sort_management(in_sortedEOs, out_sortedEOs, fldList)
+   
+   # coulddo: update all ranking fields using same ranking as before, but for ALL eligible EOs. 
+   #  These are used to provide a unique numeric rank for ALL EOs, by element. Note that rankings are sorta slow.
+   if eoImportance:
+      printMsg("Re-calculating rank fields for all eligible EOs...")
+      rankLayer = arcpy.MakeFeatureLayer_management(in_sortedEOs, where_clause="FinalRANK <> 6")
+      # addRanks(in_sortedEOs, "PERCENT_MIL", "ASCENDING", "RANK_mil", 5, "ABS")  # not using
+      addRanks(rankLayer, "EORANK_NUM", "ASCENDING", "RANK_eo", 0.5, "ABS")
+      addRanks(rankLayer, "OBSYEAR", "DESCENDING", "RANK_year", 3, "ABS")
+      addRanks(rankLayer, "BMI_score", "DESCENDING", "RANK_bmi", 5, "ABS")
+      addRanks(rankLayer, "ysnNAP", "DESCENDING", "RANK_nap", 0.5, "ABS")
+      addRanks(rankLayer, "CS_CONSVALUE", "DESCENDING", "RANK_csVal", 1, "ABS")
+      addRanks(rankLayer, "COUNT_SFID", "DESCENDING", "RANK_numPF", 1, "ABS")
+      addRanks(rankLayer, "SHAPE_Area", "DESCENDING", "RANK_eoArea", 0.1, "ABS", 2)
+      # Calculate the raw rank within the element for the state and by eco-region
+      calcGrpSeq(rankLayer, fldList, "ELCODE", "EOImportance_State")
+      reg = unique_values(rankLayer, fld_RegCode)
+      for r in reg:
+         arcpy.SelectLayerByAttribute_management(rankLayer, "NEW_SELECTION", where_clause=fld_RegCode + " = '" + r + "'")
+         calcGrpSeq(rankLayer, fldList, "ELCODE", "EOImportance_Ecoreg")
+   
+   # Output final layer
+   arcpy.Sort_management(in_sortedEOs, out_sortedEOs, [["ELCODE", "ASCENDING"]] + fldList)
    arcpy.DeleteField_management(out_sortedEOs, ["bycatch", "ORIG_FID", "ORIG_FID_1"])  # coulddo: delete other fields here if they are not needed.
    
    arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["MIN_FinalRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])

@@ -919,20 +919,18 @@ def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
    :param seq_field: The new sequence field, to add to in_Table
    :return: in_Table
    """
-   printMsg("Calculating group sequences by " + grp_field + "...")
+   printMsg("Calculating group sequences by " + grp_field + " in " + seq_field + "...")
    tmpSrt = "in_memory/grpsrt"
    # Add group field to sorting fields
    final_sort = [[grp_field, "ASCENDING"]] + sort_field
-   arcpy.DeleteField_management(in_Table, seq_field)  # removes existing field, has no effect if it doesn't exist
+   # Add sequence field (or set to 0 if it already exists)
+   arcpy.CalculateField_management(in_Table, seq_field, 0, field_type="LONG")
    arcpy.Sort_management(in_Table, tmpSrt, final_sort)
    oid = GetFlds(tmpSrt, oid_only=True)
-   join_fld = GetFlds(tmpSrt)[-1]  # this should be the TARGET_FID field
-   # Add sequence field
-   arcpy.AddField_management(tmpSrt, seq_field, "LONG")
+   join_fld = GetFlds(tmpSrt)[-1]  # this should be the ORIG_FID field
    grp0 = [a[0] for a in arcpy.da.SearchCursor(tmpSrt, grp_field, where_clause=oid + "= 1")][0]
    ct = 0
-   
-   # calculate sequence
+   # calculate sequence in temp table
    with arcpy.da.UpdateCursor(tmpSrt, [grp_field, seq_field]) as curs:
       for r in curs:
          grp = r[0]
@@ -943,8 +941,13 @@ def calcGrpSeq(in_Table, sort_field, grp_field, seq_field):
             ct += 1
          r[1] = ct
          curs.updateRow(r)
-   # join sequence field to original table
-   arcpy.JoinField_management(in_Table, oid, tmpSrt, join_fld, seq_field)
+   # Create dictionary and update original table. Not using join since that would not work with layers that are a subset of a table.
+   orig_oid = GetFlds(in_Table, oid_only=True)
+   rdict = TabToDict(tmpSrt, join_fld, seq_field)
+   with arcpy.da.UpdateCursor(in_Table, [orig_oid, seq_field]) as curs:
+      for r in curs:
+         r[1] = rdict[r[0]]
+         curs.updateRow(r)
    return in_Table
 
 def fc2df(feature_class, field_list, skip_nulls=True):
