@@ -21,7 +21,7 @@ def main():
    
    # Specify which site type(s) to run.
    # Choices are: "TCS", "AHZ", "SCU", "SCS"
-   siteTypes = ("TCS")
+   siteTypes = ("SCS")
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
@@ -36,7 +36,7 @@ def main():
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
    projFolder = r'C:\David\proc\ConSites_statewide'
-   runName = 'statewideTCS_2_2_dev'
+   runName = 'statewideSCS_2_2_7_FINAL'
    outGDB = os.path.join(projFolder, runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
    
    # Geodatabase for storing scratch products

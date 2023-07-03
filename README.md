@@ -12,8 +12,10 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 - General updates
   - changed all uses of Dissolve function to PairwiseDissolve
-  - added slopFactor to getBRANK function, and a new output field summarizing EOs
-  - Added option to calculate B-ranks in site creation tools
+
+- Prioritization tools
+  - several updates to B-rank tool. Added option to calculate B-ranks in site creation tools.
+  - Added code to calculate "EO Importance Score" for eligible EOs
 
 - Tweaks to SCS workflow:
   - Service area layers now ignore dams where `NH_IGNORE = 1` in dams layer

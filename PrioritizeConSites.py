@@ -620,10 +620,10 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
-   # todo: uncomment the section to assign 256 points to only-known locations when ready
+   # headsup: can comment out the section to assign 256 points to disable the endemic, 1-eo exception.
    codeblock = '''def score(ibr1):
-      # if ibr1.endswith("E"):
-      #    return 256
+      if ibr1.endswith("E"):
+         return 256
       ibr = ibr1[0:2]
       if ibr == "B1":
          return 256
@@ -1687,6 +1687,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    
    # coulddo: update all ranking fields using same ranking as before, but for ALL eligible EOs. 
    #  These are used to provide a unique numeric rank for ALL EOs, by element. Note that rankings are sorta slow.
+   #  Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
    if eoImportance:
       printMsg("Re-calculating rank fields for all eligible EOs...")
       rankLayer = arcpy.MakeFeatureLayer_management(in_sortedEOs, where_clause="FinalRANK <> 6")
