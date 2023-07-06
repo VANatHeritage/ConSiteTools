@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-05-04
+# Last Edit: 2023-07-06
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -556,6 +556,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    # Searches elcodes for "CEGL" so it can treat communities a little differently than species.
    # Should it do the same for "ONBCOLONY" bird colonies?
    # Includes exceptions for "only known occurrence of element", which will return a "[B-rank]E" rank. This exception excludes Healthy Waters EOs ("CAQU").
+   # headsup: can uncomment section with endemic/1 eo B1E exception, once ready.
    codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode, endem, numeo):
       if eorank == "A":
          if grank == "G1":
@@ -609,10 +610,11 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
                b = "BU"
       else:
          b = "BU"
-      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
-         return b + "E"
-      else:
-         return b
+      return b
+      # if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
+      #    return b + "E"
+      # else:
+      #   return b
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
@@ -620,7 +622,6 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
-   # headsup: can comment out the section to assign 256 points to disable the endemic, 1-eo exception.
    codeblock = '''def score(ibr1):
       if ibr1.endswith("E"):
          return 256
@@ -702,17 +703,17 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
             lsu_ct = [str(summ_by_a.count(l)) + ' ' + l for l in lsu]
             # IBR Summary
             if len(lsu_ct) == 1 and lsu_ct[0][0] == "1":
-               mx_text = "EO contributing to site B-rank: " + lsu_ct[0] + "."
+               mx_text = "EO contributing to site [UPDATE]-rank: " + lsu_ct[0] + "."
             else:
-               mx_text = "EOs contributing to site B-rank: " + ", ".join(lsu_ct) + "."
+               mx_text = "EOs contributing to site [UPDATE]-rank: " + ", ".join(lsu_ct) + "."
             endem_ct = sum(a.endswith("E") for a in arr["IBR"])
             if endem_ct == 1:
                mx_text += " Site contains the only known occurrence of an element."
             elif endem_ct > 1:
                mx_text += " Site contains the only known occurrences of " + str(endem_ct) + " elements."
-            ibr_text = "IBR_SUM = " + str(sm) + "."
+            # ibr_text = "IBR_SUM = " + str(sm) + "."
             date_text = "[" + dt + "]:"
-            row[4] = date_text + " " + mx_text + " " + ibr_text
+            row[4] = date_text + " " + mx_text  # + " " + ibr_text
             cursor.updateRow(row)
          else:
             printMsg("Site %s: Failed"%siteID)
@@ -752,6 +753,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
       '''
    expression= "brank(!IBR_SUM!,!IBR_MAX!)"
    arcpy.management.CalculateField(tmpSites, "AUTO_BRANK", expression, "PYTHON3", codeblock, "TEXT")
+   # Update the B-rank comment to include the site B-rank
+   arcpy.management.CalculateField(tmpSites, "AUTO_BRANK_COMMENT", "!AUTO_BRANK_COMMENT!.replace('[UPDATE]', !AUTO_BRANK!)")
    
    # Join rank fields
    arcpy.management.JoinField(in_ConSites, "tmpID", tmpSites, "tmpID", ["IBR_SUM", "IBR_MAX", "AUTO_BRANK", "AUTO_BRANK_COMMENT"])

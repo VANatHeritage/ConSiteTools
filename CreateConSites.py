@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2023-03-15
+# Last Edit: 2023-07-06
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -2482,6 +2482,7 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    printMsg("Filling in holes...")
    fillPolys = out_Scratch + os.sep + "fillPolys"
    arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
+   arcpy.Generalize_edit(fillPolys, "0.5 Meters")
 
    # Append final shapes to template
    arcpy.Append_management(fillPolys, out_ConSites, "NO_TEST")
