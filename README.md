@@ -6,18 +6,18 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-07-06):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-07-17):
 
-#### Version 2.2.7
+#### Version 2.3
 
-- SCS is now the default option in `3: Create Stream Conservation Sites`. Updates to the SCS workflow include:
-  - Service area layers now ignore dams where `NH_IGNORE = 1` in dams layer
+- VNHP moved from SCU to SCS, which is now the default option in `3: Create Stream Conservation Sites`. Updates to the SCS workflow include:
+  - Service area layers now exclude dams where `NH_IGNORE = 1` in dams layer
   - FillLines_scs: updated to use Network Analyst approach. A new service area layer (naFillTrace) is created in the MakeServiceLayers_scs tool.
   - DelinSite_scs: added step to also use PFs to select catchments for clipping buffer
 
 - Prioritization tools
-  - B-rank tool now calculates an "AUTO_BRANK_COMMENT" attribute, summarizing the EOs driving the B-rank. Added the option to calculate B-ranks in site creation tools.
-  - Added an optional step to calculate an "EO Importance Rank" for eligible EOs in `3: Build Conservation Portfolio`
+  - B-rank tool now calculates an `AUTO_BRANK_COMMENT` attribute, summarizing the EOs driving the B-rank
+  - Added an option to calculate B-ranks in the site creation tools
 
 #### Version 2.2
 

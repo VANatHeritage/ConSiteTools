@@ -1,11 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.2.7"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-07-06
+# Last Edit: 2023-07-17
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1320,7 +1320,7 @@ class lines_scs(object):
    def __init__(self):
       """Define the tool (tool name is the name of the class)."""
       self.label = "2: Generate SCS Lines"
-      self.description = 'Solves the upstream and downstream service layers, and combines segments to create linear SCUs'
+      self.description = 'Solves the upstream and downstream service layers, and combines segments to create SCS lines'
       self.canRunInBackground = True
       self.category = "Site Delineation Tools: SCS"
 

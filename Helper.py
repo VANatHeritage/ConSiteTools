@@ -117,7 +117,7 @@ def copyLayersToGDB(inLayers, outGDB):
          printMsg("Unable to copy %s."%l)
    
 def CleanFeatures(inFeats, outFeats):
-   '''Repairs geometry, then explodes multipart polygons to prepare features for geoprocessing.'''
+   '''Explodes multipart polygons to prepare features for geoprocessing, repairing geometry if there was an issue during processing.'''
    
    # Process: Repair Geometry
    # printMsg("Repairing geometry...")

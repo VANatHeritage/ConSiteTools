@@ -56,7 +56,6 @@ def main():
    #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
    #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
    src_elExclude = ['https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/ElementExclusions/FeatureServer/26']  # hosted table; use this unless there are new tables.
-   # src_elExclude = [r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022\ECS_Inputs_Dec2022.gdb\ElementExclusions']  # local version of hosted table
 
    # headsup: These will need updates every quarter, make sure to updates paths
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
@@ -67,16 +66,12 @@ def main():
    yyyy = int(datetime.now().strftime('%Y'))
 
    # Input type of sites to run
-   run_types = ["tcs"]  # full list: ["tcs", "kcs", "scu"]
+   run_types = ["tcs"]  # full list: ["tcs", "kcs", "scs"]
 
    ## END HEADER ###
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_conslands, src_elExclude, src_PF, src_CS)
-   # For testing only
-   # in_GDB = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb'
-   # out_GDB = r'D:\projects\EssentialConSites\testing\testing_rawRank_20230628\ECS_rawrank_test.gdb'
-   # out_DIR = os.path.dirname(out_GDB)
    
    # Input standard variables which are the same for all site types
    # No need to change this if in_GDB is valid and naming conventions maintained
@@ -94,15 +89,15 @@ def main():
       elif t == "kcs":
          in_pf = in_GDB + os.sep + 'pfKarst'
          in_cs = in_GDB + os.sep + 'csKarst'
-      elif t == "scu":
+      elif t == "scs":
          in_pf = in_GDB + os.sep + 'pfStream'
          in_cs = in_GDB + os.sep + 'csStream'
    
       # Input cutoff years
       # This should change every calendar year
       if t != "kcs":
-         cutYear = yyyy - 25  # yyyy - 25 for TCS and SCU
-         flagYear = yyyy - 20  # yyyy - 20 for TCS and SCU
+         cutYear = yyyy - 25  # yyyy - 25 for TCS and SCS
+         flagYear = yyyy - 20  # yyyy - 20 for TCS and SCS
       else:
          cutYear = yyyy - 40  # yyyy - 40 for KCS
          flagYear = yyyy - 35  # yyyy - 35 for KCS

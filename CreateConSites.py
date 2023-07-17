@@ -73,32 +73,32 @@ def ParseSiteTypes(in_ProcFeats, in_ConSites, out_GDB):
    # Note that flexibility has been added to aid transition from SCU to SCS
    qry_pfTCS = "RULE NOT IN ('SCU', 'SCS1', 'SCS2', 'MACS','KCS','AHZ')"
    qry_pfKCS = "RULE = 'KCS'"
-   qry_pfSCU = "RULE IN ('SCU', 'SCS1', 'SCS2')"
+   qry_pfSCS = "RULE IN ('SCU', 'SCS1', 'SCS2')"
    qry_pfAHZ = "RULE = 'AHZ'"
    qry_csTCS = "SITE_TYPE = 'Conservation Site'"
    qry_csKCS = "SITE_TYPE = 'Cave Site'"
-   qry_csSCU = "SITE_TYPE IN ('SCU', 'SCS')"
+   qry_csSCS = "SITE_TYPE IN ('SCU', 'SCS')"
    qry_csAHZ = "SITE_TYPE = 'Anthropogenic Habitat Zone'"
    
    
    # Define some outputs
    pfTCS = out_GDB + os.sep + 'pfTerrestrial'
    pfKCS = out_GDB + os.sep + 'pfKarst'
-   pfSCU = out_GDB + os.sep + 'pfStream'
+   pfSCS = out_GDB + os.sep + 'pfStream'
    pfAHZ = out_GDB + os.sep + 'pfAnthro'
    csTCS = out_GDB + os.sep + 'csTerrestrial'
    csKCS = out_GDB + os.sep + 'csKarst'
-   csSCU = out_GDB + os.sep + 'csStream'
+   csSCS = out_GDB + os.sep + 'csStream'
    csAHZ = out_GDB + os.sep + 'csAnthro'
    
    # Make a list of input/query/output triplets
    procList = [[in_ProcFeats, qry_pfTCS, pfTCS],
                [in_ProcFeats, qry_pfKCS, pfKCS],
-               [in_ProcFeats, qry_pfSCU, pfSCU],
+               [in_ProcFeats, qry_pfSCS, pfSCS],
                [in_ProcFeats, qry_pfAHZ, pfAHZ],
                [in_ConSites, qry_csTCS, csTCS],
                [in_ConSites, qry_csKCS, csKCS],
-               [in_ConSites, qry_csSCU, csSCU],
+               [in_ConSites, qry_csSCS, csSCS],
                [in_ConSites, qry_csAHZ, csAHZ]]
                
    # Process the data
