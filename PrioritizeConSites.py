@@ -531,7 +531,7 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    return in_Bounds
 
 ### MAIN FUNCTIONS ###
-def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
+def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    '''Automates the assignment of Biodiversity Ranks to conservation sites
    NOTE: Should only be run on one site type at a time, with type-specific inputs.
    
@@ -539,6 +539,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    - in_PF = Input site-worthy procedural features for a specific site type
    - in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
    - slopFactor = search_distance to apply for associating PFs with Sites (added so it would work for SCUs).
+   - flag = Boolean, whether to add FLAG_BRANK, indicating difference from previous B-rank. This was added so it could 
+      be set to False when this function is used directly in the "Create [ConSite]" tools.
    '''
    printMsg("Selecting PFs intersecting sites...")
    pf_lyr = arcpy.MakeFeatureLayer_management(in_PF)
@@ -610,11 +612,9 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
                b = "BU"
       else:
          b = "BU"
+      if endem == "Y" and numeo == 1 and elcode[:4] == "CAQU":
+         b = "B1E"
       return b
-      # if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
-      #    return b + "E"
-      # else:
-      #   return b
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
@@ -622,11 +622,10 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
-   codeblock = '''def score(ibr1):
-      if ibr1.endswith("E"):
+   codeblock = '''def score(ibr):
+      if ibr == "B1E":
          return 256
-      ibr = ibr1[0:2]
-      if ibr == "B1":
+      elif ibr == "B1":
          return 256
       elif ibr == "B2":
          return 64
@@ -760,20 +759,20 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters"):
    arcpy.management.JoinField(in_ConSites, "tmpID", tmpSites, "tmpID", ["IBR_SUM", "IBR_MAX", "AUTO_BRANK", "AUTO_BRANK_COMMENT"])
    arcpy.management.DeleteField(in_ConSites, "tmpID")
    
-   printMsg('Calculating flag status...')
-   codeblock = '''def flag(brank, auto_brank):
-      if auto_brank == None:
-         return 1
-      elif brank == auto_brank:
-         return 0
+   if flag:
+      printMsg('Calculating flag status...')
+      codeblock = '''def flag(brank, auto_brank):
+         if auto_brank == None:
+            return 1
+         elif brank == auto_brank:
+            return 0
+         else:
+            return 1'''
+      if "BRANK" in oldFlds:
+         expression = "flag(!BRANK!, !AUTO_BRANK!)"
+         arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "SHORT")
       else:
-         return 1
-   '''
-   if "BRANK" in oldFlds:
-      expression = "flag(!BRANK!, !AUTO_BRANK!)"
-      arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "SHORT")
-   else:
-      printMsg("No existing B-ranks available for comparison.")
+         printMsg("No existing B-ranks available for comparison.")
 
    if len(failList) > 0:
       printMsg("Processing incomplete for some sites %s"%failList)

@@ -1138,7 +1138,7 @@ def PrepProcFeats(in_PF, fld_Rule, fld_Buff, tmpWorkspace):
 
       return tmp_PF
    except:
-      arcpy.AddError('Unable to complete intitial pre-processing necessary for all further steps.')
+      arcpy.AddError('Unable to complete initial pre-processing necessary for all further steps.')
       tback()
       quit()
 

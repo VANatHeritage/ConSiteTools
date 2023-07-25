@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.1"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -877,7 +877,7 @@ class create_sbb(object):
       paramFields(parm3, parm0, ['Short', 'Long', 'Text', 'Double'])
       
       parm4 = defineParam('in_nwi', "Input Wetlands", "GPFeatureLayer", "Optional", "Input")
-      if map.name == "TCS": 
+      if map.name != "AHZ":
          parm4.enabled = True
          if "VA_Wetlands" in lnames:
             parm4.value = "VA_Wetlands"
@@ -1061,7 +1061,7 @@ class create_consite(object):
       
       parm06 = defineParam("in_TranSurf", "Input Transportation Surfaces", "GPValueTable", "Optional", "Input")
       parm06.columns = [["GPFeatureLayer","Transportation Layers"]]
-      if map.name == "TCS":
+      if map.name != "AHZ":
          parm06.enabled = True
          if "VirginiaRoadSurfaces" in lnames and "VirginiaRailSurfaces" in lnames: 
             parm06.values = [["VirginiaRoadSurfaces"], ["VirginiaRailSurfaces"]]
@@ -1071,7 +1071,7 @@ class create_consite(object):
          parm06.enabled = False
 
       parm07 = defineParam("in_Exclude", "Input Exclusion Features", "GPFeatureLayer", "Optional", "Input")
-      if map.name == "TCS":
+      if map.name != "AHZ":
          parm07.enabled = True
          if "ExclusionFeatures" in lnames:
             parm07.value = "ExclusionFeatures"
@@ -1111,13 +1111,13 @@ class create_consite(object):
             parameters[6].parameterType = "Required"
             parameters[7].enabled = 1
             parameters[7].parameterType = "Required"
-            # parameters[8].value = "consites_tcs"
+            parameters[8].value = "consites_tcs"
          else:
             parameters[6].enabled = 0
             parameters[6].parameterType = "Optional"
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
-            # parameters[8].value = "consites_ahz" 
+            parameters[8].value = "consites_ahz"
       if parameters[10].value:
          parameters[11].enabled = True
       else:
@@ -1161,7 +1161,7 @@ class create_consite(object):
       if brank == "true":
          printMsg("Calculating B-ranks...")
          try:
-            getBRANK(in_PF, out_ConSites, slopFactor)
+            getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
          except:
             printWrng("Sites created, but there was an error while calculating B-ranks.")
 
@@ -1450,7 +1450,7 @@ class sites_scs(object):
       else:
          pass
          
-      parm2 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "scsPolys")
+      parm2 = defineParam("out_ConSites", "Output Stream Conservation Sites", "DEFeatureClass", "Required", "Output", "consites_scs")
       
       parm3 = defineParam("in_Lines", "Input SCS lines", "GPFeatureLayer", "Required", "Input")
       if "scsLines" in lnames:
@@ -1502,9 +1502,9 @@ class sites_scs(object):
       has been changed."""
       if parameters[9].altered and not parameters[9].hasBeenValidated:
          if parameters[9].value == "SCU":
-            parameters[2].value = "scuPolys"
+            parameters[2].value = "consites_scu"
          else:
-            parameters[2].value = "scsPolys"
+            parameters[2].value = "consites_scs"
       if parameters[10].value:
          parameters[11].enabled = True
       else:
@@ -1541,7 +1541,7 @@ class sites_scs(object):
       if brank == "true":
          printMsg("Calculating B-ranks...")
          try:
-            getBRANK(in_PF, out_ConSites, slopFactor)
+            getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
          except:
             printWrng("Sites created, but there was an error calculating B-ranks.")
       return scsPolys
