@@ -612,8 +612,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
                b = "BU"
       else:
          b = "BU"
-      if endem == "Y" and numeo == 1 and elcode[:4] == "CAQU":
-         b = "B1E"
+      # if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
+      #    b = "B1E"
       return b
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
