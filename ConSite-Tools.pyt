@@ -747,8 +747,8 @@ class tabulate_exclusions(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "DEFile", "GPValueTable", "Input")
-      parm00.columns = [["DEFile","CSV Files"]]
+      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "GPValueTable", "Required", "Input")
+      parm00.columns = [["DEFile", "CSV Files"]]
       parm00.filters[0].list = ["csv"]
       parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output", "ElementExclusions")
 
