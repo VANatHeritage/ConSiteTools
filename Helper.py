@@ -1085,7 +1085,7 @@ def MatchTypes(in_lyr, deleteRows=True):
    :param deleteRows: Whether to delete rows not matching types.
    :return: 
    """
-   printMsg("Site matching...")
+   printMsg("Site type matching...")
    oid = GetFlds(in_lyr, oid_only=True)
    # where_clause = "NOT SITE_TYPE_EO LIKE '%' || SITE_TYPE_CS || '%'"  # THIS DOESN"T WORK in python (pipes don't work??). It does work in GUI.
    lyr = arcpy.MakeFeatureLayer_management(in_lyr, where_clause="SITE_TYPE_EO IS NOT NULL AND SITE_TYPE_CS IS NOT NULL")

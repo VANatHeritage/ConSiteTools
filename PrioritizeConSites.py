@@ -338,7 +338,7 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
          elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
          where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
       else:
-         where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
+         where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
       arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
       where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
       arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
