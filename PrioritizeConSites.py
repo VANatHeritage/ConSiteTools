@@ -318,31 +318,34 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    - slotDict: dictionary relating elcode to available slots (optional). If provided, the bycatch procedure will be limited to EOs for elements with open slots.
    '''
-   # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
-   where_clause = '("ChoiceRANK" <= 4 OR "PORTFOLIO" = 1) AND "OVERRIDE" <> -1'
-   arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
-   where_clause = '"OVERRIDE" <> -1'
-   arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-   # arcpy.SelectLayerByLocation_management ("lyr_CS", "INTERSECT", "lyr_EO", 0, "NEW_SELECTION", "NOT_INVERT")
-   arcpy.SelectLayerByLocation_management("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
-   arcpy.CalculateField_management("lyr_CS", "PORTFOLIO", 1, "PYTHON_9.3")
-   arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
-   printMsg('ConSites portfolio updated')
-   
-   # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
-   if slotDict is not None:
-      # when slotDict provided, only select EOs for elements with open slots
-      elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
-   else:
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
-   arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
-   where_clause = '"PORTFOLIO" = 1'
-   arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-   arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
-   arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
-   arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
-   printMsg('EOs portfolio updated')
+   # Loop over site types
+   st = unique_values(in_ConSites, "SITE_TYPE_CS")
+   printMsg("Updating ConSite and EO portfolio...")
+   for s in st:
+      # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
+      where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND (ChoiceRANK <= 4 OR PORTFOLIO = 1) AND OVERRIDE <> -1"
+      arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
+      where_clause = "SITE_TYPE_CS = '" + s + "' AND OVERRIDE <> -1"
+      arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
+      arcpy.SelectLayerByLocation_management("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
+      arcpy.CalculateField_management("lyr_CS", "PORTFOLIO", 1, "PYTHON_9.3")
+      arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
+      # printMsg('ConSites portfolio updated')
+      
+      # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
+      if slotDict is not None:
+         # when slotDict provided, only select EOs for elements with open slots
+         elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
+         where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
+      else:
+         where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
+      arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
+      where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
+      arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
+      arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
+      arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
+      arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
+      # printMsg('EOs portfolio updated')
    
    # Fill in counter fields
    printMsg('Summarizing portfolio status...')
@@ -391,7 +394,7 @@ def buildSlotDict(in_sumTab):
    printMsg("There are %s Elements with remaining slots to fill."%count)
    return slotDict
 
-def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO_SUMMARY", slopFactor="15 Meters"):
+def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO_SUMMARY", slopFactor="15 Meters", matchSiteType=False):
    """
    Adds a text field and/or numeric summary field(s) of EOs by tier, for each unique value in fld_ID in in_Bounds.
    :param in_Bounds: Input boundary polygons (e.g. sites)
@@ -403,6 +406,7 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
       "Both" = both text tier summary and numeric tier count fields
    :param out_field: New field to contain the tier text summary.
    :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
+   :param matchSiteType: For matching EO and CS site types. For internal use only.
    :return: in_Bounds
    # Coulddo:
       - add other summaries from sjEOs as needed. (Element names, unique elements, etc).
@@ -436,6 +440,8 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    printMsg("Adding EO counts by tier to " + os.path.basename(in_Bounds) + "...")
    sjEOs = scratchGDB + os.sep + "sjEOs"
    arcpy.SpatialJoin_analysis(in_EOs, in_Bounds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
+   if matchSiteType:
+      MatchTypes(sjEOs)
    # NOTE: this is basically just re-creating FinalRank. Re-calculating here will ensure this is compatible with other EO data layers.
    rank_field = "temprank"  # this is included so that it will correctly order the Tier fields
    arcpy.AddField_management(sjEOs, rank_field, "SHORT")
@@ -910,8 +916,26 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    printMsg("Dissolving procedural features by EO...")
    arcpy.PairwiseDissolve_analysis(in_ProcFeats, out_procEOs, 
                                    ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], 
-                                   [["SFID", "COUNT"]], "MULTI_PART")
-      
+                                   [["SFID", "COUNT"], ["RULE", "CONCATENATE"]], "MULTI_PART", concatenation_separator=",")
+   # Add site type(s) to EOs based on RULEs
+   cb = """def st(rule):
+      ls = list(set(rule.split(',')))
+      rules = []
+      if any([i.startswith("AHZ") for i in ls]):
+         rules.append('AHZ')
+      if any([i.startswith("SCS") for i in ls]):
+         rules.append('SCS')
+      if any([i.startswith("MACS") for i in ls]):
+         rules.append('MACS')
+      if any([i.startswith("KCS") for i in ls]):
+         rules.append('KCS')
+      if any([i.isnumeric() for i in ls]):
+         rules.append("TCS")
+      return ", ".join(rules)
+   """
+   arcpy.CalculateField_management(out_procEOs, "SITE_TYPE_EO", "st(!CONCATENATE_RULE!)", code_block=cb, field_type="TEXT")
+   arcpy.DeleteField_management(out_procEOs, "CONCATENATE_RULE")
+   
    # Add and calculate some fields
    
    # Field: EORANK_NUM
@@ -1425,6 +1449,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    tmpCS = scratchGDB + os.sep + "tmpCS"
    arcpy.CopyFeatures_management(in_ConSites, tmpCS)
    in_ConSites = tmpCS
+   AddTypes(in_ConSites)
       
    # Add "PORTFOLIO" and "OVERRIDE" fields to in_sortedEOs and in_ConSites tables
    for tab in [in_sortedEOs, in_ConSites]:
@@ -1455,6 +1480,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       eo_cs = scratchGDB + os.sep + "eo_cs"
       arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, eo_cs, "JOIN_ONE_TO_MANY", "KEEP_ALL",
                                  match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
+      MatchTypes(eo_cs)
       eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
       arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["EO_CONSVALUE", "SUM"]], "JOIN_FID")
       arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
@@ -1486,7 +1512,16 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       field_mapping="""%s;%s;%s;%s;%s""" %(fldmap1, fldmap2, fldmap3, fldmap4, fldmap5) 
       
       printMsg('Performing spatial join between EOs and ConSites...')
-      arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, joinFeats, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mapping, "WITHIN_A_DISTANCE", slopFactor)
+      # headsup: cannot use MatchTypes for this, because it uses a one to one join. Need to use a loop.
+      site_types = unique_values(in_ConSites, "SITE_TYPE_CS")
+      tmpFeats = []
+      for s in site_types:
+         sj = scratchGDB + os.sep + 'csJoin_' + s
+         eol = arcpy.MakeFeatureLayer_management(in_sortedEOs, where_clause="SITE_TYPE_EO LIKE '" + s + "%'")
+         csl = arcpy.MakeFeatureLayer_management(in_ConSites, where_clause="SITE_TYPE_CS = '" + s + "'")
+         arcpy.SpatialJoin_analysis(eol, csl, sj, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mapping, "WITHIN_A_DISTANCE", slopFactor)
+         tmpFeats.append(sj)
+      arcpy.Merge_management(tmpFeats, joinFeats)
       arcpy.JoinField_management(in_sortedEOs, "SF_EOID", joinFeats, "SF_EOID", ["CS_CONSVALUE", "CS_AREA_HA", "CS_SITEID", "CS_SITENAME"])
       NullToZero(in_sortedEOs, "CS_CONSVALUE")  # fill in zeros to avoid issues with NULLs when used for ranking
    
@@ -1615,6 +1650,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    cs_id = GetFlds(in_ConSites, oid_only=True)
    eo_cs = scratchGDB + os.sep + "eo_cs"
    arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, eo_cs, "JOIN_ONE_TO_MANY", "KEEP_ALL", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
+   MatchTypes(eo_cs)
    arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["FinalRANK", "MIN"]], "JOIN_FID")
    eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
    code_block = '''def fn(myMin):
@@ -1667,7 +1703,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
    
    # Field: EEO_SUMMARY (EO counts by tier in ConSites; text summary column)
-   tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor)
+   tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor, matchSiteType=True)
    
    # Create final outputs
    # Set up rank/sorting fields
@@ -1758,6 +1794,11 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    # convert fld_ID to list
    if not isinstance(fld_ID, list):
       fld_ID = [fld_ID]
+   if 'SITE_TYPE' in GetFlds(in_Bounds):
+      mt = True
+      AddTypes(in_Bounds)
+      fld_ID.append("SITE_TYPE_CS")
+      
    # Dissolve boundaries on the specified ID field, retaining only that field.
    printMsg("Dissolving...")
    dissBnds = scratchGDB + os.sep + "dissBnds"
@@ -1772,6 +1813,8 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    sjEOs = scratchGDB + os.sep + "sjEOs"
    # arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "INTERSECT")
    arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
+   if mt:
+      MatchTypes(sjEOs)
    
    # Export the table from the spatial join. This appears to be necessary for summary statistics to work. Why?
    printMsg("Exporting spatial join table...")

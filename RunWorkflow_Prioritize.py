@@ -55,18 +55,22 @@ def main():
    # src_elExclude = [r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Botany_2022-11-30.csv',
    #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Ecology_2022-11-30.csv',
    #                  r'D:\projects\EssentialConSites\exclusion_lists\2022\ExclusionList_Zoology_2022-11-30.csv']  # new lists option
-   src_elExclude = ['https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/ElementExclusions/FeatureServer/26']  # hosted table; use this unless there are new tables.
+   src_elExclude = ['https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/ElementExclusions/FeatureServer/24']  # hosted table; use this unless there are new tables.
 
    # headsup: These will need updates every quarter, make sure to updates paths
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
    src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20221212_132348'
    src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20221212_132348'
    
+   # src_conslands = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\Conslands_ECS\conslands_lam.shp'
+   # src_PF = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ProcFeats_20230606_080736'
+   # src_CS = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ConSites_20230606_080736'
+
    # Current year. This is used to define cutoff and flag years for EO selection.
    yyyy = int(datetime.now().strftime('%Y'))
 
    # Input type of sites to run
-   run_types = ["tcs"]  # full list: ["tcs", "kcs", "scs"]
+   run_types = ["tcs", "scs", "all"]  # full list: ["tcs", "kcs", "scs"]
 
    ## END HEADER ###
 
@@ -92,6 +96,9 @@ def main():
       elif t == "scs":
          in_pf = in_GDB + os.sep + 'pfStream'
          in_cs = in_GDB + os.sep + 'csStream'
+      elif t == "all":
+         in_pf = src_PF
+         in_cs = src_CS
    
       # Input cutoff years
       # This should change every calendar year
