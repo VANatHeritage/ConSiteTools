@@ -961,6 +961,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
          cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
          arcpy.CopyFeatures_management(in_ConSites, cs_out)
          out = ParseSiteTypes(pf_out, cs_out, ig)
+         out_lyrs += [pf_out, cs_out]
          out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'
@@ -973,7 +974,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
    printMsg("Finished preparation for ECS directory " + wd + ".")
    return ig, og, sd, out_lyrs
   
-def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab):
+def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutFlagYears, out_procEOs, out_sumTab):
    '''Dissolves Procedural Features by EO-ID, then attaches numerous attributes to the EOs, creating a new output EO layer as well as an Element summary table. The outputs from this function are subsequently used in the function ScoreEOs. 
    Parameters:
    - in_ProcFeats: Input feature class with "site-worthy" procedural features
@@ -981,8 +982,11 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    - in_consLands: Input feature class with conservation lands (managed areas), e.g., MAs.shp
    - in_consLands_flat: A "flattened" version of in_ConsLands, based on level of Biodiversity Management Intent (BMI). (This is needed due to stupid overlapping polygons in our database. Sigh.)
    - in_ecoReg: A polygon feature class representing ecoregions
-   - cutYear: Integer value indicating hard cutoff year. EOs with last obs equal to or earlier than this cutoff are to be excluded from the ECS process altogether.
-   - flagYear: Integer value indicating flag year. EOs with last obs equal to or earlier than this cutoff are to be flagged with "Update Needed". However, this cutoff does not affect the ECS process.
+   - cutFlagYears: List of [[Site Type, cutYear, flagYear], ...]
+      - cutYear: Integer value indicating hard cutoff year. EOs with last obs equal to or earlier than this cutoff 
+         are to be excluded from the ECS process altogether.
+      - flagYear: Integer value indicating flag year. EOs with last obs equal to or earlier than this cutoff 
+         are to be flagged with "Update Needed". However, this cutoff does not affect the ECS process.
    - out_procEOs: Output EOs with TIER scores and other attributes.
    - out_sumTab: Output table summarizing number of included EOs per element'''
    
@@ -1045,15 +1049,20 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    # Field: RECENT
    printMsg("Calculating RECENT field...")
    arcpy.AddField_management(out_procEOs, "RECENT", "SHORT")
-   codeblock = '''def thresh(obsYear, cutYear, flagYear):
-      if obsYear <= cutYear:
-         return 0
-      elif obsYear <= flagYear:
-         return 1
-      else:
-         return 2'''
-   expression = "thresh(!OBSYEAR!, %s, %s)"%(str(cutYear), str(flagYear))
-   arcpy.CalculateField_management(out_procEOs, "RECENT", expression, "PYTHON_9.3", codeblock)
+   for i in cutFlagYears:
+      lyr = arcpy.MakeFeatureLayer_management(out_procEOs, where_clause="SITE_TYPE_EO LIKE '%" + i[0] + "%'")
+      if countFeatures(lyr) == 0:
+         continue
+      codeblock = '''def thresh(obsYear, cutYear, flagYear):
+         if obsYear <= cutYear:
+            return 0
+         elif obsYear <= flagYear:
+            return 1
+         else:
+            return 2'''
+      expression = "thresh(!OBSYEAR!, %s, %s)"%(str(i[1]), str(i[2]))
+      arcpy.CalculateField_management(lyr, "RECENT", expression, "PYTHON_9.3", codeblock)
+   del lyr
    
    # Field: NEW_GRANK
    printMsg("Calculating NEW_GRANK field...")
@@ -1993,7 +2002,8 @@ def qcSitesVsEOs(in_Sites, in_EOs, out_siteList, out_eoList):
    # Export lists
    if len(eol) > 0:
       printMsg("There are %s EOs without sites. Exporting list."%str(len(eol)))
-      EOs = arcpy.MakeFeatureLayer_management(in_EOs, where_clause="SF_EOID IN ('" + "','".join(eol) + "')")
+      eol_str = [str(int(i)) for i in eol]
+      EOs = arcpy.MakeFeatureLayer_management(in_EOs, where_clause="SF_EOID IN (" + ",".join(eol_str) + ")")
       arcpy.TableToExcel_conversion(EOs, out_eoList)
    else:
       printMsg("There are no EOs without sites.")

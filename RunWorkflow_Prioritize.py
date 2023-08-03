@@ -43,11 +43,10 @@ def main():
    
    # headsup: ECS output directory for the quarterly update. This does not need to exist (it is created in MakeECSDir).
    # ecs_dir = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_Dec2022'
-   ecs_dir = r'C:\David\scratch\ConSite_scratch\ECS_Testing_' + datetime.today().strftime('%Y%m%d')
+   ecs_dir = r'C:\David\scratch\ConSite_scratch\ECS_fullTesting_' + datetime.today().strftime('%Y%m%d')
 
    # Fairly static data; keep using the same until specified otherwise
-   # src_ecoreg = 'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/TNC_Ecoregions_Virginia/FeatureServer/2' # AGOL feature service layer
-   src_ecoreg = r'D:\projects\EssentialConSites\ECS_input_database.gdb\VA_tncEcoRegions_lam'  # local copy of feature service
+   src_ecoreg = 'https://services1.arcgis.com/PxUNqSbaWFvFgHnJ/arcgis/rest/services/TNC_Ecoregions_Virginia/FeatureServer/2' # AGOL feature service layer
 
    # headsup: Element exclusion tables are currently updated once annually, prior to December updates. For the December
    #  run, those CSV files should be included in a list here. For all other quarters, just re-use the element exclusions
@@ -62,104 +61,94 @@ def main():
    src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20221212_132348'
    src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20221212_132348'
    
-   # src_conslands = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\Conslands_ECS\conslands_lam.shp'
-   # src_PF = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ProcFeats_20230606_080736'
-   # src_CS = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ConSites_20230606_080736'
-
-   # Current year. This is used to define cutoff and flag years for EO selection.
-   yyyy = int(datetime.now().strftime('%Y'))
-
    # Input type of sites to run
-   run_types = ["tcs", "scs", "all"]  # full list: ["tcs", "kcs", "scs"]
-
+   types = ["TCS", "SCS"]  # ["TCS", "SCS", "KCS", "AHZ", "MACS"]
+   
+   # Current year. This is used to define cutoff and flag years for EO selection.
+   nowYear = datetime.now().year
+   defaultYears = [['TCS', nowYear - 25, nowYear - 20],
+                    ['SCS', nowYear - 25, nowYear - 20],
+                    ['AHZ', nowYear - 25, nowYear - 20],
+                    ['KCS', nowYear - 40, nowYear - 35],
+                    ['MACS', nowYear - 25, nowYear - 20]]
+   cutFlagYears = [a for a in defaultYears if a[0] in types]
+   
+   # Subset PFs to only include certain site type(s).
+   ls = []
+   if "TCS" in types:
+      ls.append("RULE IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15')")
+   if "SCS" in types:
+      ls.append("RULE IN ('SCS1', 'SCS2')")
+   if "AHZ" in types:
+      ls.append("RULE = 'AHZ'")
+   if "KCS" in types:
+      ls.append("RULE = 'KCS'")
+   if "MACS" in types:
+      ls.append("RULE = 'MACS'")
+   query = " OR ".join(ls)
+   printMsg(query)
    ## END HEADER ###
 
    # Create ECS directory
    in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_conslands, src_elExclude, src_PF, src_CS)
+   
+   # Input PF/CS
+   print([os.path.basename(o) for o in out_lyrs])
+   in_pf = arcpy.MakeFeatureLayer_management(out_lyrs[2], where_clause=query)
+   in_cs = out_lyrs[3]
    
    # Input standard variables which are the same for all site types
    # No need to change this if in_GDB is valid and naming conventions maintained
    in_elExclude = in_GDB + os.sep + 'ElementExclusions'
    in_consLands = in_GDB + os.sep + 'conslands'
    in_consLands_flat = in_GDB + os.sep + 'conslands_flat'
-
-   for t in run_types:
-      printMsg("Starting prioritization for " + t.upper() + "...")
-      
-      # Input Procedural Features and ConSites by site type
-      if t == "tcs":
-         in_pf = in_GDB + os.sep + 'pfTerrestrial'
-         in_cs = in_GDB + os.sep + 'csTerrestrial'
-      elif t == "kcs":
-         in_pf = in_GDB + os.sep + 'pfKarst'
-         in_cs = in_GDB + os.sep + 'csKarst'
-      elif t == "scs":
-         in_pf = in_GDB + os.sep + 'pfStream'
-         in_cs = in_GDB + os.sep + 'csStream'
-      elif t == "all":
-         in_pf = src_PF
-         in_cs = src_CS
    
-      # Input cutoff years
-      # This should change every calendar year
-      if t != "kcs":
-         cutYear = yyyy - 25  # yyyy - 25 for TCS and SCS
-         flagYear = yyyy - 20  # yyyy - 20 for TCS and SCS
-      else:
-         cutYear = yyyy - 40  # yyyy - 40 for KCS
-         flagYear = yyyy - 35  # yyyy - 35 for KCS
+   # Set up outputs by type - no need to change these as long as your out_GDB and out_DIR above are valid
+   attribEOs = out_GDB + os.sep + 'attribEOs'
+   sumTab = out_GDB + os.sep + 'elementSummary'
+   scoredEOs = out_GDB + os.sep + 'scoredEOs'
+   priorEOs = out_GDB + os.sep + 'priorEOs'
+   sumTab_upd = out_GDB + os.sep + 'elementSummary_upd'
+   priorConSites = out_GDB + os.sep + 'priorConSites'
+   elementList = out_GDB + os.sep + 'elementList'
+   elementList_XLS = out_DIR + os.sep + 'elementList.xls'
+   qcList_EOs = out_DIR + os.sep + 'qcList_EOs.xls'
+   qcList_sites  = out_DIR + os.sep + 'qcList_sites.xls'
    
-      # File suffix corresponding to site type
-      suf = "_" + t
-      
-      # Set up outputs by type - no need to change these as long as your out_GDB and out_DIR above are valid
-      attribEOs = out_GDB + os.sep + 'attribEOs' + suf
-      sumTab = out_GDB + os.sep + 'elementSummary' + suf
-      scoredEOs = out_GDB + os.sep + 'scoredEOs' + suf
-      priorEOs = out_GDB + os.sep + 'priorEOs' + suf
-      sumTab_upd = out_GDB + os.sep + 'elementSummary_upd' + suf
-      priorConSites = out_GDB + os.sep + 'priorConSites' + suf
-      elementList = out_GDB + os.sep + 'elementList' + suf
-      elementList_XLS = out_DIR + os.sep + 'elementList' + suf + '.xls'
-      qcList_EOs = out_DIR + os.sep + 'qcList_EOs_' + suf + '.xls'
-      qcList_sites  = out_DIR + os.sep + 'qcList_sites_' + suf + '.xls'
-      
-      ### Specify functions to run - no need to change these as long as all your input/output variables above are valid ###
-      
-      # Get timestamp
-      tStart = datetime.now()
-      printMsg("Processing started at %s on %s" % (tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
-      
-      # Attribute EOs
-      printMsg("Attributing EOs...")
-      AttributeEOs(in_pf, in_elExclude, in_consLands, in_consLands_flat, src_ecoreg, cutYear, flagYear, attribEOs, sumTab)
-      printMsg("EO attribution ended at %s" % datetime.now().strftime("%H:%M:%S"))
-      
-      # Score EOs
-      printMsg("Scoring EOs...")
-      ScoreEOs(attribEOs, sumTab, scoredEOs, ysnMil="false", ysnYear="true")
-      printMsg("EO scoring ended at %s" % datetime.now().strftime("%H:%M:%S"))
-      
-      # Build Portfolio
-      printMsg("Building portfolio...")
-      BuildPortfolio(scoredEOs, priorEOs, sumTab, sumTab_upd, in_cs, priorConSites, out_DIR, in_consLands_flat, build='NEW')
-      printMsg("Portfolio building ended at %s" % datetime.now().strftime("%H:%M:%S"))
-      
-      # Build Elements List
-      printMsg("Building elements list...")
-      BuildElementLists(in_cs, 'SITENAME', priorEOs, sumTab_upd, elementList, elementList_XLS)
-      
-      # QC
-      printMsg("QC'ing sites and EOs")
-      qcSitesVsEOs(priorConSites, priorEOs, qcList_sites, qcList_EOs)
-      
-      # Get timestamp and elapsed time
-      tEnd = datetime.now()
-      printMsg("Processing ended at %s" % tEnd.strftime("%H:%M:%S"))
-      deltaString = GetElapsedTime(tStart, tEnd)
-      printMsg("Mission complete. Elapsed time: %s" % deltaString)
+   ### Specify functions to run - no need to change these as long as all your input/output variables above are valid ###
    
-      printMsg("Finished with " + t.upper() + ".")
+   # Get timestamp
+   tStart = datetime.now()
+   printMsg("Processing started at %s on %s" % (tStart.strftime("%H:%M:%S"), tStart.strftime("%Y-%m-%d")))
+   
+   # Attribute EOs
+   printMsg("Attributing EOs...")
+   AttributeEOs(in_pf, in_elExclude, in_consLands, in_consLands_flat, src_ecoreg, cutFlagYears, attribEOs, sumTab)
+   printMsg("EO attribution ended at %s" % datetime.now().strftime("%H:%M:%S"))
+   
+   # Score EOs
+   printMsg("Scoring EOs...")
+   ScoreEOs(attribEOs, sumTab, scoredEOs, ysnMil="false", ysnYear="true")
+   printMsg("EO scoring ended at %s" % datetime.now().strftime("%H:%M:%S"))
+   
+   # Build Portfolio
+   printMsg("Building portfolio...")
+   BuildPortfolio(scoredEOs, priorEOs, sumTab, sumTab_upd, in_cs, priorConSites, out_DIR, in_consLands_flat, build='NEW')
+   printMsg("Portfolio building ended at %s" % datetime.now().strftime("%H:%M:%S"))
+   
+   # Build Elements List
+   printMsg("Building elements list...")
+   BuildElementLists(in_cs, 'SITENAME', priorEOs, sumTab_upd, elementList, elementList_XLS)
+   
+   # QC
+   printMsg("QC'ing sites and EOs")
+   qcSitesVsEOs(priorConSites, priorEOs, qcList_sites, qcList_EOs)
+   
+   # Get timestamp and elapsed time
+   tEnd = datetime.now()
+   printMsg("Processing ended at %s" % tEnd.strftime("%H:%M:%S"))
+   deltaString = GetElapsedTime(tStart, tEnd)
+   printMsg("Mission complete. Elapsed time: %s" % deltaString)
 
 if __name__ == '__main__':
    main()

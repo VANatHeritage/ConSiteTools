@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3.2-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.3-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -1610,21 +1610,28 @@ class attribute_eo(object):
       parm02 = defineParam("in_consLands", "Input Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands")
       parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       parm04 = defineParam("in_ecoReg", "Input Ecoregions", "GPFeatureLayer", "Required", "Input", "ecoregions")
-      parm05 = defineParam("cutYear", "Cutoff observation year", "GPLong", "Required", "Input", datetime.now().year - 25)
-      parm06 = defineParam("flagYear", "Flag observation year", "GPLong", "Required", "Input", datetime.now().year - 20)
-
+      
+      parm05 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
+      parm05.filter.list = ["Local Database"]
+      parm06 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
+      
+      # deprecated parameters
       # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
       
-      parm07 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
-      parm07.filter.list = ["Local Database"]
-      parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      # option1. This parameter allows user to enter site type / cutoff year / flag year combinations. Likely unnecessary.
+      # parm07 = defineParam("typesYears", "Include PFs for the following site type(s):", "GPValueTable", "Required", "Input", multiVal=True)
+      # parm07.columns = [['GPString', 'Site Type'], ['GPLong', 'Cutoff observation year'], ['GPLong', 'Flag observation year']]
+      # parm07.filters[0].type = "ValueList"
+      # parm07.values = [['TCS', datetime.now().year - 25, datetime.now().year - 20], ['SCS', datetime.now().year - 25, datetime.now().year - 20]]
+      # parm07.filters[0].list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
       
-      parm09 = defineParam("types", "Include PFs for the following site type(s):", "GPString", "Required", "Input", ["TCS", "SCS"], multiVal=True)
-      parm09.filter.type = "ValueList"
-      parm09.filter.list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
+      # option2. This parameter allows user to select site types. Cutoff and flag years are fixed (see defaultYears)
+      parm07 = defineParam("typesList", "Attribute EOs associated with the following site type(s):", "GPString", "Required", "Input", ["TCS", "SCS"], multiVal=True)
+      parm07.filter.type = "ValueList"
+      parm07.filter.list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07]
       return parms
 
    def isLicensed(self):
@@ -1650,7 +1657,7 @@ class attribute_eo(object):
                suf = '_ahz'
             else:
                suf = ''
-            parameters[8].value = suf
+            parameters[6].value = suf
             # parameters[7].value = "attribEOs" + suf
             # parameters[8].value = "elementSummary" + suf
             # Set output parameters
@@ -1659,7 +1666,7 @@ class attribute_eo(object):
             gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
             if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
-               parameters[7].value = out_gdb
+               parameters[5].value = out_gdb
       return
 
    def updateMessages(self, parameters):
@@ -1683,6 +1690,20 @@ class attribute_eo(object):
       out_procEOs = os.path.join(out_gdb, "attribEOs" + suf2)
       out_sumTab = os.path.join(out_gdb, "elementSummary" + suf2)
       
+      # user-defined types-years (for use with typesYears parameter)
+      # cutFlagYears = [a.split(" ") for a in typesYears.split(";")]
+      # types = [i[0] for i in cutFlagYears]
+      
+      # user-defined types only (for use with typesList parameter)
+      nowYear = datetime.now().year
+      defaultYears = [['TCS', nowYear - 25, nowYear - 20],
+                    ['SCS', nowYear - 25, nowYear - 20],
+                    ['AHZ', nowYear - 25, nowYear - 20],
+                    ['KCS', nowYear - 40, nowYear - 35],
+                    ['MACS', nowYear - 25, nowYear - 20]]
+      types = typesList.split(";")
+      cutFlagYears = [a for a in defaultYears if a[0] in types]
+
       # Subset PFs to only include certain site type(s).
       ls = []
       if "TCS" in types:
@@ -1700,7 +1721,8 @@ class attribute_eo(object):
       procLyr = arcpy.MakeFeatureLayer_management(in_ProcFeats, where_clause=query)
 
       # Run function
-      AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
+      # AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
+      AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutFlagYears, out_procEOs, out_sumTab)
       replaceLayer(out_procEOs)
       replaceLayer(out_sumTab)
 
@@ -1722,7 +1744,7 @@ class score_eo(object):
       # parm02 = defineParam("out_sortedEOs", "Output Scored EOs", "DEFeatureClass", "Required", "Output", "scoredEOs")
       parm02 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm02.filter.list = ["Local Database"]
-      parm03 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      parm03 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
 
       parm04 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
       parm05 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
@@ -1797,7 +1819,7 @@ class build_portfolio(object):
       parm05 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm05.filter.list = ["Local Database"]
       parm06 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
-      parm07 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      parm07 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
       
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
       # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
@@ -1884,7 +1906,7 @@ class build_element_lists(object):
       parm04 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm04.filter.list = ["Local Database"]
       parm05 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
-      parm06 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      parm06 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
 
       # This will set up the list of fields for boundary ID
       parm01.filter.list = ['Short', 'Long', 'Text']
