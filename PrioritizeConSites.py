@@ -394,7 +394,74 @@ def buildSlotDict(in_sumTab):
    printMsg("There are %s Elements with remaining slots to fill."%count)
    return slotDict
 
-def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO_SUMMARY", slopFactor="15 Meters", matchSiteType=False):
+def AddTypes(in_lyr, cs_eo="CS"):
+   """
+   Add site type(s) to ConSites or EOs, based on SITE_TYPE or CONCATENATE_RULE field (respectively).
+   Used for site type matching (so EOs are only joined to sites matching their type, and vice versa).
+   :param in_lyr: input ConSites
+   :param cs_eo: Whether input is sites (default) or EOs.
+   :return: in_lyr
+   """
+   printMsg("Adding site types...")
+   if cs_eo == "CS":
+      cb = """def st(type):
+         if type == 'Anthropogenic Habitat Zone':
+            return 'AHZ'
+         elif type == 'Cave Site':
+            return 'KCS'
+         elif type == 'Conservation Site':
+            return 'TCS'
+         elif type == 'Migratory Animal Conservation Site':
+            return 'MACS'
+         elif type == 'SCS':
+            return 'SCS'
+      """
+      arcpy.CalculateField_management(in_lyr, "SITE_TYPE_CS", "st(!SITE_TYPE!)", code_block=cb, field_type="TEXT")
+   else:
+      # Add site type(s) to EOs based on RULEs
+      cb = """def st(rule):
+         ls = list(set(rule.split(',')))
+         rules = []
+         if any([i.startswith("AHZ") for i in ls]):
+            rules.append('AHZ')
+         if any([i.startswith("SCS") for i in ls]):
+            rules.append('SCS')
+         if any([i.startswith("MACS") for i in ls]):
+            rules.append('MACS')
+         if any([i.startswith("KCS") for i in ls]):
+            rules.append('KCS')
+         if any([i.isnumeric() for i in ls]):
+            rules.append("TCS")
+         return ",".join(rules)
+      """
+      arcpy.CalculateField_management(in_lyr, "SITE_TYPE_EO", "st(!CONCATENATE_RULE!)", code_block=cb, field_type="TEXT")
+      arcpy.DeleteField_management(in_lyr, "CONCATENATE_RULE")
+   return in_lyr
+
+def SpatialJoin_byType(inEO, inCS, outSJ, slopFactor="15 Meters"):
+   """
+   Spatial joins EOs to ConSites (one to many) with site-type matching.
+   :param inEO: Input EOs. The SITE_TYPE_EO field must exist (see AddTypes)
+   :param inCS: Input ConSites. The SITE_TYPE_CS field must exist (see AddTypes)
+   :param outSJ: Output spatial join layer
+   :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
+   :return: 
+   """
+   scratchGDB = "in_memory"
+   printMsg("Spatial joining EOs to ConSites, by site type...")
+   site_types = unique_values(inCS, "SITE_TYPE_CS")
+   tmpFeats = []
+   for s in site_types:
+      sj = scratchGDB + os.sep + 'csJoin_' + s
+      print(sj)
+      eol = arcpy.MakeFeatureLayer_management(inEO, where_clause="SITE_TYPE_EO LIKE '%" + s + "%'")
+      csl = arcpy.MakeFeatureLayer_management(inCS, where_clause="SITE_TYPE_CS = '" + s + "'")
+      arcpy.SpatialJoin_analysis(eol, csl, sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
+      tmpFeats.append(sj)
+   arcpy.Merge_management(tmpFeats, outSJ)
+   return outSJ
+
+def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO_SUMMARY", slopFactor="15 Meters"):
    """
    Adds a text field and/or numeric summary field(s) of EOs by tier, for each unique value in fld_ID in in_Bounds.
    :param in_Bounds: Input boundary polygons (e.g. sites)
@@ -406,7 +473,6 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
       "Both" = both text tier summary and numeric tier count fields
    :param out_field: New field to contain the tier text summary.
    :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
-   :param matchSiteType: For matching EO and CS site types. For internal use only.
    :return: in_Bounds
    # Coulddo:
       - add other summaries from sjEOs as needed. (Element names, unique elements, etc).
@@ -419,8 +485,19 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    # All possible tier ranks, with names to use for count fields. 6: 'Other' is assigned to anything outside of the 5 named tiers.
    tiers = {1: "Irreplaceable", 2: "Critical", 3: "Vital", 4: "High Priority", 5: "General", 6: "Other"}
    
-   # EO ID field (two options allowed)
    eo_flds = GetFlds(in_EOs)
+   bnd_flds = GetFlds(in_Bounds)
+   
+   # Check if site type matching applies
+   if ('SITE_TYPE' in bnd_flds or "SITE_TYPE_CS" in bnd_flds) and "SITE_TYPE_EO" in eo_flds:
+      printMsg("Using EO and ConSite site type matching.")
+      matchSiteType = True
+      if "SITE_TYPE_CS" not in bnd_flds:
+         AddTypes(in_Bounds)
+   else:
+      matchSiteType = False
+   
+   # EO ID field (two options allowed)
    if "SF_EOID" in eo_flds:
       eo_id = "SF_EOID"
    else:
@@ -439,9 +516,10 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    
    printMsg("Adding EO counts by tier to " + os.path.basename(in_Bounds) + "...")
    sjEOs = scratchGDB + os.sep + "sjEOs"
-   arcpy.SpatialJoin_analysis(in_EOs, in_Bounds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
    if matchSiteType:
-      MatchTypes(sjEOs)
+      SpatialJoin_byType(in_EOs, in_Bounds, sjEOs, slopFactor)
+   else:
+      arcpy.SpatialJoin_analysis(in_EOs, in_Bounds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
    # NOTE: this is basically just re-creating FinalRank. Re-calculating here will ensure this is compatible with other EO data layers.
    rank_field = "temprank"  # this is included so that it will correctly order the Tier fields
    arcpy.AddField_management(sjEOs, rank_field, "SHORT")
@@ -918,23 +996,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
                                    ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"], 
                                    [["SFID", "COUNT"], ["RULE", "CONCATENATE"]], "MULTI_PART", concatenation_separator=",")
    # Add site type(s) to EOs based on RULEs
-   cb = """def st(rule):
-      ls = list(set(rule.split(',')))
-      rules = []
-      if any([i.startswith("AHZ") for i in ls]):
-         rules.append('AHZ')
-      if any([i.startswith("SCS") for i in ls]):
-         rules.append('SCS')
-      if any([i.startswith("MACS") for i in ls]):
-         rules.append('MACS')
-      if any([i.startswith("KCS") for i in ls]):
-         rules.append('KCS')
-      if any([i.isnumeric() for i in ls]):
-         rules.append("TCS")
-      return ", ".join(rules)
-   """
-   arcpy.CalculateField_management(out_procEOs, "SITE_TYPE_EO", "st(!CONCATENATE_RULE!)", code_block=cb, field_type="TEXT")
-   arcpy.DeleteField_management(out_procEOs, "CONCATENATE_RULE")
+   AddTypes(out_procEOs, "EO")
    
    # Add and calculate some fields
    
@@ -1430,6 +1492,19 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       - UPDATE: Update portfolio but keep existing picks for both EOs and ConSites
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    '''
+   # 
+   # in_sortedEOs = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\scoredEOs_all'
+   # out_sortedEOs = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\priorEOs_all_TEST'
+   # in_sumTab = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\elementSummary_all'
+   # out_sumTab =  r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\elementSummary_all_upd_TEST'
+   # in_ConSites0 = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ConSites_20230606_080736'
+   # in_ConSites = arcpy.MakeFeatureLayer_management(in_ConSites0, where_clause="SITE_TYPE IN ('Conservation Site', 'SCS')")
+   # out_ConSites = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\priorConSites_all_TEST'
+   # out_Excel=None
+   # in_consLands_flat = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Inputs_Jul2023.gdb\conslands_flat'
+   # build = "NEW"
+   # slopFactor = "15 METERS"
+   
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
    scratchGDB = "in_memory"
@@ -1446,10 +1521,17 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CopyRows_management(in_sumTab, tmpTab)
    in_sumTab = tmpTab
    
+   tmpCS0 = scratchGDB + os.sep + "tmpCS0"
+   arcpy.CopyFeatures_management(in_ConSites, tmpCS0)
+   # Subset to only include types present in EOs
+   AddTypes(tmpCS0)
+   eo_types0 = [a.split(",") for a in unique_values(in_sortedEOs, "SITE_TYPE_EO")]
+   eo_types = list(set([a for i in eo_types0 for a in i]))
+   query = "SITE_TYPE_CS IN ('" + "','".join(eo_types) + "')"
+   printMsg(query)
    tmpCS = scratchGDB + os.sep + "tmpCS"
-   arcpy.CopyFeatures_management(in_ConSites, tmpCS)
+   arcpy.Select_analysis(tmpCS0, tmpCS, query)
    in_ConSites = tmpCS
-   AddTypes(in_ConSites)
       
    # Add "PORTFOLIO" and "OVERRIDE" fields to in_sortedEOs and in_ConSites tables
    for tab in [in_sortedEOs, in_ConSites]:
@@ -1472,22 +1554,11 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    else:
       arcpy.CalculateField_management(in_ConSites, "PORTFOLIO", "!OVERRIDE!", "PYTHON_9.3")
       printMsg('Portfolio overrides maintained for ConSites')
-      
+   
+   # Site join layer, and site ID (used for Joins) 
+   eo_cs = scratchGDB + os.sep + "eo_cs"
+   cs_id = "SITEID"  # GetFlds(in_ConSites, oid_only=True)
    if build == 'NEW':
-      # Add "CS_CONSVALUE" field to ConSites, and calculate
-      # Use spatial join to get summaries of EOs near ConSites. Note that a EO can be part of multiple consites, which is why one-to-many is used.
-      cs_id = GetFlds(in_ConSites, oid_only=True)
-      eo_cs = scratchGDB + os.sep + "eo_cs"
-      arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, eo_cs, "JOIN_ONE_TO_MANY", "KEEP_ALL",
-                                 match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
-      MatchTypes(eo_cs)
-      eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
-      arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["EO_CONSVALUE", "SUM"]], "JOIN_FID")
-      arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
-      # NOTE: tier assignment for ConSites is done later, after Tiers for EOs are finalized.
-      arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["CS_CONSVALUE"])
-      printMsg('CS_CONSVALUE field set')
-      
       # Add "CS_AREA_HA" field to ConSites, and calculate
       arcpy.AddField_management(in_ConSites, "CS_AREA_HA", "DOUBLE")
       expression = '!shape.area@squaremeters!/10000'
@@ -1495,34 +1566,32 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       
       # Tabulate Intersection of ConSites with conservation lands of specified BMI values, and score
       ScoreBMI(in_ConSites, "SITEID", in_consLands_flat, "PERCENT_BMI_")
-   
-      # Spatial Join EOs to ConSites, and join relevant field back to EOs
+      
+      # Use spatial join to get summaries of EOs near ConSites. Note that a EO can be part of multiple consites, which is why one-to-many is used.
+      SpatialJoin_byType(in_sortedEOs, in_ConSites, eo_cs, slopFactor)
+      
+      # Summarize conservation value at site level, then attach back to EO/CS join table.
+      eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
+      arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["EO_CONSVALUE", "SUM"]], cs_id)
+      arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
+      arcpy.JoinField_management(eo_cs, cs_id, eo_cs_stats, cs_id, ["CS_CONSVALUE"])
+      # Join conservation value to Sites
+      arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, cs_id, ["CS_CONSVALUE"])
+      printMsg('CS_CONSVALUE field set')
+      
+      # Now add site info to EOs
       try:
          arcpy.DeleteField_management(in_sortedEOs, ["CS_CONSVALUE", "CS_AREA_HA"])
       except:
          pass
-      joinFeats = in_sortedEOs + '_csJoin'
-      # Note that the mappings for ConSites are summaries (Max or Join), because an EO can join with multiple ConSites.
-      # If fldmaps are added, update the field_mapping object and the JoinField call performed after the Spatial Join.
-      fldmap1 = 'SF_EOID "SF_EOID" true true false 20 Double 0 0 ,First,#,%s,SF_EOID,-1,-1'%in_sortedEOs
-      fldmap2 = 'CS_CONSVALUE "CS_CONSVALUE" true true false 2 Short 0 0 ,Max,#,%s,CS_CONSVALUE,-1,-1' %in_ConSites
-      fldmap3 = 'CS_AREA_HA "CS_AREA_HA" true true false 4 Double 0 0 ,Max,#,%s,CS_AREA_HA,-1,-1' %in_ConSites
-      fldmap4 = 'CS_SITEID "CS_SITEID" true true false 100 Text 0 0,Join,"; ",%s,SITEID,-1,-1' %in_ConSites
-      fldmap5 = 'CS_SITENAME "CS_SITENAME" true true false 1000 Text 0 0,Join,"; ",%s,SITENAME,-1,-1' %in_ConSites
-      field_mapping="""%s;%s;%s;%s;%s""" %(fldmap1, fldmap2, fldmap3, fldmap4, fldmap5) 
-      
-      printMsg('Performing spatial join between EOs and ConSites...')
-      # headsup: cannot use MatchTypes for this, because it uses a one to one join. Need to use a loop.
-      site_types = unique_values(in_ConSites, "SITE_TYPE_CS")
-      tmpFeats = []
-      for s in site_types:
-         sj = scratchGDB + os.sep + 'csJoin_' + s
-         eol = arcpy.MakeFeatureLayer_management(in_sortedEOs, where_clause="SITE_TYPE_EO LIKE '" + s + "%'")
-         csl = arcpy.MakeFeatureLayer_management(in_ConSites, where_clause="SITE_TYPE_CS = '" + s + "'")
-         arcpy.SpatialJoin_analysis(eol, csl, sj, "JOIN_ONE_TO_ONE", "KEEP_ALL", field_mapping, "WITHIN_A_DISTANCE", slopFactor)
-         tmpFeats.append(sj)
-      arcpy.Merge_management(tmpFeats, joinFeats)
-      arcpy.JoinField_management(in_sortedEOs, "SF_EOID", joinFeats, "SF_EOID", ["CS_CONSVALUE", "CS_AREA_HA", "CS_SITEID", "CS_SITENAME"])
+      joinTab = in_sortedEOs + '_csJoin'
+      # Summarize by SF_EOID
+      arcpy.Statistics_analysis(eo_cs, joinTab, [["CS_CONSVALUE", "MAX"], ["CS_AREA_HA", "MAX"], ["SITEID", "CONCATENATE"],  ["SITENAME", "CONCATENATE"]], 
+                                case_field=["SF_EOID"], concatenation_separator="; ")
+      renm = [["MAX_CS_CONSVALUE", "CS_CONSVALUE"], ["MAX_CS_AREA_HA", "CS_AREA_HA"], ["CONCATENATE_SITEID", "CS_SITEID"], ["CONCATENATE_SITENAME", "CS_SITENAME"]]
+      for i in renm:
+         arcpy.AlterField_management(joinTab, i[0], i[1], i[1])
+      arcpy.JoinField_management(in_sortedEOs, "SF_EOID", joinTab, "SF_EOID", ["CS_CONSVALUE", "CS_AREA_HA", "CS_SITEID", "CS_SITENAME"])
       NullToZero(in_sortedEOs, "CS_CONSVALUE")  # fill in zeros to avoid issues with NULLs when used for ranking
    
    # PORTFOLIO UPDATES
@@ -1647,11 +1716,13 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
    
    # Fields: ECS_TIER and EEO_TIER. These include the final tier text to be stored in Biotics.
-   cs_id = GetFlds(in_ConSites, oid_only=True)
-   eo_cs = scratchGDB + os.sep + "eo_cs"
-   arcpy.SpatialJoin_analysis(in_sortedEOs, in_ConSites, eo_cs, "JOIN_ONE_TO_MANY", "KEEP_ALL", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
-   MatchTypes(eo_cs)
-   arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["FinalRANK", "MIN"]], "JOIN_FID")
+   # If join table doesn't exist, create it; otherwise just join FinalRank
+   if not arcpy.Exists(eo_cs):
+      SpatialJoin_byType(in_sortedEOs, in_ConSites, eo_cs, slopFactor)
+   else:
+      arcpy.JoinField_management(eo_cs, "SF_EOID", in_sortedEOs, "SF_EOID", ["FinalRANK"])
+   # Join final rank to EO/Site join table (generated earlier)
+   arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["FinalRANK", "MIN"]], cs_id)
    eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
    code_block = '''def fn(myMin):
       if myMin == 1:
@@ -1671,7 +1742,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # ECS_TIER
    arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
    arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_FinalRANK!)", code_block=code_block)
-   arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, "JOIN_FID", ["MIN_FinalRANK", "ECS_TIER"])
+   arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, cs_id, ["MIN_FinalRANK", "ECS_TIER"])
 
    # EEO_TIER
    arcpy.AddField_management(in_sortedEOs, "EEO_TIER", "TEXT", "", "", 20)
@@ -1703,7 +1774,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    arcpy.CalculateField_management(in_ConSites, "ESSENTIAL", expression, code_block=codeblock)
    
    # Field: EEO_SUMMARY (EO counts by tier in ConSites; text summary column)
-   tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor, matchSiteType=True)
+   tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor)
    
    # Create final outputs
    # Set up rank/sorting fields
@@ -1794,10 +1865,17 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    # convert fld_ID to list
    if not isinstance(fld_ID, list):
       fld_ID = [fld_ID]
-   if 'SITE_TYPE' in GetFlds(in_Bounds):
-      mt = True
-      AddTypes(in_Bounds)
+   
+   # Check if site type matching applies
+   bnd_flds = GetFlds(in_Bounds)
+   if ('SITE_TYPE' in bnd_flds or "SITE_TYPE_CS" in bnd_flds) and "SITE_TYPE_EO" in GetFlds(in_procEOs):
+      printMsg("Using EO and ConSite site type matching.")
+      matchSiteType = True
+      if "SITE_TYPE_CS" not in bnd_flds:
+         AddTypes(in_Bounds)
       fld_ID.append("SITE_TYPE_CS")
+   else:
+      matchSiteType = False
       
    # Dissolve boundaries on the specified ID field, retaining only that field.
    printMsg("Dissolving...")
@@ -1808,13 +1886,13 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    where_clause = '"FinalRANK" < 6'
    arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
    
-   # Perform spatial join between EOs and dissolved boundaries
-   printMsg("Spatial joining...")
+   # Perform spatial join between EOs and dissolved boundaries. Will join by site type as well, if in_Bounds has the SITE_TYPE field.
    sjEOs = scratchGDB + os.sep + "sjEOs"
-   # arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "INTERSECT")
-   arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
-   if mt:
-      MatchTypes(sjEOs)
+   if matchSiteType:
+      SpatialJoin_byType("lyr_EO", dissBnds, sjEOs, slopFactor)
+   else:
+      printMsg("Spatial joining...")
+      arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
    
    # Export the table from the spatial join. This appears to be necessary for summary statistics to work. Why?
    printMsg("Exporting spatial join table...")
@@ -1885,36 +1963,44 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    return out_Tab
 
 def qcSitesVsEOs(in_Sites, in_EOs, out_siteList, out_eoList):
-   '''Performs a QC protocol to determine if there are any EOs not intersecting a site, or vice versa. If any issues are found, they are exported to Excel tables for further review.
+   '''Performs a QC protocol to determine if there are any EOs not intersecting a site, or vice versa. If any issues are found, 
+   they are exported to Excel tables for further review. Internal function only. Requires site type matching fields (SITE_TYPE_CS and SITE_TYPE_EO).
    Parameters:
    - in_Sites: Input feature class representing Conservation Sites of one specific type only
    - in_EOs: Input features representing EOs corresponding to the same site type
    - out_siteList: An Excel file to contain a list of sites without EOs
    - out_eoList: An Excel file to contain a list of EOs without sites
    '''
-   # Make feature layers for in_Sites and in_EOs
-   sites = arcpy.MakeFeatureLayer_management(in_Sites,"Sites_lyr")
-   EOs = arcpy.MakeFeatureLayer_management(in_EOs,"EOs_lyr")
-   
-   # Select by location the EOs intersecting sites, reverse selection, and count selected records
-   arcpy.SelectLayerByLocation_management(EOs, "INTERSECT", in_Sites, "", "NEW_SELECTION", "INVERT")
-   count = countSelectedFeatures(EOs)
-   
-   # If count > 0, export list of EOs for QC
-   if count > 0:
+   types = unique_values(in_Sites, "SITE_TYPE_CS")
+   eol = []
+   csl = []
+   for t in types:
+      # Make feature layers for in_Sites and in_EOs
+      sites = arcpy.MakeFeatureLayer_management(in_Sites,"Sites_lyr", where_clause="SITE_TYPE_CS = '" + t + "'")
+      EOs = arcpy.MakeFeatureLayer_management(in_EOs,"EOs_lyr", where_clause="SITE_TYPE_EO LIKE '%" + t + "%'")
+      
+      # Select by location the EOs intersecting sites, reverse selection, and count selected records
+      arcpy.SelectLayerByLocation_management(EOs, "INTERSECT", in_Sites, "", "NEW_SELECTION", "INVERT")
+      count = countSelectedFeatures(EOs)
+      if count > 0:
+         eol += unique_values(EOs, "SF_EOID")
+      
+      # Select by location the sites intersecting EOs, reverse selection, and count selected records
+      arcpy.SelectLayerByLocation_management(sites, "INTERSECT", in_EOs, "", "NEW_SELECTION", "INVERT")
+      count = countSelectedFeatures(sites)
+      if count > 0:
+         csl += unique_values(sites, "SITEID")
+   # Export lists
+   if len(eol) > 0:
+      printMsg("There are %s EOs without sites. Exporting list."%str(len(eol)))
+      EOs = arcpy.MakeFeatureLayer_management(in_EOs, where_clause="SF_EOID IN ('" + "','".join(eol) + "')")
       arcpy.TableToExcel_conversion(EOs, out_eoList)
-      printMsg("There are %s EOs without sites. Exporting list."%count)
    else:
       printMsg("There are no EOs without sites.")
-   
-   # Select by location the EOs intersecting sites, reverse selection, and count selected records
-   arcpy.SelectLayerByLocation_management(sites, "INTERSECT", in_EOs, "", "NEW_SELECTION", "INVERT")
-   count = countSelectedFeatures(sites)
-   
-   # If count > 0, export list of sites for QC
-   if count > 0:
+   if len(csl) > 0:
+      printMsg("There are %s sites without EOs. Exporting list."%str(len(csl)))
+      sites = arcpy.MakeFeatureLayer_management(in_Sites, where_clause="SITEID IN ('" + "','".join(csl) + "')")
       arcpy.TableToExcel_conversion(sites, out_siteList)
-      printMsg("There are %s sites without EOs. Exporting list."%count)
    else:
       printMsg("There are no sites without EOs.")
    return

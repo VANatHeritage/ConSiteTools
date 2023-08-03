@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3.1"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.2-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -1619,8 +1619,12 @@ class attribute_eo(object):
       parm07 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
       parm07.filter.list = ["Local Database"]
       parm08 = defineParam("suf", "Output file suffix", "GPString", "Optional", "Input")
+      
+      parm09 = defineParam("types", "Include PFs for the following site type(s):", "GPString", "Required", "Input", ["TCS", "SCS"], multiVal=True)
+      parm09.filter.type = "ValueList"
+      parm09.filter.list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09]
       return parms
 
    def isLicensed(self):
@@ -1678,9 +1682,25 @@ class attribute_eo(object):
       # Set output names
       out_procEOs = os.path.join(out_gdb, "attribEOs" + suf2)
       out_sumTab = os.path.join(out_gdb, "elementSummary" + suf2)
+      
+      # Subset PFs to only include certain site type(s).
+      ls = []
+      if "TCS" in types:
+         ls.append("RULE IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15')")
+      if "SCS" in types:
+         ls.append("RULE IN ('SCS1', 'SCS2')")
+      if "AHZ" in types:
+         ls.append("RULE = 'AHZ'")
+      if "KCS" in types:
+         ls.append("RULE = 'KCS'")
+      if "MACS" in types:
+         ls.append("RULE = 'MACS'")
+      query = " OR ".join(ls)
+      printMsg(query)
+      procLyr = arcpy.MakeFeatureLayer_management(in_ProcFeats, where_clause=query)
 
       # Run function
-      AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
+      AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
       replaceLayer(out_procEOs)
       replaceLayer(out_sumTab)
 
@@ -1728,6 +1748,7 @@ class score_eo(object):
             # parameters[2].value = "scoredEOs" + suf
             # Set output parameters
             parameters[3].value = suf
+            parameters[1].value = parameters[1].valueAsText + suf
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
             # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
@@ -1802,6 +1823,7 @@ class build_portfolio(object):
             if not suf.startswith("_"):
                suf = ""
             parameters[7].value = suf
+            parameters[2].value = parameters[2].valueAsText + suf
             # parameters[5].value = "priorEOs" + suf
             # parameters[6].value = "elementSummary_upd" + suf
             # parameters[7].value = "priorConSites" + suf
