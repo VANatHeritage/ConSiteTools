@@ -10,6 +10,8 @@
 # ---------------------------------------------------------------------------
 
 # Import modules and functions
+import arcpy.management
+
 from Helper import *
 from CreateConSites import bmiFlatten, ExtractBiotics, ParseSiteTypes
 
@@ -447,16 +449,19 @@ def SpatialJoin_byType(inEO, inCS, outSJ, slopFactor="15 Meters"):
    :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
    :return: 
    """
-   scratchGDB = "in_memory"
+   scratchGDB = "memory"  # headsup: in_memory caused issues here (in getBRANK only when the brank function also used in_memory as scratchGDB).
    printMsg("Spatial joining EOs to ConSites, by site type...")
    site_types = unique_values(inCS, "SITE_TYPE_CS")
    tmpFeats = []
    for s in site_types:
       sj = scratchGDB + os.sep + 'csJoin_' + s
       print(sj)
-      eol = arcpy.MakeFeatureLayer_management(inEO, where_clause="SITE_TYPE_EO LIKE '%" + s + "%'")
-      csl = arcpy.MakeFeatureLayer_management(inCS, where_clause="SITE_TYPE_CS = '" + s + "'")
-      arcpy.SpatialJoin_analysis(eol, csl, sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
+      # Headsup: using layers may produce issues with not joining attributes correctly. Using Select instead.
+      eo_sub = scratchGDB + os.sep + "eo_sub"
+      cs_sub = scratchGDB + os.sep + "cs_sub"
+      arcpy.Select_analysis(inEO, eo_sub, "SITE_TYPE_EO LIKE '%" + s + "%'")
+      arcpy.Select_analysis(inCS, cs_sub, "SITE_TYPE_CS = '" + s + "'")
+      arcpy.SpatialJoin_analysis(eo_sub, cs_sub, sj, "JOIN_ONE_TO_MANY", "KEEP_COMMON", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
       tmpFeats.append(sj)
    arcpy.Merge_management(tmpFeats, outSJ)
    return outSJ
@@ -490,7 +495,6 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
    
    # Check if site type matching applies
    if ('SITE_TYPE' in bnd_flds or "SITE_TYPE_CS" in bnd_flds) and "SITE_TYPE_EO" in eo_flds:
-      printMsg("Using EO and ConSite site type matching.")
       matchSiteType = True
       if "SITE_TYPE_CS" not in bnd_flds:
          AddTypes(in_Bounds)
@@ -626,15 +630,20 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    - flag = Boolean, whether to add FLAG_BRANK, indicating difference from previous B-rank. This was added so it could 
       be set to False when this function is used directly in the "Create [ConSite]" tools.
    '''
+   # see SpatialJoin_byType for note on scratchGDB
+   scratchGDB = "in_memory"
    printMsg("Selecting PFs intersecting sites...")
    pf_lyr = arcpy.MakeFeatureLayer_management(in_PF)
    arcpy.SelectLayerByLocation_management(pf_lyr, "INTERSECT", in_ConSites, search_distance=slopFactor)
    
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
-   in_EOs = "in_memory" + os.sep + "EOs"
+   in_EOs = scratchGDB + os.sep + "EOs"
    dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "ELEMENT_EOS"]
-   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"]], "MULTI_PART")
+   # arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"]], "MULTI_PART")
+   arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"], ["RULE", "CONCATENATE"]], "MULTI_PART", concatenation_separator=",")
+   # Add site type(s) to EOs based on RULEs
+   AddTypes(in_EOs, "EO")
    
    ### For the EOs, calculate the IBR (individual B-rank)
    printMsg('Creating and calculating IBR field for EOs...')
@@ -729,9 +738,10 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    arcpy.DeleteField_management(in_ConSites, ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK_COMMENT", "AUTO_BRANK", "FLAG_BRANK"])
 
    # Calculate B-rank scores 
-   printMsg('Calculating biodiversity rank sums and maximums in loop...')
-   arcpy.MakeFeatureLayer_management(in_EOs, "eo_lyr")
-   arcpy.management.CalculateField(in_ConSites, "tmpID", "!OBJECTID!", "PYTHON3")
+   printMsg('Calculating biodiversity rank sums and maximums...')
+   # arcpy.MakeFeatureLayer_management(in_EOs, "eo_lyr")
+   oid_nm = GetFlds(in_ConSites, oid_only=True)
+   arcpy.management.CalculateField(in_ConSites, "tmpID", "str(!" + oid_nm + "!)")
    fld_ID = "tmpID"
    oldFlds = GetFlds(in_ConSites)
    # Check if SITEID is populated
@@ -741,21 +751,31 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
          fld_ID = "SITEID"
    if fld_ID == "tmpID":
       printMsg("SITEID field not found or not populated. Using OID as unique identifier instead.")
-   tmpSites = "in_memory" + os.sep + "tmpSites"
+   tmpSites = scratchGDB + os.sep + "tmpSites"
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
+   AddTypes(tmpSites)  # used in SpatialJoin_byType
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
    arcpy.management.AddField(tmpSites, "AUTO_BRANK", "TEXT", field_length=2)
    arcpy.management.AddField(tmpSites, "AUTO_BRANK_COMMENT", "TEXT", field_length=255)
    failList = []
+   # Standard date text for comment field
    dt = time.strftime('%Y-%m-%d')
+   date_text = "[" + dt + "]:"
+   
+   # Handle multiple site types
+   eoSite = scratchGDB + os.sep + "eoSite"
+   SpatialJoin_byType(in_EOs, tmpSites, eoSite, slopFactor)
+   # Make layer
+   arcpy.MakeFeatureLayer_management(eoSite, "eo_lyr")
    
    # Summarize sum, max, and ranks of best-ranked EOs
    with arcpy.da.UpdateCursor(tmpSites, ["SHAPE@", fld_ID, "IBR_SUM", "IBR_MAX", "AUTO_BRANK_COMMENT"]) as cursor:
       for row in cursor:
-         myShp = row[0]
+         # myShp = row[0]
          siteID = row[1]
-         arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
+         # arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
+         arcpy.SelectLayerByAttribute_management("eo_lyr", "NEW_SELECTION", where_clause=fld_ID + " = '" + siteID + "'")
          c = countSelectedFeatures("eo_lyr")
          if c > 0:
             arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE"], skip_nulls=True)
@@ -795,18 +815,22 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
             elif endem_ct > 1:
                mx_text += " Site contains the only known occurrences of " + str(endem_ct) + " elements."
             # ibr_text = "IBR_SUM = " + str(sm) + "."
-            date_text = "[" + dt + "]:"
             row[4] = date_text + " " + mx_text  # + " " + ibr_text
             cursor.updateRow(row)
          else:
-            printMsg("Site %s: Failed"%siteID)
+            printMsg("Site %s: no EOs found."%siteID)
+            # Add values so sites will be assigned B5.
+            row[2] = 0
+            row[3] = 0
+            row[4] = date_text + " No EOs joined to site, assigned B5."
+            cursor.updateRow(row)
             failList.append(siteID)
          
    # Determine B-rank based on the sum of IBRs
    printMsg('Calculating site biodiversity ranks from sums and maximums of individual ranks...')
    codeblock = '''def brank(sum, max):
       if sum == None:
-         sumRank = None
+         return None
       elif sum < 4:
          sumRank = "B5"
       elif sum < 16:
@@ -819,7 +843,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
          sumRank = "B1"
       
       if max == None:
-         maxRank = None
+         return None
       elif max < 4:
          maxRank = "B4"
       elif max < 16:
@@ -945,6 +969,8 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
       # These paramaters are optional in the python toolbox tool.
       printMsg("Skipping preparation for PFs and ConSites.")
    else:
+      # headsup: parsing by site type is no longer necessary for prioritization process as of v2.3.3,
+      #  but leaving it in as those layers may be conveinent to end users. Will not add those layers to map.
       if in_PF == "BIOTICS_DLINK.ProcFeats" and in_ConSites == "BIOTICS_DLINK.ConSites":
          # This will work with Biotics link layers.
          try:
@@ -953,7 +979,6 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
             printWrng("Error extracting data from Biotics. You will need to copy the PFs and ConSites (parsed by site type) to the ECS Input GDB.")
          else:
             out = ParseSiteTypes(pf_out, cs_out, ig)
-            out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
       else:
          printMsg("Copying already-extracted Biotics data...")
          pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
@@ -961,8 +986,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
          cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
          arcpy.CopyFeatures_management(in_ConSites, cs_out)
          out = ParseSiteTypes(pf_out, cs_out, ig)
-         out_lyrs += [pf_out, cs_out]
-         out_lyrs += [o for o in out if os.path.basename(o) in ['pfTerrestrial', 'csTerrestrial']]
+      out_lyrs += [pf_out, cs_out]
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'
       if len(in_elExclude) > 1:
@@ -1501,19 +1525,6 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       - UPDATE: Update portfolio but keep existing picks for both EOs and ConSites
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    '''
-   # 
-   # in_sortedEOs = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\scoredEOs_all'
-   # out_sortedEOs = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\priorEOs_all_TEST'
-   # in_sumTab = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\elementSummary_all'
-   # out_sumTab =  r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\elementSummary_all_upd_TEST'
-   # in_ConSites0 = r'D:\projects\EssentialConSites\quarterly_run\ECS_Run_jun2023\ECS_Inputs_Jun2023.gdb\ConSites_20230606_080736'
-   # in_ConSites = arcpy.MakeFeatureLayer_management(in_ConSites0, where_clause="SITE_TYPE IN ('Conservation Site', 'SCS')")
-   # out_ConSites = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Outputs_Jul2023.gdb\priorConSites_all_TEST'
-   # out_Excel=None
-   # in_consLands_flat = r'C:\David\scratch\ConSite_scratch\ECS_comboTesting_20230731\ECS_Inputs_Jul2023.gdb\conslands_flat'
-   # build = "NEW"
-   # slopFactor = "15 METERS"
-   
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
    scratchGDB = "in_memory"
@@ -1537,7 +1548,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    eo_types0 = [a.split(",") for a in unique_values(in_sortedEOs, "SITE_TYPE_EO")]
    eo_types = list(set([a for i in eo_types0 for a in i]))
    query = "SITE_TYPE_CS IN ('" + "','".join(eo_types) + "')"
-   printMsg(query)
+   printMsg("Prioritizing the following site types: " + query)
    tmpCS = scratchGDB + os.sep + "tmpCS"
    arcpy.Select_analysis(tmpCS0, tmpCS, query)
    in_ConSites = tmpCS
@@ -1803,7 +1814,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ["PORTFOLIO", "DESCENDING"]
    ]
    
-   # coulddo: update all ranking fields using same ranking as before, but for ALL eligible EOs. 
+   # coulddo: not currently used. This would update all ranking fields using same ranking as before, but for ALL eligible EOs. 
    #  These are used to provide a unique numeric rank for ALL EOs, by element. Note that rankings are sorta slow.
    #  Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
    if eoImportance:

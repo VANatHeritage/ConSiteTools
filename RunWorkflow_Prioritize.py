@@ -86,7 +86,7 @@ def main():
    if "MACS" in types:
       ls.append("RULE = 'MACS'")
    query = " OR ".join(ls)
-   printMsg(query)
+   printMsg("Selecting PFs using the query: " + query)
    ## END HEADER ###
 
    # Create ECS directory
@@ -94,8 +94,10 @@ def main():
    
    # Input PF/CS
    print([os.path.basename(o) for o in out_lyrs])
-   in_pf = arcpy.MakeFeatureLayer_management(out_lyrs[2], where_clause=query)
-   in_cs = out_lyrs[3]
+   pf_fc = [a for a in out_lyrs if os.path.basename(a).startswith("ProcFeats_")][0]
+   cs_fc = [a for a in out_lyrs if os.path.basename(a).startswith("ConSites_")][0]
+   in_pf = arcpy.MakeFeatureLayer_management(pf_fc, where_clause=query)
+   in_cs = cs_fc
    
    # Input standard variables which are the same for all site types
    # No need to change this if in_GDB is valid and naming conventions maintained

@@ -1646,7 +1646,7 @@ class attribute_eo(object):
          fc = parameters[0].valueAsText
          if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
-            # set default naming suffix based on PF layer
+            # deprecated: set default naming suffix based on PF layer
             if in_nm == "pfTerrestrial":
                suf = '_tcs'
             elif in_nm == "pfKarst":
@@ -1658,8 +1658,6 @@ class attribute_eo(object):
             else:
                suf = ''
             parameters[6].value = suf
-            # parameters[7].value = "attribEOs" + suf
-            # parameters[8].value = "elementSummary" + suf
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
@@ -1717,7 +1715,7 @@ class attribute_eo(object):
       if "MACS" in types:
          ls.append("RULE = 'MACS'")
       query = " OR ".join(ls)
-      printMsg(query)
+      printMsg("Selecting PFs using the query: " + query)
       procLyr = arcpy.MakeFeatureLayer_management(in_ProcFeats, where_clause=query)
 
       # Run function
@@ -1764,13 +1762,10 @@ class score_eo(object):
          fc = parameters[0].valueAsText
          if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
-            suf = in_nm[-4:]
-            if not suf.startswith("_"):
-               suf = ""
-            # parameters[2].value = "scoredEOs" + suf
-            # Set output parameters
+            suf = in_nm[9:]  # headsup: takes everything after basename (attribEOs)
+            # Set input parameters
             parameters[3].value = suf
-            parameters[1].value = parameters[1].valueAsText + suf
+            parameters[1].value = "elementSummary" + suf
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
             # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
@@ -1841,14 +1836,10 @@ class build_portfolio(object):
          fc = parameters[1].valueAsText
          if not parameters[1].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
-            suf = in_nm[-4:]
-            if not suf.startswith("_"):
-               suf = ""
+            suf = in_nm[9:]  # headsup: takes everything after basename (scoredEOs)
+            # Set input parameters
             parameters[7].value = suf
-            parameters[2].value = parameters[2].valueAsText + suf
-            # parameters[5].value = "priorEOs" + suf
-            # parameters[6].value = "elementSummary_upd" + suf
-            # parameters[7].value = "priorConSites" + suf
+            parameters[2].value = "elementSummary" + suf
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
@@ -1895,7 +1886,7 @@ class build_element_lists(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input", "priorConSites")
+      parm00 = defineParam("in_Bounds", "Input Boundary Polygons", "GPFeatureLayer", "Required", "Input")
       parm01 = defineParam("fld_ID", "Boundary ID field(s)", "Field", "Required", "Input", multiVal=True)
       parm02 = defineParam("in_procEOs", "Input Prioritized EOs", "GPFeatureLayer", "Required", "Input", "priorEOs")
       parm03 = defineParam("in_elementTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary_upd")
@@ -1937,12 +1928,10 @@ class build_element_lists(object):
          fc = parameters[2].valueAsText
          if not parameters[2].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
-            suf = in_nm[-4:]
-            if not suf.startswith("_"):
-               suf = ""
-            # parameters[4].value = "elementList" + suf
-            # parameters[5].value = "elementList" + suf + ".xls"
+            suf = in_nm[8:]  # headsup: takes everything after basename (priorEOs)
+            # Set input parameters
             parameters[6].value = suf
+            parameters[3].value = "elementSummary_upd" + suf
             # Set output parameters
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
