@@ -411,12 +411,12 @@ def AddTypes(in_lyr, cs_eo="CS"):
             return 'AHZ'
          elif type == 'Cave Site':
             return 'KCS'
-         elif type == 'Conservation Site':
-            return 'TCS'
          elif type == 'Migratory Animal Conservation Site':
             return 'MACS'
          elif type == 'SCS':
             return 'SCS'
+         elif type == 'Conservation Site':
+            return 'TCS'
       """
       arcpy.CalculateField_management(in_lyr, "SITE_TYPE_CS", "st(!SITE_TYPE!)", code_block=cb, field_type="TEXT")
    else:
@@ -426,12 +426,12 @@ def AddTypes(in_lyr, cs_eo="CS"):
          rules = []
          if any([i.startswith("AHZ") for i in ls]):
             rules.append('AHZ')
-         if any([i.startswith("SCS") for i in ls]):
-            rules.append('SCS')
-         if any([i.startswith("MACS") for i in ls]):
-            rules.append('MACS')
          if any([i.startswith("KCS") for i in ls]):
             rules.append('KCS')
+         if any([i.startswith("MACS") for i in ls]):
+            rules.append('MACS')
+         if any([i.startswith("SCS") for i in ls]):
+            rules.append('SCS')
          if any([i.isnumeric() for i in ls]):
             rules.append("TCS")
          return ",".join(rules)
@@ -1296,7 +1296,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    arcpy.SelectLayerByAttribute_management("lyr_EO", "NEW_SELECTION", where_clause)
    modRanks("lyr_EO", "EORANK_NUM", "EO_MODRANK", "ELCODE")
    
-   printMsg("EO attribution complete")
+   printMsg("EO attribution complete.")
    return (out_procEOs, out_sumTab)
    
 def ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil = "false", ysnYear = "true"):

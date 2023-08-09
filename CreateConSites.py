@@ -1908,10 +1908,16 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             counter +=1
             del myPS
             
+   # Update SITE_TYPE (for compatibility with B-rank tool)
+   if site_Type == "AHZ":
+      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'Anthropogenic Habitat Zone'")
+   else:
+      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'Conservation Site'")
+   
    tFinish = datetime.now()
    deltaString = GetElapsedTime (tStart, tFinish)
    printMsg("Processing complete. Total elapsed time: %s" %deltaString)
-   
+   return out_ConSites
 
 ### Functions for creating Stream Conservation Sites (SCS) ###
 def MakeServiceLayers_scs(in_hydroNet, in_dams, upDist = 3000, downDist = 500):
@@ -2484,8 +2490,9 @@ def DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSi
    arcpy.EliminatePolygonPart_management(selPolys, fillPolys, "AREA", "1 HECTARES", "", "CONTAINED_ONLY")
    arcpy.Generalize_edit(fillPolys, "0.5 Meters")
 
-   # Append final shapes to template
+   # Append final shapes to template, update SITE_TYPE (for compatibility with B-rank tool)
    arcpy.Append_management(fillPolys, out_ConSites, "NO_TEST")
+   arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'SCS'")
    
    # timestamp
    t1 = datetime.now()

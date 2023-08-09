@@ -1660,6 +1660,11 @@ class attribute_eo(object):
             parameters[6].value = suf
             # Set output parameters
             d = arcpy.da.Describe(fc)
+            # Update other inputs, using same input GDB
+            parameters[1].value = d["path"] + os.sep + "ElementExclusions"
+            parameters[2].value = d["path"] + os.sep + "conslands"
+            parameters[3].value = d["path"] + os.sep + "conslands_flat"
+            # Update output path
             fold = os.path.dirname(d["path"])
             gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
@@ -1840,8 +1845,9 @@ class build_portfolio(object):
             # Set input parameters
             parameters[7].value = suf
             parameters[2].value = "elementSummary" + suf
-            # Set output parameters
             d = arcpy.da.Describe(fc)
+            parameters[4].value = d["path"] + os.sep + "conslands_flat"
+            # Set output parameters
             fold = os.path.dirname(d["path"])
             gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
             out_gdb = fold + os.sep + gdb
