@@ -813,21 +813,24 @@ def GetEraseFeats(inFeats, selQry, elimDist, outEraseFeats, elimFeats = "", scra
    
    return outEraseFeats
 
-def CullEraseFeats(inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scratchGDB = "in_memory"):
+def CullEraseFeats(inEraseFeats, in_Feats, PerCov, outEraseFeats, scratchGDB = "in_memory"):
    '''For ConSite creation: Culls exclusion features containing a significant percentage of any input feature's (PF or SBB) area'''
    # Process:  Add Field (Erase ID) and Calculate
-   arcpy.AddField_management(inEraseFeats, "eFID", "LONG")
-   arcpy.CalculateField_management(inEraseFeats, "eFID", "!OBJECTID!", "PYTHON")
+   arcpy.CalculateField_management(inEraseFeats, "eFID", "!" + GetFlds(inEraseFeats, True) + "!", "PYTHON", field_type="LONG")
+   arcpy.CalculateField_management(in_Feats, "iFID", "!" + GetFlds(in_Feats, True) + "!", "PYTHON", field_type="LONG")
+   # arcpy.CalculateField_management(in_Feats, "iShpArea", "!shape.area@squaremeters!", field_type="FLOAT")
    
    # Process: Tabulate Intersection
    # This tabulates the percentage of each input feature that is contained within each erase feature
    TabIntersect = scratchGDB + os.sep + os.path.basename(inEraseFeats) + "_TabInter"
-   arcpy.TabulateIntersection_analysis(in_Feats, fld_SFID, inEraseFeats, TabIntersect, "eFID", "", "", "HECTARES")
+   arcpy.TabulateIntersection_analysis(in_Feats, "iFID", inEraseFeats, TabIntersect, "eFID", "", "", "HECTARES")
+   # arcpy.PairwiseIntersect_analysis([in_Feats, inEraseFeats], TabIntersect)
+   # arcpy.CalculateField_management(TabIntersect, "PERCENTAGE", "(!shape.area@squaremeters! / !iShpArea!) * 100", field_type="FLOAT")
    
    # Process: Summary Statistics
    # This tabulates the maximum percentage of ANY input feature within each erase feature
    TabSum = scratchGDB + os.sep + os.path.basename(inEraseFeats) + "_TabSum"
-   arcpy.Statistics_analysis(TabIntersect, TabSum, "PERCENTAGE SUM", fld_SFID)
+   arcpy.Statistics_analysis(TabIntersect, TabSum, "PERCENTAGE SUM", "iFID")
    
    # Process: Join Field
    # This joins the summed percentage value back to the original input features
@@ -835,7 +838,7 @@ def CullEraseFeats(inEraseFeats, in_Feats, fld_SFID, PerCov, outEraseFeats, scra
       arcpy.DeleteField_management(in_Feats, "SUM_PERCENTAGE")
    except:
       pass
-   arcpy.JoinField_management(in_Feats, fld_SFID, TabSum, fld_SFID, "SUM_PERCENTAGE")
+   arcpy.JoinField_management(in_Feats, "iFID", TabSum, "iFID", "SUM_PERCENTAGE")
    
    # Process: Select features containing a large enough percentage of erase features
    WhereClause = "SUM_PERCENTAGE >= %s" % PerCov
@@ -1027,7 +1030,7 @@ def ChopMod(in_PF, in_Feats, fld_ID, in_EraseFeats, out_Clusters, out_subErase, 
    
    # Find "groups" of fragments within fld_ID groups
    fragGrp = "fragGrp"  # field to hold group IDs
-   SpatialCluster_GrpFld(rtnParts, multiMeasure(searchDist, 0.5)[2], fragGrp, fldGrpBy='feat_' + fld_ID, chain=False)
+   SpatialCluster_GrpFld(rtnParts, multiMeasure(searchDist, 0.5)[2], fragGrp, fldGrpBy='feat_' + fld_ID)
    # Mark to keep ALL fragments in a group which contain a keep=1 fragment (intersecting a PF)
    grpKeep = [a[0] for a in arcpy.da.SearchCursor(rtnParts, [fragGrp, "keep"]) if a[1] == 1]
    with arcpy.da.UpdateCursor(rtnParts, [fragGrp, "keep"]) as curs:
@@ -1690,7 +1693,7 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             
             # Cull Hydro Erase Features
             hydroRtn = scratchGDB + os.sep + 'hydroRtn'
-            CullEraseFeats (hydroDiss, tmpSBB, fld_SFID, hydroPerCov, hydroRtn, scratchParm)
+            CullEraseFeats(hydroDiss, tmpSBB, hydroPerCov, hydroRtn, scratchParm)
             
             # Remove narrow hydro from erase features; also punch out PFs
             hydroErase = scratchGDB + os.sep + 'hydroErase'
@@ -1706,8 +1709,10 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             # Coalesce erase features to remove weird gaps and slivers
             printMsg('Coalescing erase features...')
             coalErase = scratchGDB + os.sep + 'coalErase'
-            Coalesce(tmpErase, "0.5 METERS", coalErase, scratchParm)
-
+            # Coalesce(tmpErase, "0.5 METERS", coalErase, scratchParm)  # changed for processing improvement
+            with arcpy.EnvManager(XYTolerance="0.1 Meters"):
+              arcpy.PairwiseDissolve_analysis(tmpErase, coalErase, multi_part="SINGLE_PART")
+            
             # Modify SBBs and Erase Features
             printMsg('Chopping SBBs and modifying erase features...')
             sbbClusters = scratchGDB + os.sep + 'sbbClusters'
@@ -1864,10 +1869,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             smoothBnd = scratchGDB + os.sep + "smoothFin%s"%str(counter)
             # Using a 2.5x multiple of the siteSmthDist here, to reduce number of slivers/cuts related to erase features
             # having widths similar to the siteSmthDist distance.
+            # Don't use Coalesce here, because that could re-join split sites.
             ShrinkWrap(dissFrags, "1 METERS", smoothBnd, multiMeasure(siteSmthDist, 2.5)[2])
             
             # Chop out the exclusion features once more
-            if site_Type == 'TERRESTRIAL':  
+            if site_Type == 'TERRESTRIAL':
                printMsg('Final excision of exclusion features...')
                modBnd = scratchGDB + os.sep + "mod%s"%str(counter)
                CleanErase(smoothBnd, efClp, modBnd, scratchParm) 

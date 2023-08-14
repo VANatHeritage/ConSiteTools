@@ -21,7 +21,7 @@ def main():
    
    # Specify which site type(s) to run.
    # Choices are: "TCS", "AHZ", "SCU", "SCS"
-   siteTypes = ("SCS")
+   siteTypes = ("TCS")
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
@@ -36,8 +36,9 @@ def main():
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
    projFolder = r'C:\David\proc\ConSites_statewide'
-   runName = 'statewideSCS_2_2_7_FINAL'
-   outGDB = os.path.join(projFolder, runName + '_' + datetime.now().strftime("%Y%m%d") + '.gdb')
+   runName = 'statewideTCS_2_3_3dev'
+   dt = datetime.now().strftime("%Y%m%d")
+   outGDB = os.path.join(projFolder, runName + '_' + dt + '.gdb')
    
    # Geodatabase for storing scratch products
    # To maximize speed, set to "in_memory". If trouble-shooting, replace "in_memory" with path to a scratch geodatabase on your hard drive. If it doesn't already exist it will be created on the fly.
@@ -105,10 +106,10 @@ def main():
    # SCU/SCS Outputs
    scsPts = outGDB + os.sep + "scsPts"
    scsLines = outGDB + os.sep + "scsLines"
-   scsPolys = outGDB + os.sep + "scsPolys"
-   scuPolys = outGDB + os.sep + "scuPolys"
-   scsPolys_qc = outGDB + os.sep + "scsPolys_qc"
-   scuPolys_qc = outGDB + os.sep + "scuPolys_qc"
+   scsPolys = outGDB + os.sep + "consites_scs"
+   scsPolys_qc = outGDB + os.sep + "consites_scs_qc"
+   scuPolys = outGDB + os.sep + "consites_scu"
+   scuPolys_qc = outGDB + os.sep + "consites_scu_qc"
 
 
    ### Functions to run

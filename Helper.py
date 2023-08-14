@@ -975,7 +975,7 @@ def fc2df(feature_class, field_list, skip_nulls=True):
          )
       )
 
-def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, chain=True, scratchGDB="in_memory"):
+def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, chain=False, scratchGDB="in_memory"):
    """Clusters features based on specified search distance, with optional group-by field. Features within twice
    the search distance of each other will be assigned to the same group. Use 'fldGrpBy' to only group features
    having the save value in the `fldGrpBy` field.
@@ -999,27 +999,31 @@ def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, 
 
    # Buffer input features
    print('Buffering input features...')
+   fbuff = scratchGDB + os.sep + 'fbuff'
    if fldGrpBy is not None:
-      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='LIST', dissolve_field=fldGrpBy)
+      arcpy.PairwiseBuffer_analysis(inFeats, fbuff, searchDist, dissolve_option='LIST', dissolve_field=fldGrpBy)
    else:
-      arcpy.PairwiseBuffer_analysis(inFeats, scratchGDB + os.sep + 'tmp_groups0', searchDist, dissolve_option='ALL')
+      arcpy.PairwiseBuffer_analysis(inFeats, fbuff, searchDist, dissolve_option='ALL')
 
    # Make unique group polygons, associate with original features
    tmpGrp = scratchGDB + os.sep + "tmp_groups"
-   arcpy.MultipartToSinglepart_management(scratchGDB + os.sep + "tmp_groups0", tmpGrp)
+   arcpy.MultipartToSinglepart_management(fbuff, tmpGrp)
    arcpy.CalculateField_management(tmpGrp, fldGrpID, '!' + GetFlds(tmpGrp, oid_only=True) + '!', field_type="LONG")
    print('Intersecting to find groups...')
-   arcpy.PairwiseIntersect_analysis([inFeats, tmpGrp], scratchGDB + os.sep + 'tmp_flat_group0')
+   grp0 = scratchGDB + os.sep + 'tmp_flat_group0'
+   # arcpy.PairwiseIntersect_analysis([inFeats, tmpGrp], grp0)
+   arcpy.SpatialJoin_analysis(inFeats, tmpGrp, grp0, "JOIN_ONE_TO_MANY", match_option="INTERSECT")  # seems to be a bit faster than any other option tried.
 
    if fldGrpBy is not None:
-      arcpy.Select_analysis(scratchGDB + os.sep + 'tmp_flat_group0', scratchGDB + os.sep + 'tmp_flat_group', where_clause=fldGrpBy + ' = ' + fldGrpBy + '_1')
       grpTab = scratchGDB + os.sep + 'tmp_flat_group'
+      arcpy.Select_analysis(grp0, grpTab, where_clause=fldGrpBy + ' = ' + fldGrpBy + '_1')
    else:
-      grpTab = scratchGDB + os.sep + 'tmp_flat_group0'
+      grpTab = grp0
 
    if chain:
       print('Updating group IDs using original FIDs...')
-      orid = 'FID_' + os.path.basename(inFeats)
+      # orid = 'FID_' + os.path.basename(inFeats)
+      orid = "TARGET_FID"
       # orig groups
       go = {a[0]: [] for a in arcpy.da.SearchCursor(grpTab, fldGrpID)}
       [go[a[0]].append(a[1]) for a in arcpy.da.SearchCursor(grpTab, [fldGrpID, orid])]
@@ -1052,6 +1056,8 @@ def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, 
             curs.updateRow(r)
 
    print('Joining ' + fldGrpID + ' to ' + os.path.basename(inFeats) + '...')
-   arcpy.JoinField_management(inFeats, 'OBJECTID', grpTab, 'FID_' + os.path.basename(inFeats), [fldGrpID])
+   inOID = GetFlds(inFeats, oid_only=True)
+   # arcpy.JoinField_management(inFeats, inOID, grpTab, 'FID_' + os.path.basename(inFeats), [fldGrpID])
+   arcpy.JoinField_management(inFeats, inOID, grpTab, "TARGET_FID", [fldGrpID])
 
    return inFeats
