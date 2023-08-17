@@ -1061,3 +1061,28 @@ def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, 
    arcpy.JoinField_management(inFeats, inOID, grpTab, "TARGET_FID", [fldGrpID])
 
    return inFeats
+
+def flattenFeatures(inFeat, outFeat, sortBy, scratchGDB = None):
+   '''Eliminates overlaps in the Conservation Lands feature class. The BMI field is used for consolidation; better BMI ranks (lower numeric values) take precedence over worse ones.
+   
+   Parameters:
+   - inFeat: Input feature class.
+   - outConsLands: Output planar feature class.
+   - sortBy: Fields to sort by. In areas where features overlap, the highest ranking feature according to the sort 
+      order will be retained. The output feature class will be dissolved by the attribute(s) listed here.
+   - scratchGDB: Geodatabase for storing scratch products
+   '''
+   if not scratchGDB:
+      scratchGDB = "in_memory"
+   diss_fld = [a[0] for a in sortBy]
+   printMsg("Making flat dataset from: " + inFeat)
+   tmp_sort = scratchGDB + os.sep + "tmp_sort"
+   arcpy.Sort_management(inFeat, tmp_sort, sortBy)
+   tmp_union = scratchGDB + os.sep + "tmp_union"
+   arcpy.Union_analysis(tmp_sort, tmp_union)
+   # Delete lower-ranking polygons in areas of overlap
+   arcpy.DeleteIdentical_management(tmp_union, fields="Shape")
+   # final dissolve
+   arcpy.PairwiseDissolve_analysis(tmp_union, outFeat, diss_fld, multi_part="SINGLE_PART")  # this dissolve results in multi_parts
+   printMsg("Dataset " + outFeat + " created.")
+   return outFeat

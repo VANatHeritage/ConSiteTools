@@ -10,11 +10,8 @@
 # ---------------------------------------------------------------------------
 
 # Import modules and functions
-import arcpy.management
-
 from Helper import *
-from CreateConSites import bmiFlatten, ExtractBiotics, ParseSiteTypes
-
+from CreateConSites import ExtractBiotics, ParseSiteTypes
 arcpy.env.overwriteOutput = True
 
 ### HELPER FUNCTIONS ###
@@ -449,7 +446,7 @@ def SpatialJoin_byType(inEO, inCS, outSJ, slopFactor="15 Meters"):
    :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
    :return: 
    """
-   scratchGDB = "memory"  # headsup: in_memory caused issues here (in getBRANK only when the brank function also used in_memory as scratchGDB).
+   scratchGDB = "memory"  # headsup: in_memory caused issues here in ArcGIS Pro 3.1.2 (in getBRANK only when the brank function also used in_memory as scratchGDB).
    printMsg("Spatial joining EOs to ConSites, by site type...")
    site_types = unique_values(inCS, "SITE_TYPE_CS")
    tmpFeats = []
@@ -963,7 +960,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
       out_lyrs.append(out)
       printMsg("Creating flat conslands layer...")
       out = ig + os.sep + 'conslands_flat'
-      bmiFlatten(ig + os.sep + 'conslands', out)
+      flattenFeatures(ig + os.sep + 'conslands', out, [["BMI", "ASCENDING"]])
       out_lyrs.append(out)
    if in_PF == "None" or in_ConSites == "None":
       # These paramaters are optional in the python toolbox tool.

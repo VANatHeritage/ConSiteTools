@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3.4-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.5-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -650,7 +650,9 @@ class flat_conslands(object):
       else:
          scratchParm = arcpy.env.scratchGDB
 
-      bmiFlatten(in_CL, out_CL, scratchParm)
+      # bmiFlatten(in_CL, out_CL, scratchParm)
+      sortBy = [["BMI", "ASCENDING"]]
+      flattenFeatures(in_CL, out_CL, sortBy, scratchParm)
       
       return out_CL
       
@@ -1660,14 +1662,15 @@ class attribute_eo(object):
             parameters[6].value = suf
             # Set output parameters
             d = arcpy.da.Describe(fc)
+            in_gdb = d["path"]
             # Update other inputs, using same input GDB
-            parameters[1].value = d["path"] + os.sep + "ElementExclusions"
-            parameters[2].value = d["path"] + os.sep + "conslands"
-            parameters[3].value = d["path"] + os.sep + "conslands_flat"
+            parameters[1].value = in_gdb + os.sep + "ElementExclusions"
+            parameters[2].value = in_gdb + os.sep + "conslands"
+            parameters[3].value = in_gdb + os.sep + "conslands_flat"
             # Update output path
-            fold = os.path.dirname(d["path"])
-            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
-            out_gdb = fold + os.sep + gdb
+            fold = os.path.dirname(in_gdb)
+            gdb = os.path.basename(in_gdb)
+            out_gdb = fold + os.sep + gdb.replace("_Inputs_", "_Outputs_")
             if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[5].value = out_gdb
       return
@@ -1768,14 +1771,14 @@ class score_eo(object):
          if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[9:]  # headsup: takes everything after basename (attribEOs)
-            # Set input parameters
-            parameters[3].value = suf
-            parameters[1].value = "elementSummary" + suf
             d = arcpy.da.Describe(fc)
             fold = os.path.dirname(d["path"])
-            # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
-            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
+            gdb = os.path.basename(d['path'])
             out_gdb = fold + os.sep + gdb
+            # Set input parameters
+            parameters[3].value = suf
+            parameters[1].value = out_gdb + os.sep + "elementSummary" + suf
+            # Note: for the regular case, the text replace below will have no effect. Leaving it in just in case.
             if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[2].value = out_gdb
       return
@@ -1842,15 +1845,16 @@ class build_portfolio(object):
          if not parameters[1].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[9:]  # headsup: takes everything after basename (scoredEOs)
+            d = arcpy.da.Describe(fc)
+            fold = os.path.dirname(d["path"])
+            gdb = os.path.basename(d['path'])
+            out_gdb = fold + os.sep + gdb
+            in_gdb = fold + os.sep + gdb.replace("_Outputs_", "_Inputs_")
             # Set input parameters
             parameters[7].value = suf
-            parameters[2].value = "elementSummary" + suf
-            d = arcpy.da.Describe(fc)
-            parameters[4].value = d["path"] + os.sep + "conslands_flat"
+            parameters[2].value = out_gdb + os.sep + "elementSummary" + suf
+            parameters[4].value = in_gdb + os.sep + "conslands_flat"
             # Set output parameters
-            fold = os.path.dirname(d["path"])
-            gdb = os.path.basename(d['path']).replace("_Inputs_", "_Outputs_")
-            out_gdb = fold + os.sep + gdb
             if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
                parameters[5].value = out_gdb
                subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
