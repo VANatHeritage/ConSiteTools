@@ -1,11 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3.5-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.6-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-07-17
+# Last Edit: 2023-08-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1812,17 +1812,18 @@ class build_portfolio(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("build", "Portfolio Build Option", "String", "Required", "Input", "NEW")
-      parm00.filter.list = ["NEW", "NEW_EO", "NEW_CS", "UPDATE"]
-      parm01 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "scoredEOs")
-      parm02 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
-      parm03 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
-      parm04 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
+      parm00 = defineParam("in_sortedEOs", "Input Scored Element Occurrences (EOs)", "GPFeatureLayer", "Required", "Input", "scoredEOs")
+      parm01 = defineParam("in_sumTab", "Input Element Portfolio Summary Table", "GPTableView", "Required", "Input", "elementSummary")
+      parm02 = defineParam("in_ConSites", "Input Conservation Sites", "GPFeatureLayer", "Required", "Input")
+      parm03 = defineParam("in_consLands_flat", "Input Flattened Conservation Lands", "GPFeatureLayer", "Required", "Input", "conslands_flat")
       
-      parm05 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
-      parm05.filter.list = ["Local Database"]
-      parm06 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
-      parm07 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
+      parm04 = defineParam("out_gdb", "Output GDB", "DEWorkspace", "Required", "Input")
+      parm04.filter.list = ["Local Database"]
+      parm05 = defineParam("out_folder", "Output spreadsheet folder", "DEFolder", "Optional", "Input")
+      parm06 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
+      
+      parm07 = defineParam("build", "Portfolio Build Option", "String", "Required", "Input", "NEW")
+      parm07.filter.list = ["NEW", "NEW_EO", "NEW_CS", "UPDATE"]
       
       # parm05 = defineParam("out_sortedEOs", "Output Prioritized Element Occurrences (EOs)", "DEFeatureClass", "Required", "Output", "priorEOs")
       # parm06 = defineParam("out_sumTab", "Output Updated Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary_upd")
@@ -1840,9 +1841,9 @@ class build_portfolio(object):
       """Modify the values and properties of parameters before internal
       validation is performed.  This method is called whenever a parameter
       has been changed."""
-      if parameters[1].altered:
-         fc = parameters[1].valueAsText
-         if not parameters[1].hasBeenValidated and arcpy.Exists(fc):
+      if parameters[0].altered:
+         fc = parameters[0].valueAsText
+         if not parameters[0].hasBeenValidated and arcpy.Exists(fc):
             in_nm = os.path.basename(fc)
             suf = in_nm[9:]  # headsup: takes everything after basename (scoredEOs)
             d = arcpy.da.Describe(fc)
@@ -1851,16 +1852,16 @@ class build_portfolio(object):
             out_gdb = fold + os.sep + gdb
             in_gdb = fold + os.sep + gdb.replace("_Outputs_", "_Inputs_")
             # Set input parameters
-            parameters[7].value = suf
-            parameters[2].value = out_gdb + os.sep + "elementSummary" + suf
-            parameters[4].value = in_gdb + os.sep + "conslands_flat"
+            parameters[6].value = suf
+            parameters[1].value = out_gdb + os.sep + "elementSummary" + suf
+            parameters[3].value = in_gdb + os.sep + "conslands_flat"
             # Set output parameters
             if out_gdb.endswith(".gdb") and arcpy.Exists(out_gdb):
-               parameters[5].value = out_gdb
+               parameters[4].value = out_gdb
                subf = gdb[:-4].replace("ECS_Outputs_", "Spreadsheets_")
                out_fold = fold + os.sep + subf
                if arcpy.Exists(out_fold):
-                  parameters[6].value = out_fold
+                  parameters[5].value = out_fold
       return
 
    def updateMessages(self, parameters):

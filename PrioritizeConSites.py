@@ -350,7 +350,8 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    printMsg('Summarizing portfolio status...')
    freqTab = in_procEOs + '_freq'
    pivotTab = in_procEOs + '_pivot'
-   arcpy.Frequency_analysis(in_procEOs, freqTab, frequency_fields="ELCODE;TIER")
+   arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", "OVERRIDE <> -1")
+   arcpy.Frequency_analysis("lyr_EO", freqTab, frequency_fields="ELCODE;TIER")
    arcpy.PivotTable_management(freqTab, fields="ELCODE", pivot_field="TIER", value_field="FREQUENCY", out_table=pivotTab)
    
    # headsup: Unassigned is not a final tier, but leaving it here for intermediate product usage.
@@ -363,7 +364,7 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    #printMsg('Tier count fields joined to table %s.' %in_sumTab)
    
    portfolioTab = in_procEOs + '_portfolio'
-   arcpy.Frequency_analysis(in_procEOs, portfolioTab, frequency_fields="ELCODE", summary_fields="PORTFOLIO")
+   arcpy.Frequency_analysis("lyr_EO", portfolioTab, frequency_fields="ELCODE", summary_fields="PORTFOLIO")
    try:
       arcpy.DeleteField_management(in_sumTab, "PORTFOLIO")
    except:
@@ -1520,7 +1521,18 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       - NEW_EO: overwrite existing EO picks, but keep previous ConSite picks
       - NEW_CS: overwrite existing ConSite picks, but keep previous EO picks
       - UPDATE: Update portfolio but keep existing picks for both EOs and ConSites
+   For all but the “NEW” build option, manual overrides, specified in the “OVERRIDE” fields of the input EOs and 
+   ConSites, are implemented. OVERRIDE values are as follows:
+      -1: EO or ConSite is definitely not to be included in the portfolio (forced out).
+      1: EO or ConSite is definitely to be included in the portfolio (forced in).
+      0: No override (this is the default value).
+   It is recommended that you always first build a new portfolio. Then, the output Prioritized EOs and Prioritized 
+   Conservation Sites can be used as inputs for a portfolio update with overrides, producing new outputs. 
+      - Generally, only “Choice” (Now "High priority - EOs should have overrides applied. 
+      - In practice, manual overrides are expected to decrease efficiency and increase the number of sites and EOs in 
+      the portfolio, and should be used sparingly if at all.
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
+   # headsup: build types other than NEW are not advised. Need to update this and updatePortfolio functions (i.e. reset tiers) for those to work properly.
    '''
    # Important note: when using in_memory, the Shape_* fields do not exist. To get shape attributes, use e.g. 
    # !shape.area@squaremeters! for calculate field calls.
@@ -1561,6 +1573,11 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       arcpy.CalculateField_management(in_sortedEOs, "OVERRIDE", 0, "PYTHON_9.3")
       printMsg('Portfolio picks set to zero for EOs')
    else:
+      lyrEO = arcpy.MakeFeatureLayer_management(in_sortedEOs)
+      # Reset TIER for all ChoiceRANK = 5 to Unassigned, so that overrides work correctly.
+      arcpy.SelectLayerByAttribute_management(lyrEO, "NEW_SELECTION", "ChoiceRANK = 5")
+      arcpy.CalculateField_management(lyrEO, "TIER", "'Unassigned'")
+      del lyrEO
       arcpy.CalculateField_management(in_sortedEOs, "PORTFOLIO", "!OVERRIDE!", "PYTHON_9.3")
       printMsg('Portfolio overrides maintained for EOs')
 
@@ -1593,12 +1610,13 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       arcpy.CalculateField_management(eo_cs_stats, "CS_CONSVALUE", "!SUM_EO_CONSVALUE!", field_type="SHORT")
       arcpy.JoinField_management(eo_cs, cs_id, eo_cs_stats, cs_id, ["CS_CONSVALUE"])
       # Join conservation value to Sites
+      arcpy.DeleteField_management(in_ConSites, "CS_CONSVALUE")
       arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, cs_id, ["CS_CONSVALUE"])
       printMsg('CS_CONSVALUE field set')
       
       # Now add site info to EOs
       try:
-         arcpy.DeleteField_management(in_sortedEOs, ["CS_CONSVALUE", "CS_AREA_HA"])
+         arcpy.DeleteField_management(in_sortedEOs, ["CS_CONSVALUE", "CS_AREA_HA", "CS_SITEID", "CS_SITENAME"])
       except:
          pass
       joinTab = in_sortedEOs + '_csJoin'
@@ -1617,7 +1635,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
    
    # Generic workflow for each ranking factor: 
-   #  - set up where_clause for still un-ranked High Priority EOs, make a feature layer (lyr_EO)
+   #  - set up where_clause for still-Unassigned EOs, make a feature layer (lyr_EO)
    #  - add ranks for the ranking field
    #  - update slots based on ranks. This updates the PORTFOLIO field of EOs.
    #  - update portfolio. This updates Consites, adds EOs to portfolio as bycatch, updates sumTab, and returns an updated available slotDict.
@@ -1663,12 +1681,12 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       slotDict = updateSlots("lyr_EO", slotDict, "RANK_eoArea")
       slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
       
-   # TIER Finalization for Unassigned EOs: Portfolio=1 becomes High Priority, Portfolio=0 becomes General
+   # TIER Finalization for Unassigned EOs: Portfolio=1 becomes High Priority, Portfolio=0 (or -1 for overrides) becomes General
    # Prior to 2023, these EOs were considered "Choice" tier. 
    arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", "PORTFOLIO = 1 AND TIER = 'Unassigned'")
    printMsg("Updating " + str(countFeatures("lyr_EO")) + " unassigned EOs in portfolio to High Priority.")
    arcpy.CalculateField_management("lyr_EO", "TIER", "'High Priority'")
-   arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", "PORTFOLIO = 0 AND TIER = 'Unassigned'")
+   arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", "PORTFOLIO <= 0 AND TIER = 'Unassigned'")
    printMsg("Updating " + str(countFeatures("lyr_EO")) + " unassigned EOs not in portfolio to General.")
    arcpy.CalculateField_management("lyr_EO", "TIER", "'General'")
    
@@ -1738,9 +1756,9 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       SpatialJoin_byType(in_sortedEOs, in_ConSites, eo_cs, slopFactor)
    else:
       arcpy.JoinField_management(eo_cs, "SF_EOID", in_sortedEOs, "SF_EOID", ["FinalRANK"])
-   # Join final rank to EO/Site join table (generated earlier)
-   arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["FinalRANK", "MIN"]], cs_id)
+   # Join final rank to EO/Site join table (generated earlier for NEW builds)
    eo_cs_stats = scratchGDB + os.sep + "eo_cs_stats"
+   arcpy.Statistics_analysis(eo_cs, eo_cs_stats, [["FinalRANK", "MIN"]], cs_id)
    code_block = '''def fn(myMin):
       if myMin == 1:
          tier = "Irreplaceable"
@@ -1759,6 +1777,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # ECS_TIER
    arcpy.AddField_management(eo_cs_stats, "ECS_TIER", "TEXT", "", "", 20)
    arcpy.CalculateField_management(eo_cs_stats, "ECS_TIER", "fn(!MIN_FinalRANK!)", code_block=code_block)
+   arcpy.DeleteField_management(in_ConSites, ["MIN_FinalRANK", "ECS_TIER"])
    arcpy.JoinField_management(in_ConSites, cs_id, eo_cs_stats, cs_id, ["MIN_FinalRANK", "ECS_TIER"])
 
    # EEO_TIER
