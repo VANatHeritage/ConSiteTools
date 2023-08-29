@@ -2,7 +2,7 @@
 # Helper.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2017-08-08
-# Last Edit: 2023-02-09
+# Last Edit: 2023-08-29
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1063,8 +1063,7 @@ def SpatialCluster_GrpFld(inFeats, searchDist, fldGrpID='grpID', fldGrpBy=None, 
    return inFeats
 
 def flattenFeatures(inFeat, outFeat, sortBy, scratchGDB = None):
-   '''Eliminates overlaps in the Conservation Lands feature class. The BMI field is used for consolidation; better BMI ranks (lower numeric values) take precedence over worse ones.
-   
+   '''Eliminates overlaps in a polygon feature class.
    Parameters:
    - inFeat: Input feature class.
    - outConsLands: Output planar feature class.
