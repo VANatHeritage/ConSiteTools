@@ -10,7 +10,7 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 #### Version 2.3.6-dev
 
-- The `Calculate Biodiversity Rank` tool, and all tools in the `Conservation Portfolio Tools` toolset, can now accept multiple site types in a single run. Inputs no longer need to be parsed by site type. EOs will only be associated with ConSites with a matching site type, and vice versa.
+- Inputs no longer need to be parsed by site type in the `Calculate Biodiversity Rank` tool, and all tools in the `Conservation Portfolio Tools` toolset. PFs/EOs will only be associated with ConSites with a matching site type, and vice versa.
 - General-purpose function `flattenFeatures` added to replace `bmiFlatten`.
 
 #### Version 2.3

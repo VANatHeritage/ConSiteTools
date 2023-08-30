@@ -11,7 +11,7 @@
 
 # Import modules and functions
 from Helper import *
-from CreateConSites import ExtractBiotics, ParseSiteTypes
+from CreateConSites import ExtractBiotics  # , ParseSiteTypes
 arcpy.env.overwriteOutput = True
 
 ### HELPER FUNCTIONS ###
@@ -930,8 +930,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
    Sets up new ECS directory with necessary folders and input/output geodatabases. The input geodatabase is then
    populated with necessary inputs for ECS. If provided, the Element exclusion table, conservation lands, and
    eco-regions will be copied to the input geodatabase, and the bmiFlatten function is used to create 'flat'
-   conservation lands layer. If both are provided, ParseSiteTypes is used to create site-type feature classes from the
-   input PF and CS layers.
+   conservation lands layer.
    :param ecs_dir: ECS working directory
    :param in_conslands: source conservation lands feature class
    :param in_elExclude: list of source element exclusions tables (csv)
@@ -967,23 +966,22 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
       # These paramaters are optional in the python toolbox tool.
       printMsg("Skipping preparation for PFs and ConSites.")
    else:
-      # headsup: parsing by site type is no longer necessary for prioritization process as of v2.3.3,
-      #  but leaving it in as those layers may be conveinent to end users. Will not add those layers to map.
       if in_PF == "BIOTICS_DLINK.ProcFeats" and in_ConSites == "BIOTICS_DLINK.ConSites":
          # This will work with Biotics link layers.
          try:
             pf_out, cs_out = ExtractBiotics(in_PF, in_ConSites, ig)
          except:
-            printWrng("Error extracting data from Biotics. You will need to copy the PFs and ConSites (parsed by site type) to the ECS Input GDB.")
+            printWrng("Error extracting data from Biotics. You will need to copy the ProcFeat and ConSite layers to the ECS Input GDB.")
          else:
-            out = ParseSiteTypes(pf_out, cs_out, ig)
+            pass  # no longer need parsed layers
+            # out = ParseSiteTypes(pf_out, cs_out, ig)
       else:
          printMsg("Copying already-extracted Biotics data...")
          pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
          arcpy.CopyFeatures_management(in_PF, pf_out)
          cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
          arcpy.CopyFeatures_management(in_ConSites, cs_out)
-         out = ParseSiteTypes(pf_out, cs_out, ig)
+         # out = ParseSiteTypes(pf_out, cs_out, ig)  # no longer need parsed layers
       out_lyrs += [pf_out, cs_out]
    if len(in_elExclude) != 0:
       out = ig + os.sep + 'ElementExclusions'

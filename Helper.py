@@ -7,7 +7,6 @@
 
 # Summary:
 # A library of generally useful helper functions 
-
 # ----------------------------------------------------------------------------------------
 
 # Import modules

@@ -1,39 +1,38 @@
-# ---------------------------------------------------------------------------
-# RunWorkflow_Prioritize.py
-# Version:  ArcGIS Pro 3.x / Python 3.x
-# Creation Date: 2020-09-15
-# Last Edit: 2023-08-29
-# Creator:  Kirsten R. Hazler
+"""
+RunWorkflow_Prioritize.py
+Version:  ArcGIS Pro 3.x / Python 3.x
+Creation Date: 2020-09-15
+Last Edit: 2023-08-30
+Creator:  Kirsten R. Hazler, David Bucklin
 
-# Summary:
-# Workflow for all steps needed to prioritize Conservation Sites using a script rather than the ConSite Toolbox.
-# This script is intended for prioritization of Terrestrial Conservation Sites (TCS), Stream Conservation Sites (SCS),
-# and Karst Conservation Sites (KCS).
-
-# Usage:
-# - In the main function below, update input variables by specifying the correct file paths to ECS inputs. These include:
-   # - Path to the ECS working directory, to contain the run inputs and outputs, named to include a date tag, i.e., "ECS_Run_[MonthYear]". This will be created during execution if it doesn't exist.
-   # - ElementExclusions table(s) (get annually from biologists)
-   # - ConsLands feature class (get quarterly from Dave Boyd).
-   # - EcoRegions feature class (fairly static data; use the feature service or a copy of it)
-   # - Latest Procedural Feature and Conservation Site extracts from Biotics.
-   #     - For this script, you will need to run "1. Extract Biotics Data" in ArcPro. The outputs from that tool are the inputs to src_PF and src_CS.
-# The preparation function (MakeECSDir) will run a series of preliminary steps:
-   # Creates the ECS working directory.
-   #  - Creates a sub-directory to hold spreadsheets, i.e., "Spreadsheets_[MonthYear]"
-   #  - Creates an input geodatabase named ECS_Inputs_[MonthYear].gdb.
-   #  - Creates an output geodatabase named ECS_Outputs_[MonthYear].gdb.
-   #  - Imports required inputs into the INPUT geodatabase:
-   #     - Procedural features and Conservation Sites
-   #        - runs the "Parse site types" tool, copying pf* and cs* feature classes for each ConSite type.
-   #     - Element exclusion table(s)
-   #        - copies/creates ElementExclusions, running the MakeExclusionList function if multiple tables are provided.
-   #     - ConsLands feature class
-   #        - copies to: conslands and conslands_flat, running the bmiFlatten tool to make the flat version
-# - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. 
-#     If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
-# ---------------------------------------------------------------------------
-
+Summary:
+Workflow for all steps needed to prioritize Conservation Sites using a script rather than the ConSite Toolbox.
+This script is intended for prioritization of Terrestrial Conservation Sites (TCS), Stream Conservation Sites (SCS),
+and Karst Conservation Sites (KCS).
+Usage:
+   - In the main function below, update input variables by specifying the correct file paths to ECS inputs. These include:
+      - Path to the ECS directory, to contain the run inputs and outputs, named to include a date tag, i.e., "ECS_Run_[MonthYear]". This will be created during execution if it doesn't exist.
+      - ElementExclusions table(s) (get annually from biologists)
+      - ConsLands feature class (get quarterly from Dave Boyd).
+      - EcoRegions feature class (fairly static data; use the feature service or a copy of it)
+      - Latest Procedural Feature and Conservation Site extracts from Biotics.
+          - For this script, you will need to run "1. Extract Biotics Data" in ArcPro first. The outputs from that tool are the inputs to src_PF and src_CS.
+   The preparation function (MakeECSDir) will run a series of preliminary steps:
+      Creates the ECS directory (if it doesn't exist)
+       - Creates a sub-directory to hold spreadsheets, i.e., "Spreadsheets_[MonthYear]"
+       - Creates an input geodatabase named ECS_Inputs_[MonthYear].gdb.
+       - Creates an output geodatabase named ECS_Outputs_[MonthYear].gdb.
+       - Copies required inputs into the INPUT geodatabase:
+          - Procedural features and Conservation Sites (i.e. ProcFeats_[timestamp] and ConSites_[timestamp]. 
+                - simple copies (original names retained)
+          - Element exclusion table(s)
+             - copies to "ElementExclusions". When multiple tables are provided the MakeExclusionList function is used to merge them into a single table.
+          - ConsLands feature class
+             - copies to: "conslands" and "conslands_flat"
+   - IMPORTANT: Make sure to select the appropriate siteType(s) for the prioritization. Starting in ConSiteTools 2.3.5, multiple site types can be prioritized in a single run.
+   - Zip the entire working directory, naming it ECS_Run_[MonthYear].zip, and save the zip file here: I:\DATA_MGT\Quarterly Updates. 
+       If there are more than 4 such files, delete the oldest one(s) so that only the most recent 4 remain.
+"""
 # Import function libraries and settings
 from PrioritizeConSites import *
 
@@ -58,46 +57,46 @@ def main():
 
    # headsup: These will need updates every quarter, make sure to updates paths
    src_conslands = r'D:\projects\GIS_Data\conslands\conslands_lam221212\conslands_lam.shp'
-   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20221212_132348'
-   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20221212_132348'
+   src_PF = r'D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20230810_111403'
+   src_CS = r'D:\projects\ConSites\arc\Biotics_data.gdb\ConSites_20230810_111403'
    
-   # Input type of sites to run
-   types = ["TCS", "SCS"]  # ["TCS", "SCS", "KCS", "AHZ", "MACS"]
+   # Prepare ECS directory and inputs
+   in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_conslands, src_elExclude, src_PF, src_CS)
+   
+   # Input types of EOs/Sites to include in the prioritization
+   # Full list: ("TCS", "SCS", "KCS", "AHZ", "MACS")
+   siteTypes = ("TCS", "SCS")
    
    # Current year. This is used to define cutoff and flag years for EO selection.
    nowYear = datetime.now().year
    defaultYears = [['TCS', nowYear - 25, nowYear - 20],
-                    ['SCS', nowYear - 25, nowYear - 20],
-                    ['AHZ', nowYear - 25, nowYear - 20],
-                    ['KCS', nowYear - 40, nowYear - 35],
-                    ['MACS', nowYear - 25, nowYear - 20]]
-   cutFlagYears = [a for a in defaultYears if a[0] in types]
+                   ['SCS', nowYear - 25, nowYear - 20],
+                   ['KCS', nowYear - 40, nowYear - 35],
+                   ['AHZ', nowYear - 25, nowYear - 20],
+                   ['MACS', nowYear - 25, nowYear - 20]]
+   cutFlagYears = [a for a in defaultYears if a[0] in siteTypes]
    
    # Subset PFs to only include certain site type(s).
    ls = []
-   if "TCS" in types:
+   if "TCS" in siteTypes:
       ls.append("RULE IN ('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15')")
-   if "SCS" in types:
+   if "SCS" in siteTypes:
       ls.append("RULE IN ('SCS1', 'SCS2')")
-   if "AHZ" in types:
+   if "AHZ" in siteTypes:
       ls.append("RULE = 'AHZ'")
-   if "KCS" in types:
+   if "KCS" in siteTypes:
       ls.append("RULE = 'KCS'")
-   if "MACS" in types:
+   if "MACS" in siteTypes:
       ls.append("RULE = 'MACS'")
    query = " OR ".join(ls)
    printMsg("Selecting PFs using the query: " + query)
-   ## END HEADER ###
-
-   # Create ECS directory
-   in_GDB, out_GDB, out_DIR, out_lyrs = MakeECSDir(ecs_dir, src_conslands, src_elExclude, src_PF, src_CS)
    
    # Input PF/CS
    print([os.path.basename(o) for o in out_lyrs])
    pf_fc = [a for a in out_lyrs if os.path.basename(a).startswith("ProcFeats_")][0]
    cs_fc = [a for a in out_lyrs if os.path.basename(a).startswith("ConSites_")][0]
    in_pf = arcpy.MakeFeatureLayer_management(pf_fc, where_clause=query)
-   in_cs = cs_fc
+   in_cs = cs_fc  # CS are selected in BuildPortfolio to match the site types included in the EOs, so do not need to be subset here.
    
    # Input standard variables which are the same for all site types
    # No need to change this if in_GDB is valid and naming conventions maintained
@@ -117,6 +116,8 @@ def main():
    qcList_EOs = out_DIR + os.sep + 'qcList_EOs.xls'
    qcList_sites  = out_DIR + os.sep + 'qcList_sites.xls'
    
+   ## END HEADER ###
+
    ### Specify functions to run - no need to change these as long as all your input/output variables above are valid ###
    
    # Get timestamp

@@ -1,16 +1,18 @@
-# ---------------------------------------------------------------------------
-# RunWorkflow_Delineate.py
-# Version:  ArcGIS Pro 3.0.x / Python 3.x
-# Creation Date: 2020-06-03
-# Last Edit: 2022-11-04
-# Creator:  Kirsten R. Hazler
+"""
+RunWorkflow_Delineate.py
+Version:  ArcGIS Pro 3.0.x / Python 3.x
+Creation Date: 2020-06-03
+Last Edit: 2022-11-04
+Creator:  Kirsten R. Hazler, David Bucklin
 
-# Summary:
-# Workflow for all steps needed to delineate Conservation Sites using a script rather than the toolbox. This script is intended for statewide creation of Terrestrial Conservation Sites (TCS), Anthropogenic Habitat Zones (AHZ), Stream Conservation Units (SCU) and Stream Conservation Sites (SCS), but can also be used for subsets as desired. The user must update the script with user-specific file paths and options. 
+Summary: Workflow for all steps needed to delineate Conservation Sites using a script rather than the toolbox. This 
+script is intended for statewide creation of Terrestrial Conservation Sites (TCS), Anthropogenic Habitat Zones (AHZ), 
+Stream Conservation Units (SCU) and Stream Conservation Sites (SCS), but can also be used for subsets as desired. The 
+user must update the script with user-specific file paths and options. 
 
-# Data sources that are stored as online feature services must be downloaded to your local drive. Biotics data must be extracted and parsed from within ArcGIS, while on the COV network, using the ConSite Toolbox.
-# ---------------------------------------------------------------------------
-
+Data sources that are stored as online feature services must be downloaded to your local drive. Biotics data must be 
+extracted and parsed from within ArcGIS, while on the COV network, using the ConSite Toolbox. 
+"""
 # Import function libraries and settings
 from CreateConSites import *
 
@@ -20,7 +22,7 @@ def main():
    ### User-provided variables ###
    
    # Specify which site type(s) to run.
-   # Choices are: "TCS", "AHZ", "SCU", "SCS"
+   # Choices are: ("TCS", "AHZ", "SCS", "SCU")
    siteTypes = ("TCS")
 
    # Specify if you want QC process after site delineation.
