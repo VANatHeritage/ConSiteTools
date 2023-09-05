@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2023-07-06
+# Last Edit: 2023-09-05
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -1872,11 +1872,11 @@ def CreateConSites(in_SBB, in_PF, fld_SFID, in_ConSites, out_ConSites, site_Type
             counter +=1
             del myPS
             
-   # Update SITE_TYPE (for compatibility with B-rank tool)
+   # Update SITE_TYPE (for compatibility with B-rank tool). Note use of acronyms is for compatibility with AutoConSites Feature Service
    if site_Type == "AHZ":
-      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'Anthropogenic Habitat Zone'")
+      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'AHZ'")  # "'Anthropogenic Habitat Zone'")
    else:
-      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'Conservation Site'")
+      arcpy.CalculateField_management(out_ConSites, "SITE_TYPE", "'TCS'")  # "'Conservation Site'")
    
    tFinish = datetime.now()
    deltaString = GetElapsedTime (tStart, tFinish)

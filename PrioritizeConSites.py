@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-08-29
+# Last Edit: 2023-09-05
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -415,10 +415,13 @@ def AddTypes(in_lyr, cs_eo="CS"):
             return 'SCS'
          elif type == 'Conservation Site':
             return 'TCS'
+         else:
+            return type
       """
       arcpy.CalculateField_management(in_lyr, "SITE_TYPE_CS", "st(!SITE_TYPE!)", code_block=cb, field_type="TEXT")
    else:
       # Add site type(s) to EOs based on RULEs
+      # Note that any number-only rules are assumed to be TCS.
       cb = """def st(rule):
          ls = list(set(rule.split(',')))
          rules = []
@@ -445,7 +448,7 @@ def SpatialJoin_byType(inEO, inCS, outSJ, slopFactor="15 Meters"):
    :param inCS: Input ConSites. The SITE_TYPE_CS field must exist (see AddTypes)
    :param outSJ: Output spatial join layer
    :param slopFactor: Maximum distance allowable between features for them to still be considered coincident
-   :return: 
+   :return: EO feature class with site information joined
    """
    scratchGDB = "memory"  # headsup: in_memory caused issues here in ArcGIS Pro 3.1.2 (in getBRANK only when the brank function also used in_memory as scratchGDB).
    printMsg("Spatial joining EOs to ConSites, by site type...")
@@ -638,9 +641,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = scratchGDB + os.sep + "EOs"
    dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "ELEMENT_EOS"]
-   # arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"]], "MULTI_PART")
    arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"], ["RULE", "CONCATENATE"]], "MULTI_PART", concatenation_separator=",")
-   # Add site type(s) to EOs based on RULEs
+   # Add SITE_TYPE_EO to EOs based on RULE
    AddTypes(in_EOs, "EO")
    
    ### For the EOs, calculate the IBR (individual B-rank)
@@ -751,7 +753,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
       printMsg("SITEID field not found or not populated. Using OID as unique identifier instead.")
    tmpSites = scratchGDB + os.sep + "tmpSites"
    arcpy.management.CopyFeatures(in_ConSites, tmpSites)
-   AddTypes(tmpSites)  # used in SpatialJoin_byType
+   AddTypes(tmpSites)  # Adds SITE_TYPE_CS, used in SpatialJoin_byType
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
    arcpy.management.AddField(tmpSites, "AUTO_BRANK", "TEXT", field_length=2)

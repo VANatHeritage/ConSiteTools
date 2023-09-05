@@ -1,11 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.3.6-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.3.7-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-08-29
+# Last Edit: 2023-09-05
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -929,8 +929,7 @@ class create_sbb(object):
       # Run the function
       getViewExtent()
       CreateSBBs(in_PF, fld_SFID, fld_Rule, fld_Buff, in_nwi, out_SBB, scratchParm)
-      arcpy.MakeFeatureLayer_management(out_SBB, "SBB_lyr")
-      arcpy.env.extent = "MAXOF"
+      parameters[5].value = out_SBB
 
       return out_SBB
       
@@ -1002,8 +1001,7 @@ class expand_sbb(object):
       # Run the function
       getViewExtent()
       ExpandSBBs(in_Cores, in_SBB, in_PF, joinFld, out_SBB, scratchParm)
-      arcpy.MakeFeatureLayer_management(out_SBB, "SBB_lyr")
-      arcpy.env.extent = "MAXOF"
+      parameters[4].value = out_SBB
       
       return out_SBB
       
@@ -1166,7 +1164,8 @@ class create_consite(object):
             getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
          except:
             printWrng("Sites created, but there was an error while calculating B-ranks.")
-
+      
+      parameters[8].value = out_ConSites
       return out_ConSites
 
 # SCS Delineation Tools              
@@ -1420,12 +1419,7 @@ class lines_scs(object):
       (scsLines, lyrDownTrace, lyrUpTrace, lyrTidalTrace) = CreateLines_scs(in_Points, in_downTrace, in_upTrace, in_tidalTrace, out_Lines, fld_Tidal, scratchParm)
           
       # Update the derived parameters.
-      # This enables layers to be displayed automatically if running tool from ArcMap.
       parameters[1].value = out_Lines
-      parameters[2].value = lyrDownTrace
-      parameters[3].value = lyrUpTrace
-      parameters[4].value = lyrTidalTrace
-      
       return scsLines
 
 class sites_scs(object):
@@ -1537,7 +1531,6 @@ class sites_scs(object):
       trim = "true"
       scsPolys = DelinSite_scs(in_PF, in_Lines, in_Catch, in_hydroNet, in_ConSites, out_ConSites, in_FlowBuff, fld_Rule, trim, buffDist, scratchParm)
       arcpy.env.extent = "MAXOF"
-      parameters[2].value = out_ConSites
       
       # Calculate B-ranks
       if brank == "true":
@@ -1546,6 +1539,8 @@ class sites_scs(object):
             getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
          except:
             printWrng("Sites created, but there was an error calculating B-ranks.")
+      
+      parameters[2].value = out_ConSites
       return scsPolys
       
 # Conservation Portfolio Tools
