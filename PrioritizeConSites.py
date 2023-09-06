@@ -11,7 +11,7 @@
 
 # Import modules and functions
 from Helper import *
-from CreateConSites import ExtractBiotics  # , ParseSiteTypes
+from CreateConSites import ExtractBiotics
 arcpy.env.overwriteOutput = True
 
 ### HELPER FUNCTIONS ###
@@ -402,8 +402,8 @@ def AddTypes(in_lyr, cs_eo="CS"):
    :param cs_eo: Whether input is sites (default) or EOs.
    :return: in_lyr
    """
-   printMsg("Adding site types...")
    if cs_eo == "CS":
+      printMsg("Adding site types...")
       cb = """def st(type):
          if type == 'Anthropogenic Habitat Zone':
             return 'AHZ'
@@ -420,6 +420,7 @@ def AddTypes(in_lyr, cs_eo="CS"):
       """
       arcpy.CalculateField_management(in_lyr, "SITE_TYPE_CS", "st(!SITE_TYPE!)", code_block=cb, field_type="TEXT")
    else:
+      printMsg("Adding site types to EOs...")
       # Add site type(s) to EOs based on RULEs
       # Note that any number-only rules are assumed to be TCS.
       cb = """def st(rule):
@@ -650,8 +651,8 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    arcpy.AddField_management(in_EOs, "IBR", "TEXT", 3)
    # Searches elcodes for "CEGL" so it can treat communities a little differently than species.
    # Should it do the same for "ONBCOLONY" bird colonies?
-   # Includes exceptions for "only known occurrence of element", which will return a "[B-rank]E" rank. This exception excludes Healthy Waters EOs ("CAQU").
-   # headsup: can uncomment section with endemic/1 eo B1E exception, once ready.
+   # headsup: Includes the (currently disabled) exception for "only known occurrence of element", which will 
+   #  return a "[B-rank]E" rank for the EO. This exception excludes aquatic community EOs ("CAQU").
    codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode, endem, numeo):
       if eorank == "A":
          if grank == "G1":
@@ -737,9 +738,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    ### For the ConSites, calculate the B-rank and flag if it conflicts with previous B-rank
    arcpy.DeleteField_management(in_ConSites, ["tmpID", "IBR_SUM", "IBR_MAX", "AUTO_BRANK_COMMENT", "AUTO_BRANK", "FLAG_BRANK"])
 
-   # Calculate B-rank scores 
-   printMsg('Calculating biodiversity rank sums and maximums...')
-   # arcpy.MakeFeatureLayer_management(in_EOs, "eo_lyr")
+   # Add B-rank fields 
    oid_nm = GetFlds(in_ConSites, oid_only=True)
    arcpy.management.CalculateField(in_ConSites, "tmpID", "str(!" + oid_nm + "!)")
    fld_ID = "tmpID"
@@ -770,6 +769,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    arcpy.MakeFeatureLayer_management(eoSite, "eo_lyr")
    
    # Summarize sum, max, and ranks of best-ranked EOs
+   printMsg("Calculating sum and max of EOs by site...")
    with arcpy.da.UpdateCursor(tmpSites, ["SHAPE@", fld_ID, "IBR_SUM", "IBR_MAX", "AUTO_BRANK_COMMENT"]) as cursor:
       for row in cursor:
          # myShp = row[0]
@@ -868,22 +868,15 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    arcpy.management.DeleteField(in_ConSites, "tmpID")
    
    if flag:
-      printMsg('Calculating flag status...')
-      codeblock = '''def flag(brank, auto_brank):
-         if auto_brank == None:
-            return 1
-         elif brank == auto_brank:
-            return 0
-         else:
-            return 1'''
       if "BRANK" in oldFlds:
-         expression = "flag(!BRANK!, !AUTO_BRANK!)"
-         arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, "PYTHON3", codeblock, "SHORT")
+         printMsg('Calculating flag status...')
+         expression = "int(!BRANK![1]) - int(!AUTO_BRANK![1])"
+         arcpy.management.CalculateField(in_ConSites, "FLAG_BRANK", expression, field_type="SHORT")
       else:
          printMsg("No existing B-ranks available for comparison.")
 
    if len(failList) > 0:
-      printMsg("Processing incomplete for some sites %s"%failList)
+      printWrng("No associated EOs found for some sites: %s"%failList)
    printMsg('Finished.')
    return (in_ConSites)
 
