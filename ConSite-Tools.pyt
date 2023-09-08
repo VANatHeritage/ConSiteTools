@@ -1090,7 +1090,7 @@ class create_consite(object):
       
       parm09 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
-      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", False)
+      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", True)
       parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
       parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09, parm10, parm11]
@@ -1481,7 +1481,7 @@ class sites_scs(object):
       parm9.filter.type = "ValueList"
       parm9.filter.list = ["SCS", "SCU"]
       
-      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", False)
+      parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", True)
       parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
       parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9, parm10, parm11]
