@@ -1091,9 +1091,9 @@ class create_consite(object):
       parm09 = defineParam("scratch_GDB", "Scratch Geodatabase", "DEWorkspace", "Optional", "Input")
       
       parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", True)
-      parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
+      # parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09, parm10, parm11]
+      parms = [parm00, parm01, parm02, parm03, parm04, parm05, parm06, parm07, parm08, parm09, parm10]
       return parms
 
    def isLicensed(self):
@@ -1118,10 +1118,6 @@ class create_consite(object):
             parameters[7].enabled = 0
             parameters[7].parameterType = "Optional"
             parameters[8].value = "consites_ahz"
-      if parameters[10].value:
-         parameters[11].enabled = True
-      else:
-         parameters[11].enabled = False
       return
 
    def updateMessages(self, parameters):
@@ -1161,7 +1157,7 @@ class create_consite(object):
       if brank == "true":
          printMsg("Calculating B-ranks...")
          try:
-            getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
+            getBRANK(in_PF, out_ConSites, flag=False)
          except:
             printWrng("Sites created, but there was an error while calculating B-ranks.")
       
@@ -1482,9 +1478,9 @@ class sites_scs(object):
       parm9.filter.list = ["SCS", "SCU"]
       
       parm10 = defineParam("brank", "Calculate biodiversity ranks for output sites?", "Boolean", "Required", "Input", True)
-      parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
+      # parm11 = defineParam("slopFactor", "Biodiversity rank search distance", "GPLinearUnit", "Required", "Input", "15 Meters")
 
-      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9, parm10, parm11]
+      parms = [parm0, parm1, parm2, parm3, parm4, parm5, parm6, parm7, parm8, parm9, parm10]
       
       return parms
 
@@ -1501,10 +1497,6 @@ class sites_scs(object):
             parameters[2].value = "consites_scu"
          else:
             parameters[2].value = "consites_scs"
-      if parameters[10].value:
-         parameters[11].enabled = True
-      else:
-         parameters[11].enabled = False
       return
 
    def updateMessages(self, parameters):
@@ -1536,7 +1528,7 @@ class sites_scs(object):
       if brank == "true":
          printMsg("Calculating B-ranks...")
          try:
-            getBRANK(in_PF, out_ConSites, slopFactor, flag=False)
+            getBRANK(in_PF, out_ConSites, flag=False)
          except:
             printWrng("Sites created, but there was an error calculating B-ranks.")
       
@@ -1616,14 +1608,14 @@ class attribute_eo(object):
       # parm07 = defineParam("out_procEOs", "Output Attributed EOs", "DEFeatureClass", "Required", "Output", "attribEOs")
       # parm08 = defineParam("out_sumTab", "Output Element Portfolio Summary Table", "DETable", "Required", "Output", "elementSummary")
       
-      # option1. This parameter allows user to enter site type / cutoff year / flag year combinations. Likely unnecessary.
+      # This parameter would allow user to enter site type / cutoff year / flag year combinations. Decided not to use.
       # parm07 = defineParam("typesYears", "Include PFs for the following site type(s):", "GPValueTable", "Required", "Input", multiVal=True)
       # parm07.columns = [['GPString', 'Site Type'], ['GPLong', 'Cutoff observation year'], ['GPLong', 'Flag observation year']]
       # parm07.filters[0].type = "ValueList"
       # parm07.values = [['TCS', datetime.now().year - 25, datetime.now().year - 20], ['SCS', datetime.now().year - 25, datetime.now().year - 20]]
       # parm07.filters[0].list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
       
-      # option2. This parameter allows user to select site types. Cutoff and flag years are fixed (see defaultYears)
+      # This parameter allows user to select site types. Cutoff and flag years are fixed (see execute(), defaultYears object)
       parm07 = defineParam("typesList", "Attribute EOs associated with the following site type(s):", "GPString", "Required", "Input", ["TCS", "SCS"], multiVal=True)
       parm07.filter.type = "ValueList"
       parm07.filter.list = ['TCS', 'SCS', 'KCS', 'MACS', 'AHZ']
@@ -1722,7 +1714,6 @@ class attribute_eo(object):
       procLyr = arcpy.MakeFeatureLayer_management(in_ProcFeats, where_clause=query)
 
       # Run function
-      # AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutYear, flagYear, out_procEOs, out_sumTab)
       AttributeEOs(procLyr, in_elExclude, in_consLands, in_consLands_flat, in_ecoReg, cutFlagYears, out_procEOs, out_sumTab)
       replaceLayer(out_procEOs)
       replaceLayer(out_sumTab)
