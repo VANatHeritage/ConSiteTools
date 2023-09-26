@@ -6,9 +6,9 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-09-11):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-09-26):
 
-#### Version 2.3.9-dev
+#### Version 2.4
 
 - VNHP began use of the automated biodiversity significance rank tool for site B-rank assignment. The setting was changed so that B-ranks are calculated in site delineation tools by default.
 - All Conservation Portfolio tools, and the "Calculate Biodiversity Rank" tool inputs no longer require inputs to be parsed by site type. PFs/EOs will only be associated with ConSites with a matching site type and within the search distance, and vice versa.
