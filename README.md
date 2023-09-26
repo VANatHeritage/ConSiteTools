@@ -10,7 +10,7 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 #### Version 2.3.9-dev
 
-- VNHP began use of the automated biodiversity significance rank tool for site B-rank assignment. Changed the default setting so that B-ranks are calculated in site delineation tools.
+- VNHP began use of the automated biodiversity significance rank tool for site B-rank assignment. The setting was changed so that B-ranks are calculated in site delineation tools by default.
 - All Conservation Portfolio tools, and the "Calculate Biodiversity Rank" tool inputs no longer require inputs to be parsed by site type. PFs/EOs will only be associated with ConSites with a matching site type and within the search distance, and vice versa.
 - General-purpose function `flattenFeatures` added to replace `bmiFlatten`.
 

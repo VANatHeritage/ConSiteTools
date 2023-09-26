@@ -1824,8 +1824,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ]
    
    # coulddo: not currently used. This would update all ranking fields using same ranking as before, but for ALL eligible EOs. 
-   #  These are used to provide a unique numeric rank for ALL EOs, by element. Note that rankings are sorta slow.
-   #  Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
+   #  The rankings are then used to provide a unique numeric rank ("EO Importance"), both overall and by eco-region. 
+   #  Note that rankings are sorta slow. Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
    if eoImportance:
       printMsg("Re-calculating rank fields for all eligible EOs...")
       rankLayer = arcpy.MakeFeatureLayer_management(in_sortedEOs, where_clause="FinalRANK <> 6")
@@ -1923,18 +1923,13 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
       printMsg("Spatial joining...")
       arcpy.SpatialJoin_analysis("lyr_EO", dissBnds, sjEOs, "JOIN_ONE_TO_MANY", "KEEP_COMMON", "", "WITHIN_A_DISTANCE", slopFactor)
    
-   # Export the table from the spatial join. This appears to be necessary for summary statistics to work. Why?
-   printMsg("Exporting spatial join table...")
-   sjTab = scratchGDB + os.sep + "sjTab"
-   arcpy.TableToTable_conversion(sjEOs, scratchGDB, "sjTab")
-   
    # Compute the summary stats
    printMsg("Computing summary statistics...")
    sumTab = scratchGDB + os.sep + "sumTab"
    fld_ID_sep = ";".join(fld_ID)
    caseFields = "%s;ELCODE;SNAME;RNDGRNK"%fld_ID_sep
    statsList = [["FinalRANK", "MIN"],["EO_MODRANK", "MIN"]]
-   arcpy.Statistics_analysis(sjTab, sumTab, statsList, caseFields)
+   arcpy.Statistics_analysis(sjEOs, sumTab, statsList, caseFields)
    
    # Add and calculate a EEO_TIER field
    printMsg("Calculating EEO_TIER field...")
@@ -1961,6 +1956,7 @@ def BuildElementLists(in_Bounds, fld_ID, in_procEOs, in_elementTab, out_Tab, out
    
    # Add and calculate an ALL_IN field
    # This indicates if the boundary contains all of the state's viable example(s) of an Element
+   # NOTE: a boundary only needs to be associated with at least part of each of the element's EO, in order for this to return "1". The element could still be associated with other boundaries. 
    printMsg("Calculating ALL_IN field...")
    arcpy.AddField_management(sumTab, "ALL_IN", "SHORT")
    codeblock = '''def allIn(elcode, frequency, viableDict):
