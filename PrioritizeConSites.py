@@ -308,7 +308,7 @@ def updateSlots(in_procEOs, slotDict, rankFld):
    slotDict = {key: val for key, val in slotDict.items() if val != 0}  # this can be used in updatePortfolio, so that by-catch selection is limited to Elements with open slots
    return slotDict
 
-def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS", slotDict=None):
+def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS", slotDict=None, bycatch=True):
    '''A helper function called by BuildPortfolio. Selects ConSites intersecting EOs in the EO portfolio, and adds them to the ConSite portfolio. Then selects "High Priority" EOs intersecting ConSites in the portfolio, and adds them to the EO portfolio (bycatch). Finally, updates the summary table to indicate how many EOs of each element are in the different tier classes, and how many are included in the current portfolio.
    Parameters:
    - in_procEOs: input feature class of processed EOs (i.e., out_procEOs from the AttributeEOs function, further processed by the ScoreEOs function)
@@ -316,6 +316,7 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    - in_sumTab: input table summarizing number of included EOs per element (i.e., out_sumTab from the AttributeEOs function).
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    - slotDict: dictionary relating elcode to available slots (optional). If provided, the bycatch procedure will be limited to EOs for elements with open slots.
+   - bycatch: Whether to add unassigned EOs intersecting portfolio ConSites to the portfolio.
    '''
    # Loop over site types
    st = unique_values(in_ConSites, "SITE_TYPE_CS")
@@ -329,23 +330,41 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
       arcpy.SelectLayerByLocation_management("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
       arcpy.CalculateField_management("lyr_CS", "PORTFOLIO", 1, "PYTHON_9.3")
       arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
-      # printMsg('ConSites portfolio updated')
-      
-      # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
-      if slotDict is not None:
-         # when slotDict provided, only select EOs for elements with open slots
-         elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
-         where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
-      else:
-         where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
-      arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
-      where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
-      arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-      arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
-      arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
-      arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
-      # printMsg('EOs portfolio updated')
-   
+      if bycatch:
+         # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
+         if slotDict is not None:
+            # when slotDict provided, only select EOs for elements with open slots
+            elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
+            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
+         else:
+            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
+         arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
+         where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
+         arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
+         arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
+         # headsup: below will remove bycatch selections if it is >open slots for the Element. This should ensure that portfolio cannot exceed target via bycatch.
+         if slotDict is not None:
+            # Find ELCODES to exclude from bycatch update (where more are selected than open slots)
+            arcpy.Statistics_analysis("lyr_EO", "in_memory/eo_ct", [["ELCODE", "UNIQUE"]], "ELCODE")
+            byDict = TabToDict("in_memory/eo_ct", "ELCODE", "FREQUENCY")
+            rm = []
+            for b in byDict:
+               if byDict[b] > slotDict[b]:
+                  rm.append(b)
+            if len(rm) > 0:
+               query = "ELCODE IN ('" + "','".join(rm) + "')"
+               printMsg(query)
+               arcpy.SelectLayerByAttribute_management("lyr_EO", "REMOVE_FROM_SELECTION", query)
+         # Update (remaining) selected EOs
+         if countSelectedFeatures("lyr_EO") > 0:
+            arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
+            arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
+   # Update sumTab and slotDict
+   updateStatus(in_procEOs, in_sumTab)
+   slotDict = buildSlotDict(in_sumTab)
+   return slotDict
+
+def updateStatus(in_procEOs, in_sumTab):
    # Fill in counter fields
    printMsg('Summarizing portfolio status...')
    freqTab = in_procEOs + '_freq'
@@ -370,10 +389,7 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    except:
       pass
    arcpy.JoinField_management(in_sumTab, "ELCODE", portfolioTab, "ELCODE", "PORTFOLIO")
-   #printMsg('Field "PORTFOLIO" joined to table %s.' %in_sumTab)
-   
-   slotDict = buildSlotDict(in_sumTab)
-   return slotDict
+   return in_sumTab
 
 def buildSlotDict(in_sumTab):
    '''Creates a data dictionary relating ELCODE to available slots, for elements where portfolio targets are still not met
@@ -1623,9 +1639,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       NullToZero(in_sortedEOs, "CS_CONSVALUE")  # fill in zeros to avoid issues with NULLs when used for ranking
    
    # PORTFOLIO UPDATES
-   
-   # Update the portfolio, returning updated slotDict
-   slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab)
+   # Update the portfolio (no bycatch, just add EOs and ConSites). This is needed to initiate the slotDict.
+   slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, bycatch=False)
+   # Now that slotDict is initiated, update with bycatch
+   slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
    
    # Generic workflow for each ranking factor: 
    #  - set up where_clause for still-Unassigned EOs, make a feature layer (lyr_EO)
