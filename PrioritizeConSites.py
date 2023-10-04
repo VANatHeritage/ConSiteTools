@@ -648,7 +648,13 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    - flag = Boolean, whether to add FLAG_BRANK, indicating difference from previous B-rank. This was added so it could 
       be set to False when this function is used directly in the "Create [ConSite]" tools.
    '''
-   # see SpatialJoin_byType for note on scratchGDB
+   
+   # in_PF=r"D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20230913_103746"
+   # in_ConSites=r"D:\projects\ConSites\arc\projects\ConSiteTools_v2.4dev\ConSiteTools_v2.4dev.gdb\nhf_hexes_VA_testingsub"
+   # slopFactor="15 Meters"
+   # flag=True
+
+   # see SpatialJoin_byType for note on scratchGDB. Do not set to "memory" below.
    scratchGDB = "in_memory"
    printMsg("Selecting PFs intersecting sites...")
    pf_lyr = arcpy.MakeFeatureLayer_management(in_PF)
@@ -767,8 +773,9 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    if fld_ID == "tmpID":
       printMsg("SITEID field not found or not populated. Using OID as unique identifier instead.")
    tmpSites = scratchGDB + os.sep + "tmpSites"
-   arcpy.management.CopyFeatures(in_ConSites, tmpSites)
-   AddTypes(tmpSites)  # Adds SITE_TYPE_CS, used in SpatialJoin_byType
+   arcpy.ExportFeatures_conversion(in_ConSites, tmpSites)
+   if "SITE_TYPE" in GetFlds(tmpSites):
+      AddTypes(tmpSites)  # Adds SITE_TYPE_CS, used in SpatialJoin_byType
    arcpy.management.AddField(tmpSites, "IBR_SUM", "LONG")
    arcpy.management.AddField(tmpSites, "IBR_MAX", "LONG")
    arcpy.management.AddField(tmpSites, "AUTO_BRANK", "TEXT", field_length=2)
@@ -778,9 +785,18 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    dt = time.strftime('%Y-%m-%d')
    date_text = "[" + dt + "]:"
    
-   # Handle multiple site types
+   # Spatial Join EO/input boundaries
    eoSite = scratchGDB + os.sep + "eoSite"
-   SpatialJoin_byType(in_EOs, tmpSites, eoSite, slopFactor)
+   if "SITE_TYPE_CS" in GetFlds(tmpSites):
+      # Handle multiple site types
+      SpatialJoin_byType(in_EOs, tmpSites, eoSite, slopFactor)
+   else:
+      printMsg("Input boundaries are not sites. Running standard spatial join.")
+      # headsup: use of "memory" below is to avoid a bug were IDs end up NULL for spatial joins run in in_memory workspace (as of Pro 3.1.3)
+      arcpy.SpatialJoin_analysis(in_EOs, tmpSites, "memory/eoSite", "JOIN_ONE_TO_MANY", 
+                                 "KEEP_COMMON", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
+      arcpy.ExportFeatures_conversion("memory/eoSite", eoSite)
+   
    # Make layer
    arcpy.MakeFeatureLayer_management(eoSite, "eo_lyr")
    
@@ -1822,6 +1838,21 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    # Field: EEO_SUMMARY (EO counts by tier in ConSites; text summary column)
    tierSummary(in_ConSites, "SITEID", in_sortedEOs, summary_type="Text", out_field="EEO_SUMMARY", slopFactor=slopFactor)
    
+   # Update sumTab to indicate portfolio target met
+   codeblock = '''def fn(t, p):
+      if t is not None:
+         if p > t:
+            return "Target exceeded"
+         elif p == t:
+            return "Target met"
+         else:
+            return "Target not met"
+      else:
+         return "N/A"
+   '''
+   arcpy.AddField_management(in_sumTab, "STATUS", "TEXT", field_length=30, field_alias="Target status")
+   arcpy.CalculateField_management(in_sumTab, "STATUS", "fn(!TARGET!, !PORTFOLIO!)", code_block=codeblock)
+   
    # Create final outputs
    # Set up rank/sorting fields
    fldList = [
@@ -1840,7 +1871,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ["PORTFOLIO", "DESCENDING"]
    ]
    
-   # coulddo: not currently used. This would update all ranking fields using same ranking as before, but for ALL eligible EOs. 
+   # coulddo: not currently used and unlikely to implement. This would update all ranking fields using same ranking as before, but for ALL eligible EOs. 
    #  The rankings are then used to provide a unique numeric rank ("EO Importance"), both overall and by eco-region. 
    #  Note that rankings are sorta slow. Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
    if eoImportance:

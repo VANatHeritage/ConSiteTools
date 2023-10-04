@@ -111,4 +111,4 @@ Updated toolbox to work with ArcGIS Pro, and implemented some algorithmic change
 #### Version 1.0
 This was the version used for the first major overhaul/replacement of Terrestrial Conservation Sites and Anthropomorphic Habitat Zones, starting in 2018.
 
-For more information, contact Kirsten Hazler at kirsten.hazler@dcr.virginia.gov
+For more information, contact [David Bucklin](mailto:david.bucklin@dcr.virginia.gov), Virginia Natural Heritage Program.
