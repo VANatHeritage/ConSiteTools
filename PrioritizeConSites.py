@@ -648,12 +648,6 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    - flag = Boolean, whether to add FLAG_BRANK, indicating difference from previous B-rank. This was added so it could 
       be set to False when this function is used directly in the "Create [ConSite]" tools.
    '''
-   
-   # in_PF=r"D:\projects\ConSites\arc\Biotics_data.gdb\ProcFeats_20230913_103746"
-   # in_ConSites=r"D:\projects\ConSites\arc\projects\ConSiteTools_v2.4dev\ConSiteTools_v2.4dev.gdb\nhf_hexes_VA_testingsub"
-   # slopFactor="15 Meters"
-   # flag=True
-
    # see SpatialJoin_byType for note on scratchGDB. Do not set to "memory" below.
    scratchGDB = "in_memory"
    printMsg("Selecting PFs intersecting sites...")

@@ -8,6 +8,13 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 ### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-09-26):
 
+#### Version 2.4.x-dev
+
+Prioritization tools:
+- updated tier assignment, so that inclusion of EOs via bycatch will only be used if it does not result in the target being exceeded. Added a STATUS attribute to the element table to indicate portfolio status.
+- tweaked B-rank tool to allow other boundary polygons to be used
+
+
 #### Version 2.4
 
 - VNHP began use of the automated biodiversity significance rank tool for site B-rank assignment. The setting was changed so that B-ranks are calculated in site delineation tools by default.
