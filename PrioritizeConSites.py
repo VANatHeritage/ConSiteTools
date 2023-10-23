@@ -2,7 +2,7 @@
 # EssentialConSites.py
 # Version:  ArcGIS Pro 3.x / Python 3.x
 # Creation Date: 2018-02-21
-# Last Edit: 2023-09-05
+# Last Edit: 2023-10-23
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -260,10 +260,15 @@ def updateSlots(in_procEOs, slotDict, rankFld):
    - rankFld: the ranking field used to determine which record(s) should fill the available slots
    
    Same basic workflow as updateTiers, except this function updates PORTFOLIO, and does not set lower-ranked rows to General.
-   headsup: this uses pandas data frames, which are WAY faster than ArcGIS table queries.
+   This uses pandas data frames, which are WAY faster than ArcGIS table queries.
+   updates:
+      - Oct 2023: when an EO is lower-ranking than other EOs which exceed the number of open slots, they are set to OVERRIDE = -2. 
+      This excludes those EOs from subsequent rankings.
    '''
    printMsg("Updating portfolio using " + rankFld + "...")
-   df = fc2df(in_procEOs, ["ELCODE", "TIER", "SF_EOID", "PORTFOLIO", rankFld])
+   # in_procEOs = arcpy.MakeFeatureLayer_management(in_procEOs, where_clause="OVERRIDE > -1")  
+   # Note: above is used to exclude lower-ranking EOs identified in a prior ranking. Not necessary if input layer is aready filtered (the current approach).
+   df = fc2df(in_procEOs, ["ELCODE", "TIER", "SF_EOID", "PORTFOLIO", "OVERRIDE", rankFld])
    
    for elcode in slotDict:
       availSlots = slotDict[elcode]
@@ -292,16 +297,22 @@ def updateSlots(in_procEOs, slotDict, rankFld):
             break
          else:
             #printMsg('Unable to differentiate; moving on to next criteria.')
+            # headsup: this sets lower-ranking EOs OVERRIDE to -2, so they are not part of subsequent rankings. These will be assigned General tier.
+            where_clause = "ELCODE=='%s' & TIER=='Unassigned' & PORTFOLIO==0 & %s > %s" % (elcode, rankFld, str(rnks[r-1]))
+            q2 = df.query(where_clause)
+            df.loc[df["SF_EOID"].isin(list(q2["SF_EOID"])), ["OVERRIDE"]] = -2
             break
       # Update dictionary
       slotDict[elcode] = availSlots
    
    # Now update the portfolio in the original table using the pandas data frame
-   with arcpy.da.UpdateCursor(in_procEOs, ["SF_EOID", "PORTFOLIO"]) as curs:
+   with arcpy.da.UpdateCursor(in_procEOs, ["SF_EOID", "PORTFOLIO", "OVERRIDE"]) as curs:
       for row in curs:
          id = row[0]
-         val = df.query("SF_EOID == " + str(id)).iloc[0]["PORTFOLIO"]
-         row[1] = val
+         val = df.query("SF_EOID == " + str(id)).iloc[0]
+         row[1] = val["PORTFOLIO"]
+         if val["OVERRIDE"] == -2:
+            row[2] = -2
          curs.updateRow(row)
    
    # remove keys with no open slots
@@ -323,9 +334,9 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    printMsg("Updating ConSite and EO portfolio...")
    for s in st:
       # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
-      where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND (ChoiceRANK <= 4 OR PORTFOLIO = 1) AND OVERRIDE <> -1"
+      where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND (ChoiceRANK <= 4 OR PORTFOLIO = 1) AND OVERRIDE > -1"
       arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
-      where_clause = "SITE_TYPE_CS = '" + s + "' AND OVERRIDE <> -1"
+      where_clause = "SITE_TYPE_CS = '" + s + "' AND OVERRIDE > -1"
       arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
       arcpy.SelectLayerByLocation_management("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
       arcpy.CalculateField_management("lyr_CS", "PORTFOLIO", 1, "PYTHON_9.3")
@@ -335,9 +346,9 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
          if slotDict is not None:
             # when slotDict provided, only select EOs for elements with open slots
             elcodes = [key for key, val in slotDict.items() if val != 0] + ['bla']  # adds dummy value so that where_clause will be valid with an empty slotDict
-            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
+            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE > -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
          else:
-            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE <> -1"
+            where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE > -1"
          arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
          where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
          arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
@@ -353,7 +364,6 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
                   rm.append(b)
             if len(rm) > 0:
                query = "ELCODE IN ('" + "','".join(rm) + "')"
-               printMsg(query)
                arcpy.SelectLayerByAttribute_management("lyr_EO", "REMOVE_FROM_SELECTION", query)
          # Update (remaining) selected EOs
          if countSelectedFeatures("lyr_EO") > 0:
@@ -369,7 +379,7 @@ def updateStatus(in_procEOs, in_sumTab):
    printMsg('Summarizing portfolio status...')
    freqTab = in_procEOs + '_freq'
    pivotTab = in_procEOs + '_pivot'
-   arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", "OVERRIDE <> -1")
+   arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", "OVERRIDE <> -1")  # headsup: this will include OVERRIDE = -2 EOs (as intended).
    arcpy.Frequency_analysis("lyr_EO", freqTab, frequency_fields="ELCODE;TIER")
    arcpy.PivotTable_management(freqTab, fields="ELCODE", pivot_field="TIER", value_field="FREQUENCY", out_table=pivotTab)
    
@@ -722,8 +732,9 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
                b = "BU"
       else:
          b = "BU"
-      # if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
-      #    b = "B1E"
+      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
+         # b = "B1E"
+         b+="E"
       return b
    '''
    expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
@@ -733,17 +744,17 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    printMsg('Creating and calculating IBR_SCORE field for EOs...')
    arcpy.AddField_management(in_EOs, "IBR_SCORE", "LONG")
    codeblock = '''def score(ibr):
-      if ibr == "B1E":
+      # if ibr == "B1E":
+      #    return 256
+      if ibr.startswith("B1"):
          return 256
-      elif ibr == "B1":
-         return 256
-      elif ibr == "B2":
+      elif ibr.startswith("B2"):
          return 64
-      elif ibr == "B3":
+      elif ibr.startswith("B3"):
          return 16
-      elif ibr == "B4":
+      elif ibr.startswith("B4"):
          return 4
-      elif ibr == "B5":
+      elif ibr.startswith("B5"):
          return 1
       else:
          return 0
@@ -804,7 +815,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
          arcpy.SelectLayerByAttribute_management("eo_lyr", "NEW_SELECTION", where_clause=fld_ID + " = '" + siteID + "'")
          c = countSelectedFeatures("eo_lyr")
          if c > 0:
-            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE"], skip_nulls=True)
+            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE", "ELCODE"], skip_nulls=True)
             sm = arr["IBR_SCORE"].sum()
             mx = arr["IBR_SCORE"].max()
             row[2] = sm
@@ -835,11 +846,13 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
                mx_text = "EO contributing to site [UPDATE]-rank: " + lsu_ct[0] + "."
             else:
                mx_text = "EOs contributing to site [UPDATE]-rank: " + ", ".join(lsu_ct) + "."
-            endem_ct = sum(a.endswith("E") for a in arr["IBR"])
+            # "Endemic 1-EO" elements
+            endem_el = [a[4] for a in ls0 if a[0].endswith("E")]
+            endem_ct = len(endem_el)
             if endem_ct == 1:
-               mx_text += " Site contains the only known occurrence of an element."
+               mx_text += " Site contains the only known extant occurrence of an element (" + endem_el[0] + ")."
             elif endem_ct > 1:
-               mx_text += " Site contains the only known occurrences of " + str(endem_ct) + " elements."
+               mx_text += " Site contains the only known extant occurrences of " + str(endem_ct) + " elements (" + ", ".join(endem_el) + ")."
             # ibr_text = "IBR_SUM = " + str(sm) + "."
             row[4] = date_text + " " + mx_text  # + " " + ibr_text
             cursor.updateRow(row)
@@ -1655,14 +1668,14 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
    
    # Generic workflow for each ranking factor: 
-   #  - set up where_clause for still-Unassigned EOs, make a feature layer (lyr_EO)
+   #  - set up where_clause for still-Unassigned EOs, make a feature layer (lyr_EO). Note this excludes EOs where OVERRIDE < 0.
    #  - add ranks for the ranking field
    #  - update slots based on ranks. This updates the PORTFOLIO field of EOs.
    #  - update portfolio. This updates Consites, adds EOs to portfolio as bycatch, updates sumTab, and returns an updated available slotDict.
    
-   printMsg('Trying to fill remaining slots based on land protection status...')
+   printMsg('Trying to fill remaining slots based on land protection status (BMI score)...')
    if len(slotDict) > 0:
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
+      where_clause = "TIER = 'Unassigned' AND OVERRIDE > -1 AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       printMsg('Filling slots based on BMI score...')
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "BMI_score", "DESCENDING", "RANK_bmi", 5, "ABS")
@@ -1671,7 +1684,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
 
    if len(slotDict) > 0:
       printMsg('Filling slots based on presence on NAP...')
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
+      where_clause = "TIER = 'Unassigned' AND OVERRIDE > -1 AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "ysnNAP", "DESCENDING", "RANK_nap", 0.5, "ABS")
       slotDict = updateSlots("lyr_EO", slotDict, "RANK_nap")
@@ -1679,7 +1692,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
 
    if len(slotDict) > 0:
       printMsg('Filling slots based on overall site conservation value...')
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
+      where_clause = "TIER = 'Unassigned' AND OVERRIDE > -1 AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "CS_CONSVALUE", "DESCENDING", "RANK_csVal", 1, "ABS")
       slotDict = updateSlots("lyr_EO", slotDict, "RANK_csVal")
@@ -1687,7 +1700,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    
    if len(slotDict) > 0:
       printMsg('Updating tiers based on number of procedural features...')
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
+      where_clause = "TIER = 'Unassigned' AND OVERRIDE > -1 AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
       addRanks("lyr_EO", "COUNT_SFID", "DESCENDING", "RANK_numPF", 1, "ABS")
       slotDict = updateSlots("lyr_EO", slotDict, "RANK_numPF")
@@ -1695,9 +1708,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       
    if len(slotDict) > 0:
       printMsg('Filling slots based on EO size...')
-      where_clause = "TIER = 'Unassigned' AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
+      where_clause = "TIER = 'Unassigned' AND OVERRIDE > -1 AND PORTFOLIO = 0 AND ELCODE IN ('" + "','".join(list(slotDict.keys())) + "')"
       arcpy.MakeFeatureLayer_management(in_sortedEOs, "lyr_EO", where_clause)
-      addRanks("lyr_EO", "SHAPE_Area", "DESCENDING", "RANK_eoArea", 0.1, "ABS", 2)
+      # Headsup: we want this to break any remaining ties, which is why the threshold is such a small number.
+      addRanks("lyr_EO", "SHAPE_Area", "DESCENDING", "RANK_eoArea", 0.01, "ABS", 3)
       slotDict = updateSlots("lyr_EO", slotDict, "RANK_eoArea")
       slotDict = updatePortfolio(in_sortedEOs, in_ConSites, in_sumTab, slotDict=slotDict)
       

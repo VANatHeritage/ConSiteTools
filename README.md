@@ -6,14 +6,18 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-09-26):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-10-23):
 
 #### Version 2.4.x-dev
 
-Prioritization tools:
-- updated tier assignment, so that inclusion of EOs via bycatch will only be used if it does not result in the target being exceeded. Added a STATUS attribute to the element table to indicate portfolio status.
-- tweaked B-rank tool to allow other boundary polygons to be used
+Prioritization tools -> Build Conservation Portfolio tool:
+  - updated bycatch procedure so it will not exceed portfolio targets
+  - updated secondary ranking procedure so that lower-ranking EOs are excluded from subsequent rankings when there are enough higher-ranking EOs to fill open slots
+  - added a STATUS attribute to the element table to indicate portfolio status.
 
+B-rank tool:
+  - allow boundaries other than ConSites to be used
+  - updated B-rank comment text to include ELCODE(s) of endemic, 1-EO elements in site.
 
 #### Version 2.4
 
