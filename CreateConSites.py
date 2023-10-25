@@ -2,7 +2,7 @@
 # CreateConSites.py
 # Version:  ArcGIS Pro 3.0.x / Python 3.x
 # Creation Date: 2016-02-25
-# Last Edit: 2023-09-05
+# Last Edit: 2023-10-25
 # Creator:  Kirsten R. Hazler
 
 # Summary:
@@ -23,41 +23,63 @@ import re # support for regular expressions
 
 
 ### Functions for input data preparation and output data review ###
-def ExtractBiotics(BioticsPF, BioticsCS, outGDB):
-   '''Extracts data from Biotics5 query layers for Procedural Features and Conservation Sites and saves to a file geodatabase.
-   Note: this tool must be run from within a map document containing the relevant query layers.'''
+def ExtractBiotics(BioticsPF, BioticsCS, outGDB, ext=None):
+   """
+   Extracts data from Biotics5 query layers for Procedural Features and Conservation Sites and saves to a file geodatabase.
+   Note: this tool must be run from within a map document containing the relevant query layers.
+   :param BioticsPF: Input Biotics layer of Procedural Features
+   :param BioticsCS: Input Biotics layer of ConSites
+   :param outGDB: output geodatabase
+   :param ext: extent to extract. The default (None) will extract the full datasets.
+      If set, needs to be an extent object (i.e. output of the `getViewExtent` function).
+   :return: 
+   """
    # Local variables:
-   ts = datetime.now().strftime("%Y%m%d_%H%M%S") # timestamp
+   ts = datetime.now().strftime("%Y%m%d_%H%M%S")  # timestamp
    
    # Inform user
    printMsg('Patience grasshopper; this will take a few minutes...')
+   
+   # Projection info
+   outCoordSyst = "PROJCS['NAD_1983_Virginia_Lambert',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Lambert_Conformal_Conic'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-79.5],PARAMETER['Standard_Parallel_1',37.0],PARAMETER['Standard_Parallel_2',39.5],PARAMETER['Latitude_Of_Origin',36.0],UNIT['Meter',1.0]]"
+   transformMethod = "WGS_1984_(ITRF00)_To_NAD_1983"
+   inCoordSyst = "PROJCS['WGS_1984_Web_Mercator_Auxiliary_Sphere',GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Mercator_Auxiliary_Sphere'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',0.0],PARAMETER['Standard_Parallel_1',0.0],PARAMETER['Auxiliary_Sphere_Type',0.0],UNIT['Meter',1.0]]"
 
+   # Set up extent boxes (note the projection for PF extent)
+   if ext is not None:
+      extpf = ext.projectAs(inCoordSyst, transformMethod)
+      printMsg("Extracting layers for map extent only.")
+   else:
+      ext = None
+      extpf = None
+      printMsg("Extracting full layers.")
+   
    # Process: Copy Features (ConSites)
    printMsg('Copying ConSites...')
    outCS = outGDB + os.sep + 'ConSites_' + ts
-   arcpy.CopyFeatures_management(BioticsCS, outCS)
+   with arcpy.EnvManager(extent=ext):
+      arcpy.CopyFeatures_management(BioticsCS, outCS)
    printMsg('Conservation Sites successfully exported to %s' %outCS)
 
    # Process: Copy Features (ProcFeats)
    printMsg('Copying Procedural Features...')
    unprjPF = r'in_memory\unprjProcFeats'
-   arcpy.CopyFeatures_management(BioticsPF, unprjPF)
+   with arcpy.EnvManager(extent=extpf):
+      arcpy.CopyFeatures_management(BioticsPF, unprjPF)
    
    # Process: Project
    printMsg('Projecting ProcFeats features...')
    outPF = outGDB + os.sep + 'ProcFeats_' + ts
-   outCoordSyst = "PROJCS['NAD_1983_Virginia_Lambert',GEOGCS['GCS_North_American_1983',DATUM['D_North_American_1983',SPHEROID['GRS_1980',6378137.0,298.257222101]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Lambert_Conformal_Conic'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',-79.5],PARAMETER['Standard_Parallel_1',37.0],PARAMETER['Standard_Parallel_2',39.5],PARAMETER['Latitude_Of_Origin',36.0],UNIT['Meter',1.0]]"
-   transformMethod = "WGS_1984_(ITRF00)_To_NAD_1983"
-   inCoordSyst = "PROJCS['WGS_1984_Web_Mercator_Auxiliary_Sphere',GEOGCS['GCS_WGS_1984',DATUM['D_WGS_1984',SPHEROID['WGS_1984',6378137.0,298.257223563]],PRIMEM['Greenwich',0.0],UNIT['Degree',0.0174532925199433]],PROJECTION['Mercator_Auxiliary_Sphere'],PARAMETER['False_Easting',0.0],PARAMETER['False_Northing',0.0],PARAMETER['Central_Meridian',0.0],PARAMETER['Standard_Parallel_1',0.0],PARAMETER['Auxiliary_Sphere_Type',0.0],UNIT['Meter',1.0]]"
    arcpy.Project_management(unprjPF, outPF, outCoordSyst, transformMethod, inCoordSyst, "PRESERVE_SHAPE", "")
    printMsg('Procedural Features successfully exported to %s' %outPF)
    
-   # Summarize number of EOs by element for use in B-rank automation
-   printMsg("Counting number of EOs by Element...")
-   n_eos = r"in_memory\n_eos"
-   arcpy.Statistics_analysis(outPF, n_eos, [["SF_EOID", "UNIQUE"]], ["ELCODE"])
-   arcpy.AlterField_management(n_eos, "UNIQUE_SF_EOID", "ELEMENT_EOS", "ELEMENT_EOS")
-   arcpy.JoinField_management(outPF, "ELCODE", n_eos, "ELCODE", ["ELEMENT_EOS"])
+   if ext is None:
+      # Summarize number of EOs by element for use in B-rank automation
+      printMsg("Counting number of EOs by Element...")
+      n_eos = r"in_memory\n_eos"
+      arcpy.Statistics_analysis(outPF, n_eos, [["SF_EOID", "UNIQUE"]], ["ELCODE"])
+      arcpy.AlterField_management(n_eos, "UNIQUE_SF_EOID", "ELEMENT_EOS", "ELEMENT_EOS")
+      arcpy.JoinField_management(outPF, "ELCODE", n_eos, "ELCODE", ["ELEMENT_EOS"])
    
    return (outPF, outCS)
 

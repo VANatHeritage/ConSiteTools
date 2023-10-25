@@ -141,7 +141,7 @@ def main():
    
    # Build Elements List
    printMsg("Building elements list...")
-   BuildElementLists(in_cs, 'SITENAME', priorEOs, sumTab_upd, elementList, elementList_XLS)
+   BuildElementLists(priorConSites, 'SITENAME', priorEOs, sumTab_upd, elementList, elementList_XLS)
    
    # QC
    printMsg("QC'ing sites and EOs")

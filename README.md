@@ -19,6 +19,9 @@ B-rank tool:
   - allow boundaries other than ConSites to be used
   - updated B-rank comment text to include ELCODE(s) of endemic, 1-EO elements in site.
 
+Other:
+  - added parameter to `Extract Biotics` to optionally limit extracts to current map extent
+
 #### Version 2.4
 
 - VNHP began use of the automated biodiversity significance rank tool for site B-rank assignment. The setting was changed so that B-ranks are calculated in site delineation tools by default.

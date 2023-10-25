@@ -1,11 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.4.3-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.4.4-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-10-23
+# Last Edit: 2023-10-25
 # Creators:  Kirsten R. Hazler, David N. Bucklin
 
 # Summary:
@@ -76,9 +76,9 @@ def getViewExtent(set=True):
    except:
       if set:
          printMsg("Could not set processing extent. For better performance, make sure your map is open and set to appropriate view extent when you run this tool.")
-      viewExtent = None
+      ext = None
       pass
-   return viewExtent
+   return ext
 
 def setViewExtent(lyrName, zoomBuffer=0, selected=True):
    """
@@ -300,8 +300,10 @@ class extract_biotics(object):
       else:
          pass
       parm2 = defineParam('outGDB', "Output Geodatabase", "DEWorkspace", "Required", "Input")
+      # extent limiting
+      parm3 = defineParam("extOnly", "Limit extract to current map extent?", "GPBoolean", "Required", "Input", defaultVal=False)
 
-      parms = [parm0, parm1, parm2]
+      parms = [parm0, parm1, parm2, parm3]
       return parms
 
    def isLicensed(self):
@@ -324,8 +326,15 @@ class extract_biotics(object):
       # Set up parameter names and values
       declareParams(parameters)
       
+      if extOnly.lower() == "true":
+         ext = getViewExtent(False)
+         if ext is None:
+            printErr("Could not get current map extent. Ensure you have the Biotics map activated (close any open tables).")
+            return
+      else:
+         ext = None
       # Run the function
-      (outPF, outCS) = ExtractBiotics(BioticsPF, BioticsCS, outGDB)
+      (outPF, outCS) = ExtractBiotics(BioticsPF, BioticsCS, outGDB, ext)
       
       # Delete pre-existing layers, and display the output in the current map
       try:
@@ -339,8 +348,8 @@ class extract_biotics(object):
          for n in ["Biotics ProcFeats", "Biotics ConSites", "pfTerrestrial", "pfKarst", "pfStream", "pfAnthro", "csTerrestrial", "csKarst", "csStream", "csAnthro"]:
             if n in lnames:
                map.removeLayer(ldict[n])
-         map.addDataFromPath(outPF).name = "Biotics ProcFeats"
          map.addDataFromPath(outCS).name = "Biotics ConSites"
+         map.addDataFromPath(outPF).name = "Biotics ProcFeats"
       except:
          printMsg("Cannot add layers; no current map.")
       return
