@@ -11,16 +11,16 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 #### Version 2.4.x-dev
 
 Prioritization tools -> Build Conservation Portfolio tool:
-  - updated bycatch procedure so it will not exceed portfolio targets
-  - updated secondary ranking procedure so that lower-ranking EOs are excluded from subsequent rankings when there are enough higher-ranking EOs to fill open slots
-  - added a STATUS attribute to the element table to indicate portfolio status.
+  - updated bycatch procedure, to only add EOs when it does not exceed the portfolio target
+  - updated secondary ranking procedure so that lower-ranking EOs are excluded from subsequent rankings when the higher-ranking EOs can fill all slots
+  - added a STATUS attribute to the element table to indicate portfolio target status.
 
 B-rank tool:
-  - allow boundaries other than ConSites to be used
+  - allows boundaries other than ConSites to be used
   - updated B-rank comment text to include ELCODE(s) of endemic, 1-EO elements in site.
 
 Other:
-  - added parameter to `Extract Biotics` to optionally limit extracts to current map extent
+  - added checkbox parameter to `Extract Biotics` to limit extracts to current map extent
 
 #### Version 2.4
 

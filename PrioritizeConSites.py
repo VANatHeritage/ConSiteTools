@@ -649,8 +649,6 @@ def tierSummary(in_Bounds, fld_ID, in_EOs, summary_type="Text", out_field = "EEO
 ### MAIN FUNCTIONS ###
 def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    '''Automates the assignment of Biodiversity Ranks to conservation sites
-   NOTE: Should only be run on one site type at a time, with type-specific inputs.
-   
    Parameters:
    - in_PF = Input site-worthy procedural features for a specific site type
    - in_ConSites = Input conservation sites of the same site type as the PFs. This feature class will be modified.
@@ -1043,7 +1041,6 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
          are to be flagged with "Update Needed". However, this cutoff does not affect the ECS process.
    - out_procEOs: Output EOs with TIER scores and other attributes.
    - out_sumTab: Output table summarizing number of included EOs per element'''
-   
    scratchGDB = "in_memory"
    # Field holding generalized ecoregion text
    fld_RegCode = "GEN_REG"
@@ -1218,7 +1215,6 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
                r[1] = 0
             curs.updateRow(r)
    
-   # decide: below is an option to include ALL elements to this table, along with total and ineligible counts.
    printMsg("Summarizing...")
    arcpy.analysis.Frequency(out_procEOs, scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK", "EXCLUSION"])
    arcpy.management.PivotTable(scratchGDB + os.sep + "freq", ["ELCODE", "SNAME", "NEW_GRANK"], "EXCLUSION", "FREQUENCY", out_sumTab)
@@ -1250,9 +1246,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    for code in ecoregions:
       statsList.append([str(code), "SUM"])
    statsList.append(["BMI_score", "MEAN"])
-   # decide: Option to only include eligible EO elements in sumTab.
-   # arcpy.Statistics_analysis("lyr_EO", out_sumTab, statsList, ["ELCODE", "SNAME", "NEW_GRANK"])
-   # option below is for when sumTab includes ALL elements. In that case, fields are joined.
+
    eo_stats = scratchGDB + os.sep + "eo_stats"
    arcpy.Statistics_analysis("lyr_EO", eo_stats, statsList, ["ELCODE"])
    jfld = [a[1] + "_" + a[0] for a in statsList]
@@ -1902,10 +1896,10 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    
    # Output final layer
    arcpy.Sort_management(in_sortedEOs, out_sortedEOs, [["ELCODE", "ASCENDING"]] + fldList)
-   arcpy.DeleteField_management(out_sortedEOs, ["bycatch", "ORIG_FID", "ORIG_FID_1"])  # coulddo: delete other fields here if they are not needed.
+   arcpy.DeleteField_management(out_sortedEOs, ["bycatch", "ORIG_FID", "ORIG_FID_1"])
    
    arcpy.Sort_management(in_ConSites, out_ConSites, [["PORTFOLIO", "DESCENDING"], ["MIN_FinalRANK", "ASCENDING"], ["CS_CONSVALUE", "DESCENDING"]])
-   arcpy.DeleteField_management(out_ConSites, ["ORIG_FID"])  # coulddo: delete other fields here if they are not needed.
+   arcpy.DeleteField_management(out_ConSites, ["ORIG_FID"])
    
    arcpy.CopyRows_management(in_sumTab, out_sumTab)
    
