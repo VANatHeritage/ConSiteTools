@@ -335,12 +335,12 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
    for s in st:
       # Intersect ConSites with subset of EOs, and set PORTFOLIO to 1
       where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND (ChoiceRANK <= 4 OR PORTFOLIO = 1) AND OVERRIDE > -1"
-      arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
+      lyr_EO = arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
       where_clause = "SITE_TYPE_CS = '" + s + "' AND OVERRIDE > -1"
-      arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-      arcpy.SelectLayerByLocation_management("lyr_CS", "WITHIN_A_DISTANCE", "lyr_EO", slopFactor, "NEW_SELECTION", "NOT_INVERT")
-      arcpy.CalculateField_management("lyr_CS", "PORTFOLIO", 1, "PYTHON_9.3")
-      arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
+      lyr_CS = arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
+      arcpy.SelectLayerByLocation_management(lyr_CS, "WITHIN_A_DISTANCE", lyr_EO, slopFactor, "NEW_SELECTION", "NOT_INVERT")
+      arcpy.CalculateField_management(lyr_CS, "PORTFOLIO", 1, "PYTHON_9.3")
+      arcpy.CalculateField_management(lyr_EO, "PORTFOLIO", 1, "PYTHON_9.3")
       if bycatch:
          # Intersect Unassigned EOs with Portfolio ConSites, and set PORTFOLIO to 1
          if slotDict is not None:
@@ -349,14 +349,14 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
             where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE > -1 AND ELCODE IN ('" + "','".join(elcodes) + "')"
          else:
             where_clause = "SITE_TYPE_EO LIKE '%" + s + "%' AND TIER = 'Unassigned' AND PORTFOLIO = 0 AND OVERRIDE > -1"
-         arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
+         lyr_EO = arcpy.MakeFeatureLayer_management(in_procEOs, "lyr_EO", where_clause)
          where_clause = "SITE_TYPE_CS = '" + s + "' AND PORTFOLIO = 1"
-         arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
-         arcpy.SelectLayerByLocation_management("lyr_EO", "WITHIN_A_DISTANCE", "lyr_CS", slopFactor, "NEW_SELECTION", "NOT_INVERT")
+         lyr_CS = arcpy.MakeFeatureLayer_management(in_ConSites, "lyr_CS", where_clause)
+         arcpy.SelectLayerByLocation_management(lyr_EO, "WITHIN_A_DISTANCE", lyr_CS, slopFactor, "NEW_SELECTION", "NOT_INVERT")
          # headsup: below will remove bycatch selections if it is >open slots for the Element. This should ensure that portfolio cannot exceed target via bycatch.
          if slotDict is not None:
             # Find ELCODES to exclude from bycatch update (where more are selected than open slots)
-            arcpy.Statistics_analysis("lyr_EO", "in_memory/eo_ct", [["ELCODE", "UNIQUE"]], "ELCODE")
+            arcpy.Statistics_analysis(lyr_EO, "in_memory/eo_ct", [["ELCODE", "UNIQUE"]], "ELCODE")
             byDict = TabToDict("in_memory/eo_ct", "ELCODE", "FREQUENCY")
             rm = []
             for b in byDict:
@@ -364,11 +364,20 @@ def updatePortfolio(in_procEOs, in_ConSites, in_sumTab, slopFactor ="15 METERS",
                   rm.append(b)
             if len(rm) > 0:
                query = "ELCODE IN ('" + "','".join(rm) + "')"
-               arcpy.SelectLayerByAttribute_management("lyr_EO", "REMOVE_FROM_SELECTION", query)
+               # Now set  EOs to OVERRIDE = -2. This will exclude them from further rankings.
+               lyr_EO2 = arcpy.MakeFeatureLayer_management(lyr_EO, "lyr_EO2")
+               arcpy.SelectLayerByAttribute_management(lyr_EO2, "SWITCH_SELECTION")
+               arcpy.SelectLayerByAttribute_management(lyr_EO2, "SUBSET_SELECTION", query)
+               if countSelectedFeatures(lyr_EO2) > 0:
+                  # printMsg("override " + query)
+                  arcpy.CalculateField_management(lyr_EO2, "OVERRIDE", -2)
+                  del lyr_EO2
+               # Unselect the EOs from the original layer, so they will not be added to Portfolio
+               arcpy.SelectLayerByAttribute_management(lyr_EO, "REMOVE_FROM_SELECTION", query)
          # Update (remaining) selected EOs
-         if countSelectedFeatures("lyr_EO") > 0:
-            arcpy.CalculateField_management("lyr_EO", "PORTFOLIO", 1, "PYTHON_9.3")
-            arcpy.CalculateField_management("lyr_EO", "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
+         if countSelectedFeatures(lyr_EO) > 0:
+            arcpy.CalculateField_management(lyr_EO, "PORTFOLIO", 1, "PYTHON_9.3")
+            arcpy.CalculateField_management(lyr_EO, "bycatch", 1, field_type="SHORT")  # indicator used in EXT_TIER
    # Update sumTab and slotDict
    updateStatus(in_procEOs, in_sumTab)
    slotDict = buildSlotDict(in_sumTab)
