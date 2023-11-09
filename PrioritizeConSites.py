@@ -674,7 +674,14 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    # Dissolve procedural features on SF_EOID
    printMsg("Dissolving procedural features by EO ID...")
    in_EOs = scratchGDB + os.sep + "EOs"
-   dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "ELEMENT_EOS"]
+   pf_flds = GetFlds(pf_lyr)
+   if "ENDEMIC" not in pf_flds or "ELEMENT_EOS" not in pf_flds:
+      dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT"]
+      endemCalc = False
+      printMsg("ENDEMIC and/or ELEMENT_EOS fields not found. Will not incorporate exception for endemic, 1-EO elements.")
+   else:
+      dissFlds = ["SF_EOID", "ELCODE", "SNAME", "BIODIV_GRANK", "BIODIV_SRANK", "BIODIV_EORANK", "RNDGRNK", "EORANK", "EOLASTOBS", "FEDSTAT", "SPROT", "ENDEMIC", "ELEMENT_EOS"]
+      endemCalc = True
    arcpy.PairwiseDissolve_analysis(pf_lyr, in_EOs, dissFlds, [["SFID", "COUNT"], ["RULE", "CONCATENATE"]], "MULTI_PART", concatenation_separator=",")
    # Add SITE_TYPE_EO to EOs based on RULE
    AddTypes(in_EOs, "EO")
@@ -684,9 +691,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
    arcpy.AddField_management(in_EOs, "IBR", "TEXT", 3)
    # Searches elcodes for "CEGL" so it can treat communities a little differently than species.
    # Should it do the same for "ONBCOLONY" bird colonies?
-   # headsup: Includes the (currently disabled) exception for "only known occurrence of element", which will 
-   #  return a "[B-rank]E" rank for the EO. This exception excludes aquatic community EOs ("CAQU").
-   codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode, endem, numeo):
+   codeblock = '''def ibr(grank, srank, eorank, fstat, sstat, elcode):
       if eorank == "A":
          if grank == "G1":
             b = "B1"
@@ -739,13 +744,21 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
                b = "BU"
       else:
          b = "BU"
-      if endem == "Y" and numeo == 1 and elcode[:4] != "CAQU":
-         # b = "B1E"
-         b+="E"
       return b
    '''
-   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!, !ENDEMIC!, !ELEMENT_EOS!)"
+   expression = "ibr(!BIODIV_GRANK!, !BIODIV_SRANK!, !BIODIV_EORANK!, !FEDSTAT!, !SPROT!, !ELCODE!)"
    arcpy.management.CalculateField(in_EOs, "IBR", expression, "PYTHON3", codeblock)
+   
+   # headsup: Below adjusts IBR to account for the "only known occurrence of element" exception. This will 
+   #  return a "[B-rank]E" rank for the EO. This exception excludes aquatic community EOs ("CAQU").
+   if endemCalc:
+      expr = "ENDEMIC = 'Y' AND ELEMENT_EOS = 1 AND ELCODE NOT LIKE 'CAQU%'"
+      endemLyr = arcpy.MakeFeatureLayer_management(in_EOs, where_clause=expr)
+      ctEndem = countFeatures(endemLyr)
+      if ctEndem > 0:
+         printMsg(str(ctEndem) + " EO(s) were found meeting the 1-EO endemic exception. Make sure to review the AUTO_BRANK_COMMENT field for details.")
+         arcpy.management.CalculateField(endemLyr, "IBR", "!IBR! + 'E'")
+      del endemLyr
    
    ### For the EOs, calculate the IBR score
    printMsg('Creating and calculating IBR_SCORE field for EOs...')

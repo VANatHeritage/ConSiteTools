@@ -50,7 +50,6 @@ def ExtractBiotics(BioticsPF, BioticsCS, outGDB, ext=None):
       extpf = ext.projectAs(inCoordSyst, transformMethod)
       printMsg("Extracting layers for map extent only.")
    else:
-      ext = None
       extpf = None
       printMsg("Extracting full layers.")
    
@@ -73,13 +72,16 @@ def ExtractBiotics(BioticsPF, BioticsCS, outGDB, ext=None):
    arcpy.Project_management(unprjPF, outPF, outCoordSyst, transformMethod, inCoordSyst, "PRESERVE_SHAPE", "")
    printMsg('Procedural Features successfully exported to %s' %outPF)
    
-   if ext is None:
-      # Summarize number of EOs by element for use in B-rank automation
+   # Summarize number of EOs by element for use in B-rank automation. 
+   # Note the summary is done using the Biotics layer (not the extract).
+   try:
       printMsg("Counting number of EOs by Element...")
       n_eos = r"in_memory\n_eos"
-      arcpy.Statistics_analysis(outPF, n_eos, [["SF_EOID", "UNIQUE"]], ["ELCODE"])
+      arcpy.Statistics_analysis(BioticsPF, n_eos, [["SF_EOID", "UNIQUE"]], ["ELCODE"])
       arcpy.AlterField_management(n_eos, "UNIQUE_SF_EOID", "ELEMENT_EOS", "ELEMENT_EOS")
       arcpy.JoinField_management(outPF, "ELCODE", n_eos, "ELCODE", ["ELEMENT_EOS"])
+   except:
+      printWrng("Warning: could not calculate ELEMENT_EOS attribute, which is used for in B-rank calculations.")
    
    return (outPF, outCS)
 
