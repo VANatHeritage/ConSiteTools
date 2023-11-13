@@ -6,21 +6,21 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
 2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-10-23):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-11-13):
 
 #### Version 2.4.x-dev
 
+`Extract Biotics`: added checkbox parameter to allow limiting extracts to current map extent
+`Calculate BMI score`: added parameter to customize BMI ranks and weighting in BMI score.
+
 Prioritization tools -> Build Conservation Portfolio tool:
-  - updated bycatch procedure, to only add EOs when it does not exceed the portfolio target
-  - updated secondary ranking procedure so that lower-ranking EOs are excluded from subsequent rankings when the higher-ranking EOs can fill all slots
+  - bycatch and secondary rankings procedures altered so that only bycatch/top-ranking EOs move onward to the next ranking, when the number of EOs exceeds the target. 
+  - Portfolio selections are no longer allowed to exceed the target for the element (previously this was allowed through bycatch)
   - added a STATUS attribute to the element table to indicate portfolio target status.
 
 B-rank tool:
   - allows boundaries other than ConSites to be used
-  - updated B-rank comment text to include ELCODE(s) of endemic, 1-EO elements in site.
-
-Other:
-  - added checkbox parameter to `Extract Biotics` to limit extracts to current map extent
+  - updated AUTO_BRANK_COMMENT field text to include ELCODE(s) of endemic, 1-EO elements in site, when applicable
 
 #### Version 2.4
 

@@ -1,7 +1,7 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.4.6-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.4.7-dev"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
@@ -677,12 +677,18 @@ class calc_bmi(object):
       """Define parameters"""
       parm0 = defineParam("in_Feats", "Input polygon features", "GPFeatureLayer", "Required", "Input")
       parm1 = defineParam("fld_ID", "Polygon ID field", "Field", "Required", "Input")
-      paramFields(parm1, parm0, ['Short', 'Long', 'Text'])
+      paramFields(parm1, parm0, ['Short', 'Long', 'Text', 'Double'])
       
       parm2 = defineParam("in_BMI", "Input BMI Polygons", "GPFeatureLayer", "Required", "Input")
       parm3 = defineParam("fld_Basename", "Base name for output fields", "String", "Required", "Input", "PERCENT_BMI_")
       
-      parms = [parm0, parm1, parm2, parm3]
+      parm4 = defineParam("BMI_weights", "BMI Ranks and weights", "GPValueTable", "Required", "Input")
+      parm4.columns = [['GPLong', 'BMI Rank'], ['GPDouble', 'Weight']]
+      parm4.filters[1].type = 'ValueList'
+      parm4.values = [[1, 1.00], [2, 0.75], [3, 0.50], [4, 0.25]]
+      parm4.filters[0].list = [1, 2, 3, 4, 5]
+      
+      parms = [parm0, parm1, parm2, parm3, parm4]
       return parms
 
    def isLicensed(self):
@@ -704,8 +710,9 @@ class calc_bmi(object):
       """The source code of the tool."""
       # Set up parameter names and values
       declareParams(parameters)
+      BMI_weights_ls = [a.split(" ") for a in BMI_weights.split(";")]
       
-      ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename)
+      ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename, BMI_weights_ls)
       
       return in_Feats
   

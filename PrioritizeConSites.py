@@ -50,7 +50,7 @@ def TabulateBMI(in_Feats, fld_ID, in_BMI, BMI_values=[1, 2, 3, 4], fld_Basename 
    
    return in_Feats, bmi_flds
 
-def ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename="PERCENT_BMI_"):
+def ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename="PERCENT_BMI_", BMI_weights=[[1, 1], [2, 0.75], [3, 0.5], [4, 0.25]]):
    '''A helper function that tabulates the percentage of each input polygon covered by conservation lands with 
    specified BMI value, then calculates a composite BMI_score attribute.
    Parameters:
@@ -58,20 +58,21 @@ def ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename="PERCENT_BMI_"):
    - fld_ID: Field in input feature class serving as unique ID
    - in_BMI: Feature class with conservation lands, flattened by BMI level
    - fld_Basename: The baseline of the field name to be used to store percent of polygon covered by selected conservation lands of specified BMIs
+   - BMI_weights: List of BMI ranks and associated weights for the BMI score function
    ''' 
    # variables
-   BMI_values = [1, 2, 3, 4]  # BMI values to tabulate intersections for
    fld_score = 'BMI_score'  # Name of new BMI score field
-      
-   in_Feats, fldNames = TabulateBMI(in_Feats, fld_ID, in_BMI, BMI_values, fld_Basename)
-   printMsg("Calculating BMI score...")
-   # headsup: should this be rounded or truncated? int() truncates value to the integer, which is what originally was used.
-   codeblock = '''def score(bmi1, bmi2, bmi3, bmi4):
-      score = int(round(1.00*bmi1 + 0.75*bmi2 + 0.50*bmi3 + 0.25*bmi4))
-      return score'''
-   expression = 'score(!%s!, !%s!, !%s!, !%s!)'%(fldNames[1], fldNames[2], fldNames[3], fldNames[4])
-   arcpy.CalculateField_management(in_Feats, fld_score, expression, code_block=codeblock, field_type="SHORT")
    
+   # Extract BMI values used for scoring
+   BMI_values = [a[0] for a in BMI_weights]
+   in_Feats, fldNames = TabulateBMI(in_Feats, fld_ID, in_BMI, BMI_values, fld_Basename)
+   
+   printMsg("Calculating BMI score...")
+   # construct BMI score equation
+   eq = " + ".join(["!" + fld_Basename + str(a[0]) + "!*" + str(a[1]) for a in BMI_weights])
+   expression = "int(round(" + eq + "))"
+   arcpy.CalculateField_management(in_Feats, fld_score, expression, field_type="SHORT")
+   printMsg("BMI score calculated.")
    return in_Feats
 
 def addRanks(in_Table, fld_Sorting, order = 'ASCENDING', fld_Ranking='RANK', thresh = 5, threshtype = 'ABS', rounding = None, fld_rankOver="ELCODE"):
@@ -1786,7 +1787,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
                t = "High Priority - Secondary Ranking Selection"
       elif tier == "General":
          if choiceRank == 5:
-            t = "General - Swap Option"
+            t = "General - Bycatch/Secondary Ranking Demotion"
          else:
             t = "General"
       else:
@@ -1799,6 +1800,12 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       '''
    expression = "extTier(!EXCLUSION!, !TIER!, !EO_MODRANK!, !EORANK_NUM!, !RECENT!, !ChoiceRANK!, !bycatch!)"
    arcpy.CalculateField_management(in_sortedEOs, "EXT_TIER", expression, code_block=codeblock)
+   # Reset OVERRIDE -2 to 0
+   with arcpy.da.UpdateCursor(in_sortedEOs, ["OVERRIDE"]) as curs:
+      for r in curs:
+         if r[0] == -2:
+            r[0] = 0
+            curs.updateRow(r)
    
    # Fields: ECS_TIER and EEO_TIER. These include the final tier text to be stored in Biotics.
    # If join table doesn't exist, create it; otherwise just join FinalRank
