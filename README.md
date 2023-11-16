@@ -10,9 +10,6 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
 
 #### Version 2.4.x-dev
 
-`Extract Biotics`: added checkbox parameter to allow limiting extracts to current map extent
-`Calculate BMI score`: added parameter to customize BMI ranks and weighting in BMI score.
-
 Prioritization tools -> Build Conservation Portfolio tool:
   - bycatch and secondary rankings procedures altered so that only bycatch/top-ranking EOs move onward to the next ranking, when the number of EOs exceeds the target. 
   - Portfolio selections are no longer allowed to exceed the target for the element (previously this was allowed through bycatch)
@@ -21,6 +18,10 @@ Prioritization tools -> Build Conservation Portfolio tool:
 B-rank tool:
   - allows boundaries other than ConSites to be used
   - updated AUTO_BRANK_COMMENT field text to include ELCODE(s) of endemic, 1-EO elements in site, when applicable
+
+Other:
+  - `Extract Biotics`: added checkbox parameter to allow limiting extracts to current map extent
+  - `Calculate BMI score`: added parameters to allow for customization of field names and BMI rank weights
 
 #### Version 2.4
 

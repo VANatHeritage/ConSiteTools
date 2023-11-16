@@ -50,19 +50,17 @@ def TabulateBMI(in_Feats, fld_ID, in_BMI, BMI_values=[1, 2, 3, 4], fld_Basename 
    
    return in_Feats, bmi_flds
 
-def ScoreBMI(in_Feats, fld_ID, in_BMI, fld_Basename="PERCENT_BMI_", BMI_weights=[[1, 1], [2, 0.75], [3, 0.5], [4, 0.25]]):
+def ScoreBMI(in_Feats, fld_ID, in_BMI, fld_score="BMI_score", fld_Basename="PERCENT_BMI_", BMI_weights=[[1, 1], [2, 0.75], [3, 0.5], [4, 0.25]]):
    '''A helper function that tabulates the percentage of each input polygon covered by conservation lands with 
    specified BMI value, then calculates a composite BMI_score attribute.
    Parameters:
    - in_Feats: Feature class with polygons for which BMI should be tabulated
    - fld_ID: Field in input feature class serving as unique ID
    - in_BMI: Feature class with conservation lands, flattened by BMI level
+   - fld_score: New or existing field to populated with BMI scores
    - fld_Basename: The baseline of the field name to be used to store percent of polygon covered by selected conservation lands of specified BMIs
    - BMI_weights: List of BMI ranks and associated weights for the BMI score function
-   ''' 
-   # variables
-   fld_score = 'BMI_score'  # Name of new BMI score field
-   
+   '''    
    # Extract BMI values used for scoring
    BMI_values = [a[0] for a in BMI_weights]
    in_Feats, fldNames = TabulateBMI(in_Feats, fld_ID, in_BMI, BMI_values, fld_Basename)
@@ -1189,7 +1187,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
 
    # Tabulate intersection of EOs with military land
    printMsg("Tabulating intersection of EOs with military lands...")
-   where_clause = '"MATYPE" IN (\'Military Installation\', \'Military Recreation Area\', \'NASA Facility\', \'sold - Military Installation\', \'surplus - Military Installation\')'
+   where_clause = "MATYPE IN ('Military Installation', 'Military Recreation Area', 'NASA Facility', 'sold - Military Installation', 'surplus - Military Installation')"
    arcpy.MakeFeatureLayer_management(in_consLands, "lyr_Military", where_clause)
    # Dissolve to remove overlaps, so that percentage tabulations are correct
    milLands = scratchGDB + os.sep + "milLands"
@@ -1203,7 +1201,7 @@ def AttributeEOs(in_ProcFeats, in_elExclude, in_consLands, in_consLands_flat, in
    arcpy.JoinField_management(out_procEOs, "SF_EOID", TabInter_mil, "SF_EOID", "PERCENT_MIL")
    NullToZero(out_procEOs, "PERCENT_MIL")
    # Tabulate Intersection of EOs with conservation lands of specified BMI values
-   ScoreBMI(out_procEOs, "SF_EOID", in_consLands_flat, "PERCENT_BMI_")
+   ScoreBMI(out_procEOs, "SF_EOID", in_consLands_flat)
    
    # Field: ysnNAP
    printMsg("Categorizing intersection of EOs with Natural Area Preserves...")
@@ -1648,7 +1646,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       arcpy.CalculateField_management(in_ConSites, "CS_AREA_HA", expression, "PYTHON_9.3")
       
       # Tabulate Intersection of ConSites with conservation lands of specified BMI values, and score
-      ScoreBMI(in_ConSites, "SITEID", in_consLands_flat, "PERCENT_BMI_")
+      ScoreBMI(in_ConSites, "SITEID", in_consLands_flat)
       
       # Use spatial join to get summaries of EOs near ConSites. Note that a EO can be part of multiple consites, which is why one-to-many is used.
       SpatialJoin_byType(in_sortedEOs, in_ConSites, eo_cs, slopFactor)
