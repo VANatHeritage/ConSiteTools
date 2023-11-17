@@ -679,7 +679,7 @@ class calc_bmi(object):
       parm1 = defineParam("fld_ID", "Polygon ID field", "Field", "Required", "Input")
       paramFields(parm1, parm0, ['Short', 'Long', 'Text', 'Double'])
       
-      parm2 = defineParam("in_BMI", "Input BMI Polygons", "GPFeatureLayer", "Required", "Input")
+      parm2 = defineParam("in_BMI", "Input Conservation Land BMI polygons", "GPFeatureLayer", "Required", "Input")
       parm3 = defineParam("fld_score", "BMI score field name", "String", "Required", "Input", "BMI_score")
       parm4 = defineParam("fld_Basename", "Base name for output fields", "String", "Required", "Input", "PERCENT_BMI_")
 

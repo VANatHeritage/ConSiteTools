@@ -755,7 +755,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
       endemLyr = arcpy.MakeFeatureLayer_management(in_EOs, where_clause=expr)
       ctEndem = countFeatures(endemLyr)
       if ctEndem > 0:
-         printMsg(str(ctEndem) + " EO(s) were found meeting the 1-EO endemic exception. Make sure to review the AUTO_BRANK_COMMENT field for details.")
+         printWrng(str(ctEndem) + " EO(s) meet the 1-EO endemic criteria. The AUTO_BRANK_COMMENT field will indicate sites containing these EOs; however, these sites are NOT automatically assigned the B1 rank.")
          arcpy.management.CalculateField(endemLyr, "IBR", "!IBR! + 'E'")
       del endemLyr
    
@@ -815,14 +815,14 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
       # Handle multiple site types
       SpatialJoin_byType(in_EOs, tmpSites, eoSite, slopFactor)
    else:
-      printMsg("Input boundaries are not sites. Running standard spatial join.")
+      printMsg("Input boundaries are not ConSites. Running standard spatial join.")
       # headsup: use of "memory" below is to avoid a bug were IDs end up NULL for spatial joins run in in_memory workspace (as of Pro 3.1.3)
       arcpy.SpatialJoin_analysis(in_EOs, tmpSites, "memory/eoSite", "JOIN_ONE_TO_MANY", 
                                  "KEEP_COMMON", match_option="WITHIN_A_DISTANCE", search_radius=slopFactor)
       arcpy.ExportFeatures_conversion("memory/eoSite", eoSite)
    
    # Make layer
-   arcpy.MakeFeatureLayer_management(eoSite, "eo_lyr")
+   eo_lyr = arcpy.MakeFeatureLayer_management(eoSite, "eo_lyr")
    
    # Summarize sum, max, and ranks of best-ranked EOs
    printMsg("Calculating sum and max of EOs by site...")
@@ -830,11 +830,11 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
       for row in cursor:
          # myShp = row[0]
          siteID = row[1]
-         # arcpy.SelectLayerByLocation_management("eo_lyr", "INTERSECT", myShp, slopFactor, "NEW_SELECTION")
-         arcpy.SelectLayerByAttribute_management("eo_lyr", "NEW_SELECTION", where_clause=fld_ID + " = '" + siteID + "'")
-         c = countSelectedFeatures("eo_lyr")
+         query = fld_ID + " = '" + siteID + "'"
+         arr = arcpy.da.TableToNumPyArray(eo_lyr, ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE", "ELCODE"], 
+                                          where_clause=query, skip_nulls=True)
+         c = len(arr)
          if c > 0:
-            arr = arcpy.da.TableToNumPyArray("eo_lyr", ["IBR", "BIODIV_GRANK", "BIODIV_EORANK", "IBR_SCORE", "ELCODE"], skip_nulls=True)
             sm = arr["IBR_SCORE"].sum()
             mx = arr["IBR_SCORE"].max()
             row[2] = sm
@@ -869,11 +869,11 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
             endem_el = [a[4] for a in ls0 if a[0].endswith("E")]
             endem_ct = len(endem_el)
             if endem_ct == 1:
-               mx_text += " Site contains the only known extant occurrence of an element (" + endem_el[0] + ")."
+               mx_text += " Site contains the only known site-worthy occurrence of an element (" + endem_el[0] + ")."
             elif endem_ct > 1:
-               mx_text += " Site contains the only known extant occurrences of " + str(endem_ct) + " elements (" + ", ".join(endem_el) + ")."
-            # ibr_text = "IBR_SUM = " + str(sm) + "."
-            row[4] = date_text + " " + mx_text  # + " " + ibr_text
+               mx_text += " Site contains the only known site-worthy occurrences of " + str(endem_ct) + " elements (" + ", ".join(endem_el) + ")."
+            # Apply AUTO_BRANK_COMMENT text
+            row[4] = date_text + " " + mx_text
             cursor.updateRow(row)
          else:
             printMsg("Site %s: no EOs found."%siteID)
@@ -934,7 +934,7 @@ def getBRANK(in_PF, in_ConSites, slopFactor="15 Meters", flag=True):
          printMsg("No existing B-ranks available for comparison.")
 
    if len(failList) > 0:
-      printWrng("No associated EOs found for some sites: %s"%failList)
+      printWrng("No associated EOs found for some sites: %s"% (failList))
    printMsg('Finished.')
    return (in_ConSites)
 
@@ -1575,9 +1575,8 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
       0: No override (this is the default value).
    It is recommended that you always first build a new portfolio. Then, the output Prioritized EOs and Prioritized 
    Conservation Sites can be used as inputs for a portfolio update with overrides, producing new outputs. 
-      - Generally, only “Choice” (Now "High priority - EOs should have overrides applied. 
-      - In practice, manual overrides are expected to decrease efficiency and increase the number of sites and EOs in 
-      the portfolio, and should be used sparingly if at all.
+      - Generally, only "High priority" or "General" EOs should have overrides applied.
+      - In practice, manual overrides are expected to decrease efficiency and increase the number of sites and EOs in the portfolio, and should be used sparingly if at all.
    - slopFactor: Maximum distance allowable between features for them to still be considered coincident
    # headsup: build types other than NEW are not advised. Need to update this and updatePortfolio functions (i.e. reset tiers) for those to work properly.
    '''
@@ -1684,9 +1683,9 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    
    # Generic workflow for each ranking factor: 
    #  - set up where_clause for still-Unassigned EOs, make a feature layer (lyr_EO). Note this excludes EOs where OVERRIDE < 0.
-   #  - add ranks for the ranking field
+   #  - add ranks to those EOs in the ranking field
    #  - update slots based on ranks. This updates the PORTFOLIO field of EOs.
-   #  - update portfolio. This updates Consites, adds EOs to portfolio as bycatch, updates sumTab, and returns an updated available slotDict.
+   #  - update portfolio. This adds any new Consites, adds EOs to portfolio as bycatch, updates sumTab, and returns an updated slotDict.
    
    printMsg('Trying to fill remaining slots based on land protection status (BMI score)...')
    if len(slotDict) > 0:
