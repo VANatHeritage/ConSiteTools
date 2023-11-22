@@ -857,21 +857,26 @@ def ExpandPFselection(inPF_lyr, inCS_lyr, SearchDist):
    
    Parameters:
    - inPF_lyr: layer representing Procedural Features. Must have a selection on it.
-   - inCS_lyr: layer representing Conservaton Sites. Must be of same type as PFs.
+   - inCS_lyr: layer representing Conservation Sites. Must be of same type as PFs.
    - SearchDist: distance within which PFs should be added to the selection
    
    '''
    c = countSelectedFeatures(inPF_lyr)
    if c == 0:
       printErr("You need to have an active selection on the PF layer for this function to work.")
-   else:
+      return
+   c1 = c+1
+   # Loop process until no new PFs selected
+   while c < c1:
+      # Expand selection
       inPF_lyr = ExpandSelection(inPF_lyr, SearchDist)
-      
-   arcpy.management.SelectLayerByLocation(inCS_lyr, "INTERSECT", inPF_lyr, "", "NEW_SELECTION")
-   inPF_lyr = arcpy.management.SelectLayerByLocation(inPF_lyr, "INTERSECT", inCS_lyr, "", "ADD_TO_SELECTION")
-   
-   c = countSelectedFeatures(inPF_lyr)
-   printMsg("Update: %s PFs are selected"%str(c))
+      c = countSelectedFeatures(inPF_lyr)
+      # Select by ConSite
+      arcpy.management.SelectLayerByLocation(inCS_lyr, "INTERSECT", inPF_lyr, "", "NEW_SELECTION")
+      inPF_lyr = arcpy.management.SelectLayerByLocation(inPF_lyr, "INTERSECT", inCS_lyr, "", "ADD_TO_SELECTION")
+      # Check if selecting increased
+      c1 = countSelectedFeatures(inPF_lyr)
+      printMsg("Update: %s PFs are selected"%str(c1))
    
    return inPF_lyr
    
