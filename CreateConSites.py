@@ -871,12 +871,15 @@ def ExpandPFselection(inPF_lyr, inCS_lyr, SearchDist):
       # Expand selection
       inPF_lyr = ExpandSelection(inPF_lyr, SearchDist)
       c = countSelectedFeatures(inPF_lyr)
-      # Select by ConSite
-      arcpy.management.SelectLayerByLocation(inCS_lyr, "INTERSECT", inPF_lyr, "", "NEW_SELECTION")
-      inPF_lyr = arcpy.management.SelectLayerByLocation(inPF_lyr, "INTERSECT", inCS_lyr, "", "ADD_TO_SELECTION")
+      if inCS_lyr.lower() != "none":
+         # Select by ConSite
+         arcpy.management.SelectLayerByLocation(inCS_lyr, "INTERSECT", inPF_lyr, "", "NEW_SELECTION")
+         inPF_lyr = arcpy.management.SelectLayerByLocation(inPF_lyr, "INTERSECT", inCS_lyr, "", "ADD_TO_SELECTION")
+      else:
+         break
       # Check if selecting increased
       c1 = countSelectedFeatures(inPF_lyr)
-      printMsg("Update: %s PFs are selected"%str(c1))
+   printMsg("Update: %s PFs are selected"%str(c))
    
    return inPF_lyr
    
