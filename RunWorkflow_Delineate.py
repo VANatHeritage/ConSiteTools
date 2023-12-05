@@ -20,6 +20,7 @@ from CreateConSites import *
 
 def main():
    ### User-provided variables ###
+   # TODO: run 12/5/23
    
    # Specify which site type(s) to run.
    # Choices are: ("TCS", "AHZ", "SCS", "SCU")
@@ -27,7 +28,7 @@ def main():
 
    # Specify if you want QC process after site delineation.
    # Choices are Y or N
-   ysnQC = "N"
+   ysnQC = "Y"
    
    # Specify the cutoff percentage area difference, used to flag significantly changed site boundaries
    cutVal = 5
@@ -38,7 +39,7 @@ def main():
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
    projFolder = r'C:\David\proc\ConSites_statewide'
-   runName = 'statewideTCS_2_3_3dev'
+   runName = 'statewideTCS_2_5_prep'
    dt = datetime.now().strftime("%Y%m%d")
    outGDB = os.path.join(projFolder, runName + '_' + dt + '.gdb')
    
