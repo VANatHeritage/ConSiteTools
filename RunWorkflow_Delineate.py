@@ -39,7 +39,7 @@ def main():
    # Geodatabase for storing processing outputs
    # This will be created on the fly if it doesn't already exist
    projFolder = r'C:\David\proc\ConSites_statewide'
-   runName = 'statewideTCS_2_5_prep'
+   runName = 'statewideTCS_2_5'
    dt = datetime.now().strftime("%Y%m%d")
    outGDB = os.path.join(projFolder, runName + '_' + dt + '.gdb')
    

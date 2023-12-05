@@ -1,11 +1,11 @@
 # ----------------------------------------------------------------------------------------
 # ConSite-Tools.pyt
 # Toolbox version: set below. The toolbox version is printed during tool execution, also viewable in Pro with (right click toolbox -> Properties).
-tbx_version = "2.4.9-dev"  # scheme: major.minor[.bugfix/feature]
+tbx_version = "2.5"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-11-29
+# Last Edit: 2023-12-05
 # Creators:  Kirsten R. Hazler, David N. Bucklin
 
 # Summary:
