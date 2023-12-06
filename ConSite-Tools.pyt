@@ -5,7 +5,7 @@ tbx_version = "2.5"  # scheme: major.minor[.bugfix/feature]
 # ArcGIS version: Pro 3.x
 # Python version: 3.x
 # Creation Date: 2017-08-11
-# Last Edit: 2023-12-05
+# Last Edit: 2023-12-06
 # Creators:  Kirsten R. Hazler, David N. Bucklin
 
 # Summary:
@@ -766,9 +766,7 @@ class tabulate_exclusions(object):
 
    def getParameterInfo(self):
       """Define parameter definitions"""
-      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "GPValueTable", "Required", "Input")
-      parm00.columns = [["DEFile", "CSV Files"]]
-      parm00.filters[0].list = ["csv"]
+      parm00 = defineParam("in_Tabs", "Input Exclusion Tables (CSV)", "GPTableView", "Required", "Input", multiVal=True)
       parm01 = defineParam("out_Tab", "Output Element Exclusion Table", "DETable", "Required", "Output", "ElementExclusions")
 
       parms = [parm00, parm01]
@@ -1595,8 +1593,7 @@ class make_ecs_dir(object):
       # Set up parameter names and values
       declareParams(parameters)
       
-      in_elExclude_ls = in_elExclude.split(";")  # this is a multi-value, convert it to a list.
-      ig, og, sd, lyrs = MakeECSDir(output_path, in_conslands, in_elExclude_ls, in_PF, in_ConSites)
+      ig, og, sd, lyrs = MakeECSDir(output_path, in_conslands, in_elExclude, in_PF, in_ConSites)
       for l in lyrs:
          replaceLayer(l)
       return lyrs
@@ -1755,10 +1752,10 @@ class score_eo(object):
       parm02.filter.list = ["Local Database"]
       parm03 = defineParam("suf", "Output file suffix (optional)", "GPString", "Optional", "Input")
 
-      parm04 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
-      parm05 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+      parm04 = defineParam("ysnYear", "Use observation year as ranking factor?", "GPBoolean", "Required", "Input", "true")
+      # parm05 = defineParam("ysnMil", "Use military land as ranking factor?", "GPBoolean", "Required", "Input", "false")
 
-      parms = [parm00, parm01, parm02, parm03, parm04, parm05]
+      parms = [parm00, parm01, parm02, parm03, parm04]  #, parm05]
       return parms
 
    def isLicensed(self):
@@ -1800,7 +1797,7 @@ class score_eo(object):
       out_sortedEOs = os.path.join(out_gdb, 'scoredEOs' + suf2)
 
       # Run function
-      ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil, ysnYear)
+      ScoreEOs(in_procEOs, in_sumTab, out_sortedEOs, ysnMil="false", ysnYear=ysnYear)
       replaceLayer(out_sortedEOs)
 
       return (out_sortedEOs)

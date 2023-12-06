@@ -21,6 +21,7 @@ from CreateConSites import *
 def main():
    ### User-provided variables ###
    # TODO: run 12/5/23
+   # 1225 Protosites
    
    # Specify which site type(s) to run.
    # Choices are: ("TCS", "AHZ", "SCS", "SCU")

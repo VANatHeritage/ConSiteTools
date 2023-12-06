@@ -969,13 +969,20 @@ def MakeExclusionList(in_Tabs, out_Tab):
          
    # Append each of the input tables
    printMsg('Appending lists to master table...')
-   # First convert string to list if necessary
-   if type(in_Tabs) == str:
-      in_Tabs = in_Tabs.split(';')
-   for tab in in_Tabs:
-      arcpy.management.MakeTableView(tab, "tabView", "EXCLUDE = 1")
-      arcpy.management.Append("tabView", out_Tab, 'NO_TEST')
-      
+   
+   # Merge tables - this avoids issues with spaces in paths in in_Tabs.
+   arcpy.Merge_management(in_Tabs, "in_memory/tabView")
+   arcpy.TableSelect_analysis("in_memory/tabView", "in_memory/tabView1", "EXCLUDE = 1")
+   arcpy.management.Append("in_memory/tabView1", out_Tab, 'NO_TEST')
+   
+   # Error checking
+   try:
+      els = unique_values(out_Tab, "ELCODE")
+   except:
+      printWrng("Output created, but there may be null values in ELCODE field.")
+   else:
+      if any([len(e) != 10 for e in els]):
+         printWrng("Element exclusions table created, but there are invalid values in ELCODE field (less than 10 characters in length).")
    printMsg('Finished creating Element Exclusion table.')
 
 def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_ConSites=None):
@@ -991,8 +998,6 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
    :param in_ConSites: ConSites extract from Biotics (generated using 1: Extract Biotics data)
    :return: (input geodatabase, output geodatabase, spreadsheet directory, output datasets)
    """
-   if in_elExclude is None:
-      in_elExclude = []
    dt = datetime.today().strftime("%b%Y")
    wd = ecs_dir
    sd = os.path.join(wd, "Spreadsheets_" + dt)
@@ -1036,13 +1041,9 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
          arcpy.CopyFeatures_management(in_ConSites, cs_out)
          # out = ParseSiteTypes(pf_out, cs_out, ig)  # no longer need parsed layers
       out_lyrs += [pf_out, cs_out]
-   if len(in_elExclude) != 0:
+   if in_elExclude is not None:
       out = ig + os.sep + 'ElementExclusions'
-      if len(in_elExclude) > 1:
-         MakeExclusionList(in_elExclude, out)
-      else:
-         printMsg("Copying element exclusions table...")
-         arcpy.CopyRows_management(in_elExclude[0], out)
+      MakeExclusionList(in_elExclude, out)
       out_lyrs.append(out)
    printMsg("Finished preparation for ECS directory " + wd + ".")
    return ig, og, sd, out_lyrs
