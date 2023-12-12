@@ -4,10 +4,10 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 ## Getting started:
 This toolbox works best with ArcGIS Pro version 3+, though it may work with earlier versions. To use:
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
-2. In ArcGIS Pro, go to the **Catalog** pane. If applicable, remove the previous version of the ConSite Toolbox. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
-3. If you had a previous version of the ConSite Toolbox in your ArcGIS Pro project, restart ArcGIS Pro, to make sure the changes take effect!
+2. In ArcGIS Pro, go to the **Catalog** pane. If applicable, remove the previous version of the ConSite Toolbox from your project. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
+3. If you had a previous version of the ConSite Toolbox in your ArcGIS Pro project, restart ArcGIS Pro to make sure toolbox update takes effect!
 
-### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-12-06):
+### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-12-12):
 
 #### Version 2.5
 
@@ -16,9 +16,9 @@ This toolbox works best with ArcGIS Pro version 3+, though it may work with earl
   - bycatch and secondary rankings procedures altered so that only bycatch/top-ranking EOs move onward to the next ranking, when the number of EOs exceeds the target.
   - added a STATUS attribute to the element table to indicate portfolio target status
 - Calculate biodiversity rank:
-  - allows boundaries other than ConSites to be used
-  - updated AUTO_BRANK_COMMENT field text to include ELCODE(s) of endemic, 1-EO elements in site, when applicable
-- Extract Biotics: added checkbox parameter to only extract data for current map extent
+  - No longer requires that "Input Conservation Sites" to be a ConSite layer (other polygon layers can be used)
+  - updated the AUTO_BRANK_COMMENT field text to include ELCODE(s) of endemic, 1-EO elements in sites, when applicable
+- Extract Biotics: added a checkbox parameter to only extract data within the current map extent
 - Calculate BMI score: added parameters to allow for customization of field names and BMI rank weights
 
 #### Version 2.4
