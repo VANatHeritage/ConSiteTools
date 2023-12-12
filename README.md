@@ -4,7 +4,8 @@ ArcGIS toolbox and associated scripts for automated delineation of Virginia Natu
 ## Getting started:
 This toolbox works best with ArcGIS Pro version 3+, though it may work with earlier versions. To use:
 1. Download this repository (Code -> Download Zip). Unzip the contents to a new folder.
-2. In ArcGIS Pro, go to the **Catalog** pane. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
+2. In ArcGIS Pro, go to the **Catalog** pane. If applicable, remove the previous version of the ConSite Toolbox. Under **Project**, right click on **Toolboxes->Add Toolbox**, and select `ConSite-Tools.pyt` from the downloaded repository
+3. If you had a previous version of the ConSite Toolbox in your ArcGIS Pro project, restart ArcGIS Pro, to make sure the changes take effect!
 
 ### Toolbox Version Notes (notes last updated by D. Bucklin, 2023-12-06):
 
