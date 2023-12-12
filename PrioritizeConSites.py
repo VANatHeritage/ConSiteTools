@@ -968,7 +968,7 @@ def MakeExclusionList(in_Tabs, out_Tab):
       arcpy.management.AddField(out_Tab, field_name, field_type, '', '', field_length)
          
    # Append each of the input tables
-   printMsg('Appending lists to master table...')
+   printMsg('Appending list(s) to master table...')
    
    # Merge tables - this avoids issues with spaces in paths in in_Tabs.
    arcpy.Merge_management(in_Tabs, "in_memory/tabView")
@@ -981,8 +981,9 @@ def MakeExclusionList(in_Tabs, out_Tab):
    except:
       printWrng("Output created, but there may be null values in ELCODE field.")
    else:
-      if any([len(e) != 10 for e in els]):
-         printWrng("Element exclusions table created, but there are invalid values in ELCODE field (less than 10 characters in length).")
+      qc = [a for a in els if len(a) != 10]
+      if len(qc) > 0:
+         printWrng("Element exclusions table created, but there may be invalid ELCODEs: (" + ",".join(qc) + ")")
    printMsg('Finished creating Element Exclusion table.')
 
 def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_ConSites=None):
@@ -1014,7 +1015,7 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
       printMsg("Copying and repairing " + in_conslands + "...")
       out = ig + os.sep + 'conslands'
       arcpy.CopyFeatures_management(in_conslands, out)
-      arcpy.RepairGeometry_management(out, "DELETE_NULL", "ESRI")  # adding this because there can be topology issues in the source conslands layer
+      arcpy.RepairGeometry_management(out, "DELETE_NULL", "ESRI")  # added this because there can be topology issues in the source conslands layer
       out_lyrs.append(out)
       printMsg("Creating flat conslands layer...")
       out = ig + os.sep + 'conslands_flat'
@@ -1032,14 +1033,12 @@ def MakeECSDir(ecs_dir, in_conslands=None, in_elExclude=None, in_PF=None, in_Con
             printWrng("Error extracting data from Biotics. You will need to copy the ProcFeat and ConSite layers to the ECS Input GDB.")
          else:
             pass  # no longer need parsed layers
-            # out = ParseSiteTypes(pf_out, cs_out, ig)
       else:
          printMsg("Copying already-extracted Biotics data...")
          pf_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_PF)["catalogPath"])
          arcpy.CopyFeatures_management(in_PF, pf_out)
          cs_out = ig + os.sep + os.path.basename(arcpy.da.Describe(in_ConSites)["catalogPath"])
          arcpy.CopyFeatures_management(in_ConSites, cs_out)
-         # out = ParseSiteTypes(pf_out, cs_out, ig)  # no longer need parsed layers
       out_lyrs += [pf_out, cs_out]
    if in_elExclude is not None:
       out = ig + os.sep + 'ElementExclusions'
@@ -1900,7 +1899,7 @@ def BuildPortfolio(in_sortedEOs, out_sortedEOs, in_sumTab, out_sumTab, in_ConSit
    ["PORTFOLIO", "DESCENDING"]
    ]
    
-   # coulddo: not currently used and unlikely to implement. This would update all ranking fields using same ranking as before, but for ALL eligible EOs. 
+   # coulddo: not currently used and unlikely to implement. This would update all ranking fields using same ranking attributes as before, but for ALL eligible EOs. 
    #  The rankings are then used to provide a unique numeric rank ("EO Importance"), both overall and by eco-region. 
    #  Note that rankings are sorta slow. Running this will also overwrite the existing rank values in these fields (i.e. those used for tier assignments).
    if eoImportance:
